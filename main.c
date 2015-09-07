@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define RING_ITERATIONS 100
+
 void read_file(char* filename, char** buffer_ptr)
 {
 	long length;
@@ -71,21 +73,46 @@ void load_shaders(GLuint *program, const char* vert_source, const char* frag_sou
 
 void generate_rings(unsigned char *buffer, int size, int seed)
 {
-    srand(seed);
-    int gapsize = rand()%10 + 10;
-    int gap = rand()%(size-gapsize);
+    // Starting fill
     int i;
-    for (i=0;i<gap;++i)
+    for (i=0;i<size;++i)
     {
         buffer[i] = 255;
     }
-    for (i=gap;i<gap+gapsize;++i)
+    srand(seed);
+
+    // gap generation
+    const int max_gapsize = size/20;
+    for (i=0;i<RING_ITERATIONS;++i)
     {
-        buffer[i] = 0;
+        int gapsize = rand()%(max_gapsize);
+        int gap = rand()%(size-gapsize+1);
+        float gap_opacity = (rand()%256 / 255.0);
+        int j;
+        for (j=gap;j<gap+gapsize;++j)
+        {
+            buffer[j] *= gap_opacity;
+        }
     }
-    for (i=gap+gapsize;i<size;++i)
+    // brightness equalization
+    float mean = 0;
+    for (i=0;i<size;++i)
     {
-        buffer[i] = 255;
+        mean += buffer[i];
+    }
+    mean /= size;
+    float mul = 255.0/mean;
+    for (i=0;i<size;++i)
+    {
+        buffer[i] *= mul;
+    }
+
+    // fading
+    const int fade = size/40;
+    for (i=0;i<fade;++i)
+    {
+        buffer[size-i] *= i/(float)fade; 
+        buffer[i] *= i/(float)fade;
     }
 }
 
@@ -102,7 +129,8 @@ int main(void)
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+	//GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+    GLFWwindow* window = glfwCreateWindow(512, 512, "Roche", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -131,7 +159,7 @@ int main(void)
     free(frag_source);
 
     
-    const int ringsize = 2048;
+    const int ringsize = 128;
     unsigned char *rings = malloc(ringsize);
     generate_rings(rings, ringsize, 1909802985);
     GLuint ring_tex;
@@ -160,6 +188,8 @@ int main(void)
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
+    GLint ring_color_location = glGetUniformLocation(program, "ring_color");
+
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
@@ -167,6 +197,7 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(program);
+        glUniform4f(ring_color_location, 0.89, 0.84, 0.68, 1.0);
         glBindTexture(GL_TEXTURE_1D, ring_tex);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
