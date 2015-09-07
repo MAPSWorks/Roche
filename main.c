@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define RING_ITERATIONS 100
+#include "mat4.h"
 
-#define PI 3.141592
+#define RING_ITERATIONS 100
 
 void read_file(char* filename, char** buffer_ptr)
 {
@@ -246,21 +246,34 @@ int main(void)
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    float viewprojmat[] = {
-        1.0,0.0,0.0,0.0,
-        0.0,1.0,0.0,0.0,
-        0.0,0.0,1.0,0.0,
-        0.0,0.0,0.0,1.0};
+    float camera_pos[] = {0.5,0.1,0.1};
+    float camera_direction[] = {-1,0.0,0.0};
+    float camera_up[] = {0.0,0.0,1.0};
+
+    float viewprojmat[16];
 
     GLint ring_color_location = glGetUniformLocation(program_ring, "ring_color");
     GLint ring_viewprojmat_loc = glGetUniformLocation(program_ring, "viewprojMat");
     GLint planet_viewprojmat_loc = glGetUniformLocation(program_planet, "viewprojMat");
+
+    float angle = 0;
 
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
 		if (escape_key == GLFW_PRESS) break;
         glClear(GL_COLOR_BUFFER_BIT);
+
+        camera_direction[0] = cos(angle);
+        camera_direction[1] = sin(angle);
+
+        angle += 0.01;
+
+        float projmat[16];
+        mat4_pers(projmat, 40,ratio, 0.01,20);
+        float viewmat[16];
+        mat4_lookAt(viewmat, camera_pos, camera_direction, camera_up);
+        mat4_mul(projmat, viewmat, viewprojmat);
 
         glUseProgram(program_planet);
         glUniformMatrix4fv(planet_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
