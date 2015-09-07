@@ -3,8 +3,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define RING_ITERATIONS 100
+
+#define PI 3.141592
 
 void read_file(char* filename, char** buffer_ptr)
 {
@@ -116,6 +119,51 @@ void generate_rings(unsigned char *buffer, int size, int seed)
     }
 }
 
+void generate_planet(GLuint *vbo, GLuint *ibo)
+{
+    const int res = 64;
+
+    float theta, phi;
+
+    glGenBuffers(1, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo);
+    glBufferData(GL_ARRAY_BUFFER, (res+1)*res*24, NULL, GL_STATIC_DRAW);
+
+    int offset = 0;
+    for (phi=0;phi<=1.0;phi += 1.0/res)
+    {
+        float cosphi = cos(PI*(phi-0.5));
+        float sinphi = sin(PI*(phi-0.5));
+        for (theta=0;theta<1.0;theta += 1.0/res)
+        {
+            float costheta = cos(theta*PI*2);
+            float sintheta = sin(theta*PI*2);
+            float vertex_data[] = {cosphi*costheta*0.3, cosphi*sintheta*0.3, sinphi*0.3,1.0, theta, phi};
+            glBufferSubData(GL_ARRAY_BUFFER, offset*24, 24, vertex_data);
+            offset++;
+        }
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glGenBuffers(1, ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,res*res*6*4,NULL,GL_STATIC_DRAW);
+    int i,j;
+    offset=0;
+    for (i=0;i<res;++i)
+    {
+        for (j=0;j<res;++j)
+        {
+            int i1 = i+1;
+            int j1 = (j+1)%res;
+            int indices[] = {i*res + j, i1*res + j, i1*res + j1, i1*res+j1, i*res + j1, i*res + j};
+            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset*24, 24, indices);
+            offset++;
+        }
+    }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+}
+
 int main(void)
 {
 
@@ -150,11 +198,18 @@ int main(void)
     float ratio = width / (float) height;
     glViewport(0, 0, width, height);
     
-    GLuint program;
+    GLuint program_ring;
     char *vert_source, *frag_source;
+    read_file("ring.vert", &vert_source);
+    read_file("ring.frag", &frag_source);
+    load_shaders(&program_ring, vert_source, frag_source);
+    free(vert_source);
+    free(frag_source);
+
+    GLuint program_planet;
     read_file("planet.vert", &vert_source);
     read_file("planet.frag", &frag_source);
-    load_shaders(&program, vert_source, frag_source);
+    load_shaders(&program_planet, vert_source, frag_source);
     free(vert_source);
     free(frag_source);
 
@@ -185,10 +240,21 @@ int main(void)
     glBufferData(GL_ARRAY_BUFFER, sizeof(ring_pos),ring_pos,GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    GLuint planetvbo, planetibo;
+    generate_planet(&planetvbo, &planetibo);
+
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    GLint ring_color_location = glGetUniformLocation(program, "ring_color");
+    float viewprojmat[] = {
+        1.0,0.0,0.0,0.0,
+        0.0,1.0,0.0,0.0,
+        0.0,0.0,1.0,0.0,
+        0.0,0.0,0.0,1.0};
+
+    GLint ring_color_location = glGetUniformLocation(program_ring, "ring_color");
+    GLint ring_viewprojmat_loc = glGetUniformLocation(program_ring, "viewprojMat");
+    GLint planet_viewprojmat_loc = glGetUniformLocation(program_planet, "viewprojMat");
 
     while (!glfwWindowShouldClose(window))
     {
@@ -196,7 +262,18 @@ int main(void)
 		if (escape_key == GLFW_PRESS) break;
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(program);
+        glUseProgram(program_planet);
+        glUniformMatrix4fv(planet_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
+        glBindBuffer(GL_ARRAY_BUFFER, planetvbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planetibo);
+        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
+        glDrawElements(GL_TRIANGLES, 64*64*6,GL_UNSIGNED_INT, NULL);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        glUseProgram(program_ring);
+        glUniformMatrix4fv(ring_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
         glUniform4f(ring_color_location, 0.89, 0.84, 0.68, 1.0);
         glBindTexture(GL_TEXTURE_1D, ring_tex);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
