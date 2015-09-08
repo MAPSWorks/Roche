@@ -9,6 +9,8 @@
 
 #define RING_ITERATIONS 100
 
+#define PI 3.1415926
+
 void read_file(char* filename, char** buffer_ptr)
 {
 	long length;
@@ -177,8 +179,8 @@ int main(void)
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-	//GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-    GLFWwindow* window = glfwCreateWindow(512, 512, "Roche", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+    //GLFWwindow* window = glfwCreateWindow(512, 512, "Roche", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -197,6 +199,9 @@ int main(void)
     glfwGetFramebufferSize(window, &width, &height);
     float ratio = width / (float) height;
     glViewport(0, 0, width, height);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_BLEND);
     
     GLuint program_ring;
     char *vert_source, *frag_source;
@@ -227,12 +232,12 @@ int main(void)
     int escape_key;
 
     float ring_pos[] = 
-    {-1.0,-1.0,0.0,1.0,-1.0,-1.0,
+    { 0.0,-1.0,0.0,1.0,-0.0,-1.0,
      +1.0,-1.0,0.0,1.0,+1.0,-1.0,
      +1.0,+1.0,0.0,1.0,+1.0,+1.0,
      +1.0,+1.0,0.0,1.0,+1.0,+1.0,
-     -1.0,+1.0,0.0,1.0,-1.0,+1.0,
-     -1.0,-1.0,0.0,1.0,-1.0,-1.0};
+     -0.0,+1.0,0.0,1.0,-0.0,+1.0,
+     -0.0,-1.0,0.0,1.0,-0.0,-1.0};
 
     GLuint vbo;
     glGenBuffers(1,&vbo);
@@ -255,14 +260,21 @@ int main(void)
     GLint ring_color_location = glGetUniformLocation(program_ring, "ring_color");
     GLint ring_viewprojmat_loc = glGetUniformLocation(program_ring, "viewprojMat");
     GLint planet_viewprojmat_loc = glGetUniformLocation(program_planet, "viewprojMat");
+    GLint ring_modelmat_loc = glGetUniformLocation(program_ring, "modelMat");
+    GLint planet_modelmat_loc = glGetUniformLocation(program_planet, "modelMat");
 
     float angle = 0;
+
+    float planetmat[16];
+    mat4_iden(planetmat);
+    float ringmat[16];
+    mat4_iden(ringmat);
 
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
 		if (escape_key == GLFW_PRESS) break;
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         camera_direction[0] = cos(angle);
         camera_direction[1] = sin(angle);
@@ -275,18 +287,11 @@ int main(void)
         mat4_lookAt(viewmat, camera_pos, camera_direction, camera_up);
         mat4_mul(projmat, viewmat, viewprojmat);
 
-        glUseProgram(program_planet);
-        glUniformMatrix4fv(planet_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
-        glBindBuffer(GL_ARRAY_BUFFER, planetvbo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planetibo);
-        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
-        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
-        glDrawElements(GL_TRIANGLES, 64*64*6,GL_UNSIGNED_INT, NULL);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        ringmat[0] = -1;
 
         glUseProgram(program_ring);
         glUniformMatrix4fv(ring_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
+        glUniformMatrix4fv(ring_modelmat_loc, 1, GL_FALSE, ringmat);
         glUniform4f(ring_color_location, 0.89, 0.84, 0.68, 1.0);
         glBindTexture(GL_TEXTURE_1D, ring_tex);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -295,7 +300,32 @@ int main(void)
         glDrawArrays(GL_TRIANGLES, 0,6);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindTexture(GL_TEXTURE_1D, 0);
-        glUseProgram(0);
+
+        glUseProgram(program_planet);
+        glUniformMatrix4fv(planet_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
+        glUniformMatrix4fv(planet_modelmat_loc, 1, GL_FALSE, planetmat);
+        glBindBuffer(GL_ARRAY_BUFFER, planetvbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planetibo);
+        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
+        glDrawElements(GL_TRIANGLES, 64*64*6,GL_UNSIGNED_INT, NULL);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        ringmat[0] = 1;
+
+        glUseProgram(program_ring);
+        glUniformMatrix4fv(ring_viewprojmat_loc, 1, GL_FALSE, viewprojmat);
+        glUniformMatrix4fv(ring_modelmat_loc, 1, GL_FALSE, ringmat);
+        glUniform4f(ring_color_location, 0.89, 0.84, 0.68, 1.0);
+        glBindTexture(GL_TEXTURE_1D, ring_tex);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
+        glDrawArrays(GL_TRIANGLES, 0,6);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_1D, 0);
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
