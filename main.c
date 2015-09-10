@@ -79,46 +79,59 @@ void load_shaders(GLuint *program, const char* vert_source, const char* frag_sou
 void generate_rings(unsigned char *buffer, int size, int seed)
 {
     // Starting fill
-    int i;
-    for (i=0;i<size;++i)
+    int i,j;
+    const int ref_size = 4096;
+    float *ref_buffer = malloc(sizeof(float)*ref_size);
+    for (i=0;i<ref_size;++i)
     {
-        buffer[i] = 255;
+        ref_buffer[i] = 1.0;
     }
     srand(seed);
 
     // gap generation
-    const int max_gapsize = size/20;
+    const int max_gapsize = ref_size/20;
     for (i=0;i<RING_ITERATIONS;++i)
     {
         int gapsize = rand()%(max_gapsize);
-        int gap = rand()%(size-gapsize+1);
-        float gap_opacity = (rand()%256 / 255.0);
-        int j;
+        int gap = rand()%(ref_size-gapsize+1);
+        float gap_opacity = rand()%RAND_MAX/(float)RAND_MAX;
         for (j=gap;j<gap+gapsize;++j)
         {
-            buffer[j] *= gap_opacity;
+            ref_buffer[j] *= gap_opacity;
         }
     }
     // brightness equalization
     float mean = 0;
-    for (i=0;i<size;++i)
+    for (i=0;i<ref_size;++i)
     {
-        mean += buffer[i];
+        mean += ref_buffer[i];
     }
-    mean /= size;
-    float mul = 255.0/mean;
-    for (i=0;i<size;++i)
+    mean /= ref_size;
+    float mul = 1.0/mean;
+    for (i=0;i<ref_size;++i)
     {
-        buffer[i] *= mul;
+        ref_buffer[i] *= mul;
     }
 
     // fading
-    const int fade = size/40;
+    const int fade = ref_size/10;
     for (i=0;i<fade;++i)
     {
-        buffer[size-i] *= i/(float)fade; 
-        buffer[i] *= i/(float)fade;
+        ref_buffer[ref_size-i-1] *= i/(float)fade; 
+        ref_buffer[i] *= i/(float)fade;
     }
+    float scale = ref_size/(float)size;
+    for (i=0;i<size;++i)
+    {
+        float mean = 0.0;
+        for (j=i*scale;j<(i+1)*scale;++j)
+        {
+            mean += ref_buffer[j];
+        }
+        mean /= scale;
+        buffer[i] = (unsigned char)(mean*255);
+    }
+    free(ref_buffer);
 }
 
 void generate_planet(GLuint *vbo, GLuint *ibo)

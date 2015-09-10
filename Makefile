@@ -9,7 +9,7 @@ ROCHE=bin/roche.exe
 
 roche:$(ROCHE)
 
-bin/roche.exe: obj/main.o obj/glew.o obj/vec3.o obj/mat4.o
+bin/roche.exe: obj/main.o obj/glew.o obj/vec3.o obj/mat4.o obj/lodepng.o obj/opengl.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 obj/vec3.o: vec3.h
