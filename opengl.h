@@ -8,44 +8,57 @@ typedef struct
 {
     GLuint id;
     GLenum target;
-} Texture;
+} 
+Texture;
 
-void create_tex(Texture *tex, GLenum target);
+void create_tex(Texture *tex);
 void delete_tex(Texture *tex);
 void use_tex(Texture *tex, int unit);
-void image1d32_tex(Texture *tex,int width, void* data);
-void image1d24_tex(Texture *tex,int width, void* data);
-void image2d32_tex(Texture *tex,int width, int height, void* data);
-void image2d24_tex(Texture *tex,int width, int height, void* data);
+void image_tex(Texture *tex,int channels, int width, int height, void* data);
 
 typedef struct 
 {
     GLuint vbo,ibo;
-} Object;
+    int count;
+} 
+Object;
 
 void create_obj(Object *obj);
 void delete_obj(Object *obj);
-void update_obj(Object *obj, size_t size, void* data);
-void render_obj(Object *obj, void (*render_fun)(void), float *model_mat);
+void update_verts_obj(Object *obj, size_t size, void* data);
+void update_ind_obj(Object *obj, size_t size, int* data);
+void render_obj(Object *obj, void (*render_fun)(void));
 
-#define UNIFORM_MAX_CHARS 64
+typedef union
+{
+	void (*vec)(GLint location, GLsizei count, GLvoid *value);
+	void (*mat)(GLint location, GLsizei count, GLboolean transpose, GLvoid *value);
+} 
+UniformFunc;
+
+typedef struct 
+{
+	char* name;
+	GLint location;
+	GLint size;
+	int matrix; // boolean
+	UniformFunc func;
+}
+Uniform;
 
 typedef struct 
 {
     GLuint program;
-    char uniform_names[32*UNIFORM_MAX_CHARS];
-    GLint uniforms[32];
-} Shader;
+    Uniform *uniforms;
+    int uniform_count;
+} 
+Shader;
 
 void create_shader(Shader *s);
 void delete_shader(Shader *s);
 void load_shader(Shader *s,const char* vert_source, const char* frag_source);
-void uniform1f_shader(Shader *s, int id, void *value);
-void uniform2f_shader(Shader *s, int id, void *value);
-void uniform3f_shader(Shader *s, int id, void *value);
-void uniform4f_shader(Shader *s, int id, void *value);
-void uniform_matrix3_shader(Shader *s, int id, void *value);
-void uniform_matrix4_shader(Shader *s, int id, void *value);
-void uniform1i_shader(Shader *s, int id, void *value);
+void load_shader_from_file(Shader *s,const char* vert_filename, const char* frag_filename);
+void uniform(Shader *s, const char *name, void *value);
+void use_shader(Shader *s);
 
 #endif
