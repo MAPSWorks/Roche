@@ -6,7 +6,25 @@
 #include <math.h>
 
 #include "mat4.h"
+#include "vec3.h"
 #include "opengl.h"
+
+#ifdef LINUX
+#include <unistd.h>
+#endif
+#ifdef WINDOWS
+#include <windows.h>
+#endif
+
+void mySleep(int sleepMs)
+{
+#ifdef LINUX
+    usleep(sleepMs * 1000);   // usleep takes sleep time in us (1 millionth of a second)
+#endif
+#ifdef WINDOWS
+    Sleep(sleepMs);
+#endif
+}
 
 #define RING_ITERATIONS 100
 
@@ -31,6 +49,7 @@ void generate_rings(unsigned char *buffer, int size, int seed)
         int gapsize = rand()%(max_gapsize);
         int gap = rand()%(ref_size-gapsize+1);
         float gap_opacity = rand()%RAND_MAX/(float)RAND_MAX;
+        if (gap_opacity < 0.4) gap_opacity = 0.4;
         for (j=gap;j<gap+gapsize;++j)
         {
             ref_buffer[j] *= gap_opacity;
@@ -70,7 +89,15 @@ void generate_rings(unsigned char *buffer, int size, int seed)
     free(ref_buffer);
 }
 
+#define PLANET_STRIDE 24
+
 void render_planet()
+{
+    glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,PLANET_STRIDE,(GLvoid*)0);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,PLANET_STRIDE,(GLvoid*)16);
+}
+
+void render_rings()
 {
     glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
@@ -84,26 +111,26 @@ void generate_planet(Object *obj)
 
     glGenBuffers(1, &obj->vbo);
     glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
-    glBufferData(GL_ARRAY_BUFFER, (res+1)*res*24, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (res+1)*(res+1)*PLANET_STRIDE, NULL, GL_STATIC_DRAW);
 
     int offset = 0;
     for (phi=0;phi<=1.0;phi += 1.0/res)
     {
         float cosphi = cos(PI*(phi-0.5));
         float sinphi = sin(PI*(phi-0.5));
-        for (theta=0;theta<1.0;theta += 1.0/res)
+        for (theta=0;theta<=1.0;theta += 1.0/res)
         {
             float costheta = cos(theta*PI*2);
             float sintheta = sin(theta*PI*2);
-            float vertex_data[] = {cosphi*costheta*0.3, cosphi*sintheta*0.3, sinphi*0.3,1.0, theta, phi};
-            glBufferSubData(GL_ARRAY_BUFFER, offset*24, 24, vertex_data);
+            float vertex_data[] = {cosphi*costheta, cosphi*sintheta, sinphi,1.0, theta, 1.0-phi, };
+            glBufferSubData(GL_ARRAY_BUFFER, offset*PLANET_STRIDE, PLANET_STRIDE, vertex_data);
             offset++;
         }
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glGenBuffers(1, &obj->ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,res*res*6*4,NULL,GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,offset*24,NULL,GL_STATIC_DRAW);
     int i,j;
     offset=0;
     for (i=0;i<res;++i)
@@ -111,20 +138,39 @@ void generate_planet(Object *obj)
         for (j=0;j<res;++j)
         {
             int i1 = i+1;
-            int j1 = (j+1)%res;
-            int indices[] = {i*res + j, i1*res + j, i1*res + j1, i1*res+j1, i*res + j1, i*res + j};
+            int j1 = j+1;
+            int indices[] = {i*(res+1) + j, i1*(res+1) + j, i1*(res+1) + j1, i1*(res+1)+j1, i*(res+1) + j1, i*(res+1) + j};
             glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset*24, 24, indices);
             offset++;
         }
     }
     obj->count = offset*6;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
 
+void computeRingMatrix(float *ringmat, float *toward_view, float *rings_up)
+{
+    mat4_iden(ringmat);
+    vec3_norm(toward_view, toward_view);
+
+    float rings_right[3];
+    vec3_cross(rings_up, toward_view, rings_right);
+    vec3_norm(rings_right, rings_right);
+
+    float rings_x[3];
+    vec3_cross(rings_up, rings_right, rings_x);
+    vec3_norm(rings_x, rings_x);
+    int i;
+    for (i=0;i<3;++i)
+    {
+        ringmat[i*4] = rings_x[i];
+        ringmat[i*4+1] = rings_right[i];
+        ringmat[i*4+2] = rings_up[i];
+    }
 }
 
 int main(void)
 {
-
     if (!glfwInit())
         return -1;
 
@@ -134,6 +180,7 @@ int main(void)
 	glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+    glfwWindowHint(GLFW_SAMPLES, 16);
 
 	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
     //GLFWwindow* window = glfwCreateWindow(512, 512, "Roche", NULL, NULL);
@@ -158,6 +205,10 @@ int main(void)
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
     Shader ring_shader, planet_shader;
     create_shader(&ring_shader);
@@ -166,7 +217,7 @@ int main(void)
     load_shader_from_file(&ring_shader, "ring.vert", "ring.frag");
     load_shader_from_file(&planet_shader, "planet.vert", "planet.frag");
     
-    const int ringsize = 128;
+    const int ringsize = 2048;
     unsigned char *rings = malloc(ringsize);
     generate_rings(rings, ringsize, 1909802985);
 
@@ -193,23 +244,31 @@ int main(void)
     Object planet_obj;
     generate_planet(&planet_obj);
 
+    Texture earth_day, earth_clouds;
+    tex_load_from_file(&earth_day, "earth_land.png", 3);
+    tex_load_from_file(&earth_clouds, "earth_clouds.png", 3);
+
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    float camera_pos[] = {0.5,0.1,0.1};
-    float camera_direction[] = {-1,0.0,0.0};
+    float camera_pos[] = {-0.4,0.0,0.14};
+    float camera_direction[] = {0.0,0.0,0.0};
     float camera_up[] = {0.0,0.0,1.0};
 
-    float viewprojmat[16];
-
-    float angle = 0;
+    float angle = 1.0;
 
     float planetmat[16];
     mat4_iden(planetmat);
+    planetmat[0] = 0.3;
+    planetmat[5] = 0.3;
+    planetmat[10] = 0.3;
     float ringmat[16];
     mat4_iden(ringmat);
 
     float ring_color[] = {0.89, 0.84, 0.68, 1.0};
+    float light_dir[] = {1.0, -2.0, -0.8};
+    vec3_norm(light_dir, light_dir);
+    float cloud_disp[] = {0.0};
 
     while (!glfwWindowShouldClose(window))
     {
@@ -217,39 +276,60 @@ int main(void)
 		if (escape_key == GLFW_PRESS) break;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        camera_direction[0] = cos(angle);
-        camera_direction[1] = sin(angle);
+        camera_pos[0] = cos(angle)*0.6;
+        camera_pos[1] = sin(angle)*0.6;
 
-        angle += 0.01;
+        angle += 0.001;
+        cloud_disp[0] += 0.0001;
+        camera_pos[2] += 0.001;
 
         float projmat[16];
         mat4_pers(projmat, 40,ratio, 0.01,20);
         float viewmat[16];
         mat4_lookAt(viewmat, camera_pos, camera_direction, camera_up);
-        mat4_mul(projmat, viewmat, viewprojmat);
 
-        ringmat[0] = -1;
+        float toward_view[3]; int i;
+        for (i=0;i<3;++i) toward_view[i] = camera_pos[i];
+        float rings_up[] = {0,0,1};
+
+        computeRingMatrix(ringmat, toward_view, rings_up);
 
         use_shader(&ring_shader);
-        uniform(&ring_shader, "viewprojMat", viewprojmat);
+        uniform(&ring_shader, "projMat", projmat);
+        uniform(&ring_shader, "viewMat", viewmat);
         uniform(&ring_shader, "modelMat", ringmat);
         uniform(&ring_shader, "ring_color", ring_color);
         use_tex(&ring_tex,0);
-        render_obj(&ring_obj, render_planet);
+        render_obj(&ring_obj, render_rings);
 
         use_shader(&planet_shader);
-        uniform(&planet_shader, "viewprojMat", viewprojmat);
+        uniform(&planet_shader, "projMat", projmat);
+        uniform(&planet_shader, "viewMat", viewmat);
         uniform(&planet_shader, "modelMat", planetmat);
+        uniform(&planet_shader, "light_dir", light_dir);
+        int zero[] = {0};
+        int one[] = {1};
+        uniform(&planet_shader, "day_tex", zero);
+        uniform(&planet_shader, "clouds_tex", one);
+        uniform(&planet_shader, "cloud_disp", cloud_disp);
+        uniform(&planet_shader, "view_dir", camera_pos);
+        use_tex(&earth_day,0);
+        use_tex(&earth_clouds,1);
         render_obj(&planet_obj, render_planet);
 
-        ringmat[0] = 1;
+        for (i=0;i<3;++i) toward_view[i] = -toward_view[i];
+
+        computeRingMatrix(ringmat, toward_view, rings_up);
 
         use_shader(&ring_shader);
-        uniform(&ring_shader, "viewprojMat", viewprojmat);
+        uniform(&ring_shader, "projMat", projmat);
+        uniform(&ring_shader, "viewMat", viewmat);
         uniform(&ring_shader, "modelMat", ringmat);
         uniform(&ring_shader, "ring_color", ring_color);
         use_tex(&ring_tex,0);
-        render_obj(&ring_obj, render_planet);
+        render_obj(&ring_obj, render_rings);
+
+        mySleep(10);
         
         glfwSwapBuffers(window);
         glfwPollEvents();

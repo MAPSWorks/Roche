@@ -4,6 +4,7 @@
 #define PI 3.1415926
 
 #include <math.h>
+#include <stdio.h>
 
 void mat4_mul(float *m1, float *m2, float *m3)
 {
@@ -19,6 +20,16 @@ void mat4_mul(float *m1, float *m2, float *m3)
             }
         }
     }
+}
+
+void mat4_scale(float *m1, float *v1, float *m2)
+{
+    float m3[16];
+    mat4_iden(m3);
+    m3[0] = v1[0];
+    m3[5] = v1[1];
+    m3[10] = v1[2];
+    mat4_mul(m1,m3,m2);
 }
 
 void mat4_iden(float *m1)
@@ -40,9 +51,12 @@ void mat4_pers(float *m1, float fovy, float aspect, float near, float far)
     m1[15] = 0;
 }
 
-void mat4_lookAt(float *m1, float *eye, float *dir, float *up)
+void mat4_lookAt(float *m1, float *eye, float *center, float *up)
 {
+    float dir[3]; int i;
+    for (i=0;i<3;++i) dir[i] = -center[i] + eye[i];
     float dirn[3];
+    
     vec3_norm(dir, dirn);
     float upn[3];
     vec3_norm(up,upn);

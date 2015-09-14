@@ -15,6 +15,7 @@ void create_tex(Texture *tex);
 void delete_tex(Texture *tex);
 void use_tex(Texture *tex, int unit);
 void image_tex(Texture *tex,int channels, int width, int height, void* data);
+void tex_load_from_file(Texture *tex, const char *filename, int channels);
 
 typedef struct 
 {
