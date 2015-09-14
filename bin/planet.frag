@@ -45,7 +45,7 @@ void main(void)
 	angle = pow(angle, 3);
 
 	float cloud = texture(clouds_tex, cloud_offset + cloud_tex_offset).r;
-	float nightlights = clamp(-rawlight*12.0,0.0,1.0);
+	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
 	vec3 color = mix(day*light  + nightlights*texture(night_tex, pass_uv).rgb, vec3(light), cloud);
 	float rim = (angle*angle*angle);
 

@@ -103,7 +103,7 @@ void render_rings()
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
 }
 
-void generate_planet(Object *obj)
+void generate_sphere(Object *obj)
 {
     const int res = 64;
 
@@ -148,9 +148,9 @@ void generate_planet(Object *obj)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void computeRingMatrix(float *ringmat, float *toward_view, float *rings_up)
+void computeRingMatrix(float *ring_mat, float *toward_view, float *rings_up)
 {
-    mat4_iden(ringmat);
+    mat4_iden(ring_mat);
     vec3_norm(toward_view, toward_view);
 
     float rings_right[3];
@@ -163,9 +163,9 @@ void computeRingMatrix(float *ringmat, float *toward_view, float *rings_up)
     int i;
     for (i=0;i<3;++i)
     {
-        ringmat[i*4] = rings_x[i];
-        ringmat[i*4+1] = rings_right[i];
-        ringmat[i*4+2] = rings_up[i];
+        ring_mat[i*4] = rings_x[i];
+        ring_mat[i*4+1] = rings_right[i];
+        ring_mat[i*4+2] = rings_up[i];
     }
 }
 
@@ -206,16 +206,18 @@ int main(void)
     glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_CULL_FACE);
+    //glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
-    Shader ring_shader, planet_shader;
+    Shader ring_shader, planet_shader, skybox_shader;
     create_shader(&ring_shader);
     create_shader(&planet_shader);
+    create_shader(&skybox_shader);
 
     load_shader_from_file(&ring_shader, "ring.vert", "ring.frag");
     load_shader_from_file(&planet_shader, "planet.vert", "planet.frag");
+    load_shader_from_file(&skybox_shader, "skybox.vert", "skybox.frag");
     
     const int ringsize = 2048;
     unsigned char *rings = malloc(ringsize);
@@ -241,13 +243,15 @@ int main(void)
     update_verts_obj(&ring_obj, 24*4, ring_pos);
     update_ind_obj(&ring_obj, 6, ring_ind);
 
-    Object planet_obj;
-    generate_planet(&planet_obj);
+    Object planet_obj, skybox_obj;
+    generate_sphere(&planet_obj);
+    generate_sphere(&skybox_obj);
 
-    Texture earth_day, earth_clouds, earth_night;
+    Texture earth_day, earth_clouds, earth_night, skybox;
     tex_load_from_file(&earth_day, "earth_land.png", 3);
     tex_load_from_file(&earth_clouds, "earth_clouds.png", 3);
     tex_load_from_file(&earth_night, "earth_night.png", 3);
+    tex_load_from_file(&skybox, "space_skybox.png", 3);
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
@@ -258,18 +262,26 @@ int main(void)
 
     float angle = 1.0;
 
-    float planetmat[16];
-    mat4_iden(planetmat);
-    planetmat[0] = 0.3;
-    planetmat[5] = 0.3;
-    planetmat[10] = 0.3;
-    float ringmat[16];
-    mat4_iden(ringmat);
+    float planet_mat[16];
+    mat4_iden(planet_mat);
+    planet_mat[0] = 0.3;
+    planet_mat[5] = 0.3;
+    planet_mat[10] = 0.3;
+    float ring_mat[16];
+    mat4_iden(ring_mat);
+
+    float skybox_mat[16];
+    mat4_iden(skybox_mat);
+    skybox_mat[0] = 1800;
+    skybox_mat[5] = 1800;
+    skybox_mat[10] = 1800;
 
     float ring_color[] = {0.89, 0.84, 0.68, 1.0};
     float light_dir[] = {1.0, -2.0, -0.8};
     vec3_norm(light_dir, light_dir);
     float cloud_disp[] = {0.0};
+
+    float exposure[] = {1.0};
 
     while (!glfwWindowShouldClose(window))
     {
@@ -284,34 +296,51 @@ int main(void)
         cloud_disp[0] += 0.0004;
         //camera_pos[2] -= 0.001;
 
-        float projmat[16];
-        mat4_pers(projmat, 40,ratio, 0.01,20);
-        float viewmat[16];
-        mat4_lookAt(viewmat, camera_pos, camera_direction, camera_up);
+        if (glfwGetKey(window, GLFW_KEY_E)) exposure[0] -= 0.006;
+        if (glfwGetKey(window, GLFW_KEY_A)) exposure[0] += 0.006;
+
+        float proj_mat[16];
+        mat4_pers(proj_mat, 40,ratio, 0.01,2000);
+        float view_mat[16];
+        mat4_lookAt(view_mat, camera_pos, camera_direction, camera_up);
 
         float toward_view[3]; int i;
         for (i=0;i<3;++i) toward_view[i] = camera_pos[i];
         float rings_up[] = {0,0,1};
 
-        computeRingMatrix(ringmat, toward_view, rings_up);
+        computeRingMatrix(ring_mat, toward_view, rings_up);
 
         int zero[] = {0};
         int one[] = {1};
         int two[] = {2};
 
+        glCullFace(GL_BACK);
+        // SKYBOX RENDER
+        use_shader(&skybox_shader);
+        uniform(&skybox_shader, "projMat", proj_mat);
+        uniform(&skybox_shader, "viewMat", view_mat);
+        uniform(&skybox_shader, "modelMat", skybox_mat);
+        uniform(&skybox_shader, "exposure", exposure);
+        uniform(&skybox_shader, "tex", zero);
+        use_tex(&skybox,0);
+        render_obj(&skybox_obj, render_planet);
+
+        glCullFace(GL_FRONT);
+        // FAR RING RENDER
         use_shader(&ring_shader);
-        uniform(&ring_shader, "projMat", projmat);
-        uniform(&ring_shader, "viewMat", viewmat);
-        uniform(&ring_shader, "modelMat", ringmat);
+        uniform(&ring_shader, "projMat", proj_mat);
+        uniform(&ring_shader, "viewMat", view_mat);
+        uniform(&ring_shader, "modelMat", ring_mat);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
+        // PLANET RENDER
         use_shader(&planet_shader);
-        uniform(&planet_shader, "projMat", projmat);
-        uniform(&planet_shader, "viewMat", viewmat);
-        uniform(&planet_shader, "modelMat", planetmat);
+        uniform(&planet_shader, "projMat", proj_mat);
+        uniform(&planet_shader, "viewMat", view_mat);
+        uniform(&planet_shader, "modelMat", planet_mat);
         uniform(&planet_shader, "light_dir", light_dir);
         uniform(&planet_shader, "day_tex", zero);
         uniform(&planet_shader, "clouds_tex", one);
@@ -325,12 +354,13 @@ int main(void)
 
         for (i=0;i<3;++i) toward_view[i] = -toward_view[i];
 
-        computeRingMatrix(ringmat, toward_view, rings_up);
+        computeRingMatrix(ring_mat, toward_view, rings_up);
 
+        // NEAR RING RENDER
         use_shader(&ring_shader);
-        uniform(&ring_shader, "projMat", projmat);
-        uniform(&ring_shader, "viewMat", viewmat);
-        uniform(&ring_shader, "modelMat", ringmat);
+        uniform(&ring_shader, "projMat", proj_mat);
+        uniform(&ring_shader, "viewMat", view_mat);
+        uniform(&ring_shader, "modelMat", ring_mat);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         use_tex(&ring_tex,0);
