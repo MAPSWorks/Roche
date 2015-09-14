@@ -12,6 +12,6 @@ void main(void)
 	float minDist = 0.4;
     float dist = length(pass_uv);
     if (dist < minDist || dist > 1.0) discard;
-    float matter = textureLod(tex, (dist-minDist)/(1.0-minDist), log(pass_dist));
+    float matter = texture(tex, (dist-minDist)/(1.0-minDist)).r;
 	out_color = matter*ring_color;
 }

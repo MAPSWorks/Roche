@@ -6,6 +6,7 @@ in mat4 pass_tbn;
 
 uniform sampler2D day_tex;
 uniform sampler2D clouds_tex;
+uniform sampler2D night_tex;
 uniform float cloud_disp;
 
 uniform vec3 light_dir;
@@ -25,7 +26,8 @@ float max_angle = acos(CLOUD_ALT_RATIO)/(2*M_PI);
 
 void main(void)
 {
-	float light = clamp(dot(-light_dir, pass_normal),0.04,1.0);
+	float rawlight = dot(-light_dir, pass_normal);
+	float light = clamp(rawlight,0.04,1.0);
 	vec3 day = texture(day_tex,pass_uv).rgb;
 	vec2 cloud_offset = pass_uv + vec2(cloud_disp,0.0);
 
@@ -43,10 +45,11 @@ void main(void)
 	angle = pow(angle, 3);
 
 	float cloud = texture(clouds_tex, cloud_offset + cloud_tex_offset).r;
-	vec3 color = mix(day, vec3(1.0), cloud);
+	float nightlights = clamp(-rawlight*12.0,0.0,1.0);
+	vec3 color = mix(day*light  + nightlights*texture(night_tex, pass_uv).rgb, vec3(light), cloud);
 	float rim = (angle*angle*angle);
 
-	color = mix(color, sky_color, angle);
+	color = mix(color, sky_color*light, angle);
 
-	out_color = vec4(mix(color, sky_color*2, rim)*light, 1.0-(rim*rim*rim));
+	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
 }

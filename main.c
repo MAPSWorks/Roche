@@ -244,9 +244,10 @@ int main(void)
     Object planet_obj;
     generate_planet(&planet_obj);
 
-    Texture earth_day, earth_clouds;
+    Texture earth_day, earth_clouds, earth_night;
     tex_load_from_file(&earth_day, "earth_land.png", 3);
     tex_load_from_file(&earth_clouds, "earth_clouds.png", 3);
+    tex_load_from_file(&earth_night, "earth_night.png", 3);
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
@@ -279,9 +280,9 @@ int main(void)
         camera_pos[0] = cos(angle)*0.6;
         camera_pos[1] = sin(angle)*0.6;
 
-        angle += 0.001;
-        cloud_disp[0] += 0.0001;
-        camera_pos[2] += 0.001;
+        angle += 0.004;
+        cloud_disp[0] += 0.0004;
+        //camera_pos[2] -= 0.001;
 
         float projmat[16];
         mat4_pers(projmat, 40,ratio, 0.01,20);
@@ -294,11 +295,16 @@ int main(void)
 
         computeRingMatrix(ringmat, toward_view, rings_up);
 
+        int zero[] = {0};
+        int one[] = {1};
+        int two[] = {2};
+
         use_shader(&ring_shader);
         uniform(&ring_shader, "projMat", projmat);
         uniform(&ring_shader, "viewMat", viewmat);
         uniform(&ring_shader, "modelMat", ringmat);
         uniform(&ring_shader, "ring_color", ring_color);
+        uniform(&ring_shader, "tex", zero);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
@@ -307,14 +313,14 @@ int main(void)
         uniform(&planet_shader, "viewMat", viewmat);
         uniform(&planet_shader, "modelMat", planetmat);
         uniform(&planet_shader, "light_dir", light_dir);
-        int zero[] = {0};
-        int one[] = {1};
         uniform(&planet_shader, "day_tex", zero);
         uniform(&planet_shader, "clouds_tex", one);
+        uniform(&planet_shader, "night_tex", two);
         uniform(&planet_shader, "cloud_disp", cloud_disp);
         uniform(&planet_shader, "view_dir", camera_pos);
         use_tex(&earth_day,0);
         use_tex(&earth_clouds,1);
+        use_tex(&earth_night,2);
         render_obj(&planet_obj, render_planet);
 
         for (i=0;i<3;++i) toward_view[i] = -toward_view[i];
@@ -326,6 +332,7 @@ int main(void)
         uniform(&ring_shader, "viewMat", viewmat);
         uniform(&ring_shader, "modelMat", ringmat);
         uniform(&ring_shader, "ring_color", ring_color);
+        uniform(&ring_shader, "tex", zero);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
