@@ -102,7 +102,7 @@ void render_rings()
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
 }
 
-void generate_sphere(Object *obj)
+void generate_sphere(Object *obj, int exterior)
 {
     const int res = 64;
 
@@ -139,6 +139,11 @@ void generate_sphere(Object *obj)
             int i1 = i+1;
             int j1 = j+1;
             int indices[] = {i*(res+1) + j, i1*(res+1) + j, i1*(res+1) + j1, i1*(res+1)+j1, i*(res+1) + j1, i*(res+1) + j};
+            if (!exterior)
+            {
+                indices[1] = i*(res+1) + j1;
+                indices[4] = i1*(res+1) + j;
+            }
             glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset*24, 24, indices);
             offset++;
         }
@@ -203,7 +208,7 @@ int main(void)
     glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    //glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
@@ -241,8 +246,8 @@ int main(void)
     update_ind_obj(&ring_obj, 6, ring_ind);
 
     Object planet_obj, skybox_obj;
-    generate_sphere(&planet_obj);
-    generate_sphere(&skybox_obj);
+    generate_sphere(&planet_obj, 1);
+    generate_sphere(&skybox_obj, 0);
 
     Texture earth_day, earth_clouds, earth_night, skybox;
     tex_load_from_file(&earth_day, "earth_land.png", 3);
@@ -287,7 +292,7 @@ int main(void)
 
         angle += 0.004;
         cloud_disp[0] += 0.0004;
-        //camera_pos[2] -= 0.001;
+        camera_pos.v[2] -= 0.001;
 
         if (glfwGetKey(window, GLFW_KEY_E)) exposure[0] -= 0.006;
         if (glfwGetKey(window, GLFW_KEY_A)) exposure[0] += 0.006;
@@ -306,8 +311,6 @@ int main(void)
         int zero[] = {0};
         int one[] = {1};
         int two[] = {2};
-
-        glCullFace(GL_BACK);
         // SKYBOX RENDER
         use_shader(&skybox_shader);
         uniform(&skybox_shader, "projMat", proj_mat.v);
@@ -318,7 +321,6 @@ int main(void)
         use_tex(&skybox,0);
         render_obj(&skybox_obj, render_planet);
 
-        glCullFace(GL_FRONT);
         // FAR RING RENDER
         use_shader(&ring_shader);
         uniform(&ring_shader, "projMat", proj_mat.v);
@@ -365,9 +367,15 @@ int main(void)
 
     delete_shader(&ring_shader);
     delete_shader(&planet_shader);
+
     delete_tex(&ring_tex);
-    
+    delete_tex(&earth_day);
+    delete_tex(&earth_night);
+    delete_tex(&earth_clouds);
+    delete_tex(&skybox);
+
     delete_obj(&ring_obj);
+    delete_obj(&planet_obj);
 
     glfwTerminate();
     return 0;

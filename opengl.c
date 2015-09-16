@@ -169,12 +169,13 @@ void image_tex(Texture *tex,int channels, int width, int height, void* data)
 	else
 		glTexImage2D(tex->target, 0, channels, width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(tex->target);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
+	glTexParameteri(tex->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(tex->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    /*glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
     float aniso = 0.0f;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso); 
+    glTexParameterf(tex->target, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+    glBindTexture(tex->target, 0);*/
 }
 
 void tex_load_from_file(Texture *tex, const char *filename, int channels)

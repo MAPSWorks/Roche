@@ -1,6 +1,5 @@
 #version 330
 in vec2 pass_uv;
-in float pass_dist;
 
 uniform sampler1D tex;
 uniform vec4 ring_color;
@@ -12,6 +11,6 @@ void main(void)
 	float minDist = 0.4;
     float dist = length(pass_uv);
     if (dist < minDist || dist > 1.0) discard;
-    float matter = texture(tex, (dist-minDist)/(1.0-minDist)).r;
-	out_color = matter*ring_color;
+    float matter = texture(tex, (dist-minDist)/(1.0-minDist));
+	out_color = ring_color * vec4(vec3(1),matter);
 }
