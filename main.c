@@ -224,10 +224,11 @@ int main(void)
     const int ringsize = 2048;
     unsigned char *rings = malloc(ringsize);
     generate_rings(rings, ringsize, 1909802985);
+    int i;
 
     Texture ring_tex;
     create_tex(&ring_tex);
-    image_tex(&ring_tex, 1, ringsize, 0, (void*)rings);
+    image_tex(&ring_tex, 1, ringsize, 1, (void*)rings);
     free(rings);
     int escape_key;
 
@@ -258,7 +259,7 @@ int main(void)
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    vec3 camera_pos = vec3n(-0.4,0.0,0.14);
+    vec3 camera_pos = vec3n(-0.4,0.0,1.0);
     vec3 camera_direction = vec3n(0.0,0.0,0.0);
     vec3 camera_up = vec3n(0.0,0.0,1.0);
 
@@ -312,6 +313,7 @@ int main(void)
         int one[] = {1};
         int two[] = {2};
         // SKYBOX RENDER
+        
         use_shader(&skybox_shader);
         uniform(&skybox_shader, "projMat", proj_mat.v);
         uniform(&skybox_shader, "viewMat", view_mat.v);
@@ -319,7 +321,7 @@ int main(void)
         uniform(&skybox_shader, "exposure", exposure);
         uniform(&skybox_shader, "tex", zero);
         use_tex(&skybox,0);
-        render_obj(&skybox_obj, render_planet);
+        render_obj(&skybox_obj, render_planet); 
 
         // FAR RING RENDER
         use_shader(&ring_shader);

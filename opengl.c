@@ -153,7 +153,7 @@ GLenum format(int channels)
 {
 	switch (channels)
 	{
-		case 1: return GL_R;
+		case 1: return GL_DEPTH_COMPONENT;
 		case 2: return GL_RG;
 		case 3: return GL_RGB;
 		case 4: return GL_RGBA;
@@ -162,12 +162,8 @@ GLenum format(int channels)
 }
 void image_tex(Texture *tex,int channels, int width, int height, void* data)
 {
-	if (height<=1) tex->target = GL_TEXTURE_1D;
 	glBindTexture(tex->target, tex->id);
-	if (height<=1)
-		glTexImage1D(tex->target, 0, channels, width, 0, format(channels),GL_UNSIGNED_BYTE, data);
-	else
-		glTexImage2D(tex->target, 0, channels, width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
+	glTexImage2D(tex->target, 0, channels, width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(tex->target);
 	glTexParameteri(tex->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(tex->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
