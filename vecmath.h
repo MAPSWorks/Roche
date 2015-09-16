@@ -22,7 +22,13 @@ mat4 mat4_iden();
 mat4 mat4_pers(float fovy, float aspect, float near, float far);
 mat4 mat4_lookAt(vec3 eye, vec3 dir, vec3 up);
 
+void mat4_print(mat4 m);
+
 vec3 vec3n(float x, float y, float z);
+vec3 vec3_cpy(vec3 v);
+vec3 vec3_add(vec3 v1, vec3 v2);
+vec3 vec3_inv(vec3 v);
+vec3 vec3_mul(vec3 v, float f); 
 vec3 vec3_cross(vec3 v1, vec3 v2);
 float vec3_dot(vec3 v1, vec3 v2);
 float vec3_len(vec3 v);

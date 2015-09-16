@@ -56,11 +56,7 @@ mat4 mat4_pers(float fovy, float aspect, float near, float far)
 
 mat4 mat4_lookAt(vec3 eye, vec3 center, vec3 up)
 {
-    int i;
-    vec3 dir;
-    for (i=0;i<3;++i) dir.v[i] = -center.v[i] + eye.v[i];
-
-    dir = vec3_norm(dir);
+    vec3 dir = vec3_norm(vec3_add(eye, vec3_inv(center)));
     up = vec3_norm(up);
 
     vec3 right = vec3_cross(up, dir);
@@ -79,6 +75,14 @@ mat4 mat4_lookAt(vec3 eye, vec3 center, vec3 up)
     return m1;
 }
 
+void mat4_print(mat4 m)
+{
+    printf("[%f,%f,%f,%f\n" , m.v[0] ,m.v[4] ,m.v[8] ,m.v[12]);
+    printf(" %f,%f,%f,%f\n" , m.v[1] ,m.v[5] ,m.v[9] ,m.v[13]);
+    printf(" %f,%f,%f,%f\n" , m.v[2] ,m.v[6] ,m.v[10],m.v[14]);
+    printf(" %f,%f,%f,%f]\n", m.v[3] ,m.v[7] ,m.v[11],m.v[15]);
+}
+
 vec3 vec3n(float x, float y, float z)
 {
     vec3 v;
@@ -86,6 +90,26 @@ vec3 vec3n(float x, float y, float z)
     v.v[1] = y; 
     v.v[2] = z; 
     return v;
+}
+
+vec3 vec3_cpy(vec3 v)
+{
+    return vec3n(v.v[0], v.v[1], v.v[2]);
+}
+
+vec3 vec3_add(vec3 v1, vec3 v2)
+{
+    return vec3n(v1.v[0] + v2.v[0], v1.v[1] + v2.v[1], v1.v[2] + v2.v[2]);
+}
+
+vec3 vec3_inv(vec3 v)
+{
+    return vec3n(-v.v[0], -v.v[1], -v.v[2]);
+}
+
+vec3 vec3_mul(vec3 v, float f)
+{
+    return vec3n(v.v[0]*f, v.v[1]*f, v.v[2]*f);
 }
 
 vec3 vec3_cross(vec3 v1, vec3 v2)

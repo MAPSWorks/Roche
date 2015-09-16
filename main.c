@@ -147,16 +147,15 @@ void generate_sphere(Object *obj)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void computeRingMatrix(mat4 ring_mat, vec3 toward_view, vec3 rings_up)
+mat4 computeRingMatrix(vec3 toward_view, vec3 rings_up)
 {
-    ring_mat = mat4_iden();
+    mat4 ring_mat = mat4_iden();
+    rings_up = vec3_norm(rings_up);
     toward_view = vec3_norm(toward_view);
 
-    vec3 rings_right = vec3_cross(rings_up, toward_view);
-    rings_right = vec3_norm(rings_right);
+    vec3 rings_right = vec3_norm(vec3_cross(rings_up, toward_view));
 
-    vec3 rings_x = vec3_cross(rings_up, rings_right);
-    rings_x = vec3_norm(rings_x);
+    vec3 rings_x = vec3_norm(vec3_cross(rings_up, rings_right));
     int i;
     for (i=0;i<3;++i)
     {
@@ -164,6 +163,7 @@ void computeRingMatrix(mat4 ring_mat, vec3 toward_view, vec3 rings_up)
         ring_mat.v[i*4+1] = rings_right.v[i];
         ring_mat.v[i*4+2] = rings_up.v[i];
     }
+    return ring_mat;
 }
 
 int main(void)
@@ -259,9 +259,7 @@ int main(void)
 
     float angle = 1.0;
 
-    float planet_size = 0.3;
-    vec3 planet_scale = vec3n(planet_size, planet_size, planet_size);
-
+    vec3 planet_scale = vec3_mul(vec3n(1,1,1),0.3);
     mat4 planet_mat = mat4_iden();
     planet_mat = mat4_scale(planet_mat, planet_scale);
 
@@ -270,7 +268,7 @@ int main(void)
     vec3 anglerot = vec3n(1,0,0);
     quat skybox_rot = quat_rot(anglerot, 60.0/180.0*PI);
     mat4 skybox_mat = quat_tomatrix(skybox_rot);
-    skybox_mat = mat4_scale(skybox_mat,vec3n(1800,1800,1800));
+    skybox_mat = mat4_scale(skybox_mat,vec3_mul(vec3n(1,1,1),1800));
 
     float ring_color[] = {0.89, 0.84, 0.68, 1.0};
     vec3 light_dir = vec3_norm(vec3n(1.0, -2.0, -0.8));
@@ -300,11 +298,10 @@ int main(void)
         mat4 proj_mat = mat4_pers(40,ratio, 0.01,2000);
         mat4 view_mat = mat4_lookAt(camera_pos, camera_direction, camera_up);
 
-        vec3 toward_view; int i;
-        for (i=0;i<3;++i) toward_view.v[i] = camera_pos.v[i];
+        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_direction)));
         vec3 rings_up = vec3n(0,0,1);
 
-        computeRingMatrix(ring_mat, toward_view, rings_up);
+        ring_mat = computeRingMatrix(toward_view, rings_up);
 
         int zero[] = {0};
         int one[] = {1};
@@ -348,9 +345,7 @@ int main(void)
         use_tex(&earth_night,2);
         render_obj(&planet_obj, render_planet);
 
-        for (i=0;i<3;++i) toward_view.v[i] = -toward_view.v[i];
-
-        computeRingMatrix(ring_mat, toward_view, rings_up);
+        ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up);
 
         // NEAR RING RENDER
         use_shader(&ring_shader);
