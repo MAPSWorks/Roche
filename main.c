@@ -224,7 +224,6 @@ int main(void)
     const int ringsize = 2048;
     unsigned char *rings = malloc(ringsize);
     generate_rings(rings, ringsize, 1909802985);
-    int i;
 
     Texture ring_tex;
     create_tex(&ring_tex);
@@ -239,12 +238,12 @@ int main(void)
      -0.0,+1.0,0.0,1.0,-0.0,+1.0,
     };
 
-    int ring_ind[] = {0,1,2,2,3,0};
+    int ring_ind[] = {0,1,2,2,3,0,0,3,2,2,1,0};
 
     Object ring_obj;
     create_obj(&ring_obj);
     update_verts_obj(&ring_obj, 24*4, ring_pos);
-    update_ind_obj(&ring_obj, 6, ring_ind);
+    update_ind_obj(&ring_obj, 12, ring_ind);
 
     Object planet_obj, skybox_obj;
     generate_sphere(&planet_obj, 1);
@@ -265,6 +264,9 @@ int main(void)
 
     float angle = 1.0;
 
+    float ring_outer = 0.6;
+    float ring_inner = 0.4;
+    float ring_mindist[] = {ring_inner/ring_outer};
     vec3 planet_scale = vec3_mul(vec3n(1,1,1),0.3);
     mat4 planet_mat = mat4_iden();
     planet_mat = mat4_scale(planet_mat, planet_scale);
@@ -276,7 +278,8 @@ int main(void)
     mat4 skybox_mat = quat_tomatrix(skybox_rot);
     skybox_mat = mat4_scale(skybox_mat,vec3_mul(vec3n(1,1,1),1800));
 
-    float ring_color[] = {0.89, 0.84, 0.68, 1.0};
+    //float ring_color[] = {0.89, 0.84, 0.68, 1.0};
+    float ring_color[] = {0.6, 0.6, 0.6, 1.0};
     vec3 light_dir = vec3_norm(vec3n(1.0, -2.0, -0.8));
     float cloud_disp[] = {0.0};
 
@@ -308,12 +311,13 @@ int main(void)
         vec3 rings_up = vec3n(0,0,1);
 
         ring_mat = computeRingMatrix(toward_view, rings_up);
+        ring_mat = mat4_scale(ring_mat, vec3_mul(vec3n(1,1,1),ring_outer));
 
         int zero[] = {0};
         int one[] = {1};
         int two[] = {2};
+
         // SKYBOX RENDER
-        
         use_shader(&skybox_shader);
         uniform(&skybox_shader, "projMat", proj_mat.v);
         uniform(&skybox_shader, "viewMat", view_mat.v);
@@ -330,6 +334,7 @@ int main(void)
         uniform(&ring_shader, "modelMat", ring_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
+        uniform(&ring_shader, "minDist", ring_mindist);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
@@ -350,6 +355,7 @@ int main(void)
         render_obj(&planet_obj, render_planet);
 
         ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up);
+        ring_mat = mat4_scale(ring_mat, vec3_mul(vec3n(1,1,1),ring_outer));
 
         // NEAR RING RENDER
         use_shader(&ring_shader);
@@ -358,6 +364,7 @@ int main(void)
         uniform(&ring_shader, "modelMat", ring_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
+        uniform(&ring_shader, "minDist", ring_mindist);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
