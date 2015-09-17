@@ -152,7 +152,7 @@ void generate_sphere(Object *obj, int exterior)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-mat4 computeRingMatrix(vec3 toward_view, vec3 rings_up)
+mat4 computeRingMatrix(vec3 toward_view, vec3 rings_up, float size)
 {
     mat4 ring_mat = mat4_iden();
     rings_up = vec3_norm(rings_up);
@@ -168,7 +168,26 @@ mat4 computeRingMatrix(vec3 toward_view, vec3 rings_up)
         ring_mat.v[i*4+1] = rings_right.v[i];
         ring_mat.v[i*4+2] = rings_up.v[i];
     }
-    return ring_mat;
+    return mat4_scale(ring_mat,vec3_mul(vec3n(1,1,1),size));
+}
+
+mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float ring_outer)
+{
+    mat4 light_mat = mat4_iden();
+    light_up = vec3_norm(light_up);
+    light_dir = vec3_norm(light_dir);
+    vec3 light_right = vec3_norm(vec3_cross(light_dir, light_up));
+    light_dir = vec3_mul(light_dir,ring_outer);
+    light_up = vec3_mul(light_up, planet_size);
+    light_right = vec3_mul(light_right, planet_size);
+    int i;
+    for (i=0;i<3;++i)
+    {
+        light_mat.v[i*4] = light_dir.v[i];
+        light_mat.v[i*4+1] = light_right.v[i];
+        light_mat.v[i*4+2] = light_up.v[i];
+    }
+    return light_mat;
 }
 
 int main(void)
@@ -212,7 +231,7 @@ int main(void)
     glCullFace(GL_FRONT);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
-    Shader ring_shader, planet_shader, skybox_shader;
+    Shader ring_shader, planet_shader, skybox_shader, shadowmap_shader;
     create_shader(&ring_shader);
     create_shader(&planet_shader);
     create_shader(&skybox_shader);
@@ -220,6 +239,7 @@ int main(void)
     load_shader_from_file(&ring_shader, "ring.vert", "ring.frag");
     load_shader_from_file(&planet_shader, "planet.vert", "planet.frag");
     load_shader_from_file(&skybox_shader, "skybox.vert", "skybox.frag");
+    load_shader_from_file(&shadowmap_shader, "shadow_map.vert", "shadow_map.frag");
     
     const int ringsize = 2048;
     unsigned char *rings = malloc(ringsize);
@@ -255,6 +275,11 @@ int main(void)
     tex_load_from_file(&earth_night, "earth_night.png", 3);
     tex_load_from_file(&skybox, "space_skybox.png", 3);
 
+    Texture default_tex;
+    create_tex(&default_tex);
+    unsigned char white[] = {0xFF,0xFF,0xFF, 0xFF};
+    image_tex(&default_tex, 4, 1,1, white);
+
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
@@ -267,11 +292,10 @@ int main(void)
     float ring_outer = 0.6;
     float ring_inner = 0.4;
     float ring_mindist[] = {ring_inner/ring_outer};
-    vec3 planet_scale = vec3_mul(vec3n(1,1,1),0.3);
+    float planet_size = 0.3;
+    vec3 planet_scale = vec3_mul(vec3n(1,1,1),planet_size);
     mat4 planet_mat = mat4_iden();
     planet_mat = mat4_scale(planet_mat, planet_scale);
-
-    mat4 ring_mat = mat4_iden();
 
     vec3 anglerot = vec3n(1,0,0);
     quat skybox_rot = quat_rot(anglerot, 60.0/180.0*PI);
@@ -285,11 +309,29 @@ int main(void)
 
     float exposure[] = {1.0};
 
+    const int shadowtex_size = 2048;
+    GLuint shadow_fbo;
+    GLuint shadow_tex;
+    glGenFramebuffers(1, &shadow_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
+
+    glGenTextures(1, &shadow_tex);
+    glBindTexture(GL_TEXTURE_2D, shadow_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, shadowtex_size, shadowtex_size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    vec3 light_up = vec3n(0,0,1);
+    vec3 rings_up = vec3n(0,0,1);
+
+    int zero[] = {0};
+    int one[] = {1};
+    int two[] = {2};
+
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
 		if (escape_key == GLFW_PRESS) break;
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         camera_pos.v[0] = cos(angle)*0.6;
         camera_pos.v[1] = sin(angle)*0.6;
@@ -304,18 +346,40 @@ int main(void)
         if (exposure[0] <0.0) exposure[0] = 0.0;
         else if (exposure[0] > 1.0) exposure[0] = 1.0;
 
+        mat4 light_mat = computeLightMatrix(light_dir, light_up, planet_size, ring_outer);
+        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_direction)));
+        
+        mat4 far_ring_mat = computeRingMatrix(toward_view, rings_up, ring_outer);
+        mat4 near_ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up, ring_outer);
+
+        glViewport(0,0,shadowtex_size, shadowtex_size);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+
+        use_shader(&shadowmap_shader);
+        uniform(&shadowmap_shader, "lightMat", light_mat.v);
+        uniform(&shadowmap_shader, "minDist", ring_mindist);
+        uniform(&shadowmap_shader, "tex", zero);
+
+        use_tex(&ring_tex, 0);
+        uniform(&shadowmap_shader, "modelMat", far_ring_mat.v);
+        render_obj(&ring_obj, render_rings);
+
+        use_tex(&default_tex, 0);
+        uniform(&shadowmap_shader, "modelMat", planet_mat.v);
+        render_obj(&planet_obj, render_planet);
+
+        use_tex(&ring_tex, 0);
+        uniform(&shadowmap_shader, "modelMat", near_ring_mat.v);
+        render_obj(&ring_obj, render_rings);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+
+        glViewport(0,0,width, height);
+
         mat4 proj_mat = mat4_pers(40,ratio, 0.01,2000);
         mat4 view_mat = mat4_lookAt(camera_pos, camera_direction, camera_up);
-
-        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_direction)));
-        vec3 rings_up = vec3n(0,0,1);
-
-        ring_mat = computeRingMatrix(toward_view, rings_up);
-        ring_mat = mat4_scale(ring_mat, vec3_mul(vec3n(1,1,1),ring_outer));
-
-        int zero[] = {0};
-        int one[] = {1};
-        int two[] = {2};
 
         // SKYBOX RENDER
         use_shader(&skybox_shader);
@@ -331,7 +395,7 @@ int main(void)
         use_shader(&ring_shader);
         uniform(&ring_shader, "projMat", proj_mat.v);
         uniform(&ring_shader, "viewMat", view_mat.v);
-        uniform(&ring_shader, "modelMat", ring_mat.v);
+        uniform(&ring_shader, "modelMat", far_ring_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         uniform(&ring_shader, "minDist", ring_mindist);
@@ -354,14 +418,11 @@ int main(void)
         use_tex(&earth_night,2);
         render_obj(&planet_obj, render_planet);
 
-        ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up);
-        ring_mat = mat4_scale(ring_mat, vec3_mul(vec3n(1,1,1),ring_outer));
-
         // NEAR RING RENDER
         use_shader(&ring_shader);
         uniform(&ring_shader, "projMat", proj_mat.v);
         uniform(&ring_shader, "viewMat", view_mat.v);
-        uniform(&ring_shader, "modelMat", ring_mat.v);
+        uniform(&ring_shader, "modelMat", near_ring_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         uniform(&ring_shader, "minDist", ring_mindist);
