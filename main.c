@@ -121,7 +121,7 @@ void generate_sphere(Object *obj, int exterior)
         {
             float costheta = cos(theta*PI*2);
             float sintheta = sin(theta*PI*2);
-            float vertex_data[] = {cosphi*costheta, cosphi*sintheta, sinphi,1.0, theta, 1.0-phi, };
+            float vertex_data[] = {cosphi*costheta, cosphi*sintheta, sinphi,1.0, theta, 1.0-phi};
             glBufferSubData(GL_ARRAY_BUFFER, offset*PLANET_STRIDE, PLANET_STRIDE, vertex_data);
             offset++;
         }
@@ -178,14 +178,14 @@ mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float 
     light_dir = vec3_inv(vec3_norm(light_dir));
     vec3 light_right = vec3_norm(vec3_cross(light_dir, light_up));
     light_dir = vec3_mul(light_dir,ring_outer);
-    light_up = vec3_mul(light_up, planet_size);
+    light_up = vec3_mul(vec3_norm(vec3_cross(light_dir, light_right)), planet_size);
     light_right = vec3_mul(light_right, planet_size);
     int i;
     for (i=0;i<3;++i)
     {
-        light_mat.v[i*4] = light_dir.v[i];
-        light_mat.v[i*4+1] = light_right.v[i];
-        light_mat.v[i*4+2] = light_up.v[i];
+        light_mat.v[i*4] = light_right.v[i];
+        light_mat.v[i*4+1] = light_up.v[i];
+        light_mat.v[i*4+2] = -light_dir.v[i];
     }
     return light_mat;
 }
@@ -204,7 +204,7 @@ int main(void)
     glfwWindowHint(GLFW_SAMPLES, 16);
 
 	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-    //GLFWwindow* window = glfwCreateWindow(512, 512, "Roche", NULL, NULL);
+    //GLFWwindow* window = glfwCreateWindow(768, 768, "Roche", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -284,19 +284,15 @@ int main(void)
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    vec3 camera_pos = vec3n(-0.4,0.0,1.0);
-    vec3 camera_direction = vec3n(0.0,0.0,0.0);
+    vec3 camera_pos = vec3n(-0.8,0.0,0.1);
+    vec3 camera_angle = vec3n(0.0,0.0,0.0);
     vec3 camera_up = vec3n(0.0,0.0,1.0);
-
-    float angle = 1.0;
 
     float ring_outer = 0.6;
     float ring_inner = 0.4;
     float ring_mindist[] = {ring_inner/ring_outer};
     float planet_size = 0.3;
     vec3 planet_scale = vec3_mul(vec3n(1,1,1),planet_size);
-    mat4 planet_mat = mat4_iden();
-    planet_mat = mat4_scale(planet_mat, planet_scale);
 
     vec3 anglerot = vec3n(1,0,0);
     quat skybox_rot = quat_rot(anglerot, 60.0/180.0*PI);
@@ -321,8 +317,11 @@ int main(void)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, shadowtex_size, shadowtex_size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
 
     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
+    glDrawBuffer(GL_NONE);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {
@@ -332,31 +331,56 @@ int main(void)
     vec3 light_up = vec3n(0,0,1);
     vec3 rings_up = vec3n(0,0,1);
 
-    int zero[] = {0};
-    int one[] = {1};
-    int two[] = {2};
-    int three[] = {3};
+    float sensibility = 0.001;
+
+    glfwSetCursorPos(window, width/2, height/2);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
+    float speed = 0.006;
+
+    float planet_angle = 0.0;
 
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
 		if (escape_key == GLFW_PRESS) break;
 
-        camera_pos.v[0] = cos(angle)*0.6;
-        camera_pos.v[1] = sin(angle)*0.6;
+        double moveX, moveY;
+        glfwGetCursorPos(window, &moveX, &moveY);
+        moveX -= width/2;
+        moveY -= height/2;
+        camera_angle.v[0] -= moveX*sensibility;
+        camera_angle.v[1] -= moveY*sensibility;
+        if (camera_angle.v[1] > PI/2) camera_angle.v[1] = PI/2;
+        if (camera_angle.v[1] < -PI/2) camera_angle.v[1] = -PI/2;
+        glfwSetCursorPos(window, width/2, height/2);
 
-        angle += 0.004;
+        vec3 camera_dir = vec3n(cos(camera_angle.v[0])*cos(camera_angle.v[1]), sin(camera_angle.v[0])*cos(camera_angle.v[1]),sin(camera_angle.v[1]));
+        vec3 camera_right = vec3_norm(vec3_cross(camera_dir, camera_up));
+
+        if (glfwGetKey(window,GLFW_KEY_W)) camera_pos = vec3_add(camera_pos, vec3_mul(camera_dir, speed));
+        else if (glfwGetKey(window, GLFW_KEY_S)) camera_pos = vec3_add(camera_pos, vec3_mul(camera_dir, -speed));
+        if (glfwGetKey(window,GLFW_KEY_D)) camera_pos = vec3_add(camera_pos, vec3_mul(camera_right, speed));
+        else if (glfwGetKey(window,GLFW_KEY_A)) camera_pos = vec3_add(camera_pos, vec3_mul(camera_right, -speed));
+
+        if (glfwGetKey(window,GLFW_KEY_SPACE)) camera_pos.v[2] += speed;
+        else if (glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)) camera_pos.v[2] -= speed;
+
+        quat q = quat_rot(vec3n(0,0,1), planet_angle);
+        mat4 planet_mat = quat_tomatrix(q);
+        planet_mat = mat4_scale(planet_mat, planet_scale);
+        planet_angle += 0.001;
+        
         cloud_disp[0] += 0.0004;
-        camera_pos.v[2] -= 0.001;
 
         if (glfwGetKey(window, GLFW_KEY_E)) exposure[0] -= 0.006;
-        if (glfwGetKey(window, GLFW_KEY_A)) exposure[0] += 0.006;
+        if (glfwGetKey(window, GLFW_KEY_Q)) exposure[0] += 0.006;
 
         if (exposure[0] <0.0) exposure[0] = 0.0;
         else if (exposure[0] > 1.0) exposure[0] = 1.0;
 
         mat4 light_mat = computeLightMatrix(light_dir, light_up, planet_size, ring_outer);
-        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_direction)));
+        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_dir)));
         
         mat4 far_ring_mat = computeRingMatrix(toward_view, rings_up, ring_outer);
         mat4 near_ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up, ring_outer);
@@ -368,7 +392,7 @@ int main(void)
         use_shader(&shadowmap_shader);
         uniform(&shadowmap_shader, "lightMat", light_mat.v);
         uniform(&shadowmap_shader, "minDist", ring_mindist);
-        uniform(&shadowmap_shader, "tex", zero);
+        uniform1i(&shadowmap_shader, "tex", 0);
 
         use_tex(&ring_tex, 0);
         uniform(&shadowmap_shader, "modelMat", far_ring_mat.v);
@@ -388,7 +412,7 @@ int main(void)
         glViewport(0,0,width, height);
 
         mat4 proj_mat = mat4_pers(40,ratio, 0.01,2000);
-        mat4 view_mat = mat4_lookAt(camera_pos, camera_direction, camera_up);
+        mat4 view_mat = mat4_lookAt(camera_pos, vec3_add(camera_pos, camera_dir), camera_up);
 
         // SKYBOX RENDER
         use_shader(&skybox_shader);
@@ -396,7 +420,7 @@ int main(void)
         uniform(&skybox_shader, "viewMat", view_mat.v);
         uniform(&skybox_shader, "modelMat", skybox_mat.v);
         uniform(&skybox_shader, "exposure", exposure);
-        uniform(&skybox_shader, "tex", zero);
+        uniform1i(&skybox_shader, "tex", 0);
         use_tex(&skybox,0);
         render_obj(&skybox_obj, render_planet); 
 
@@ -405,10 +429,11 @@ int main(void)
         uniform(&ring_shader, "projMat", proj_mat.v);
         uniform(&ring_shader, "viewMat", view_mat.v);
         uniform(&ring_shader, "modelMat", far_ring_mat.v);
+        uniform(&ring_shader, "lightMat", light_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
-        uniform(&ring_shader, "tex", zero);
+        uniform1i(&ring_shader, "tex", 0);
         uniform(&ring_shader, "minDist", ring_mindist);
-        uniform(&ring_shader, "shadow_map", three);
+        uniform1i(&ring_shader, "shadow_map", 3);
         use_tex(&ring_tex,0);
         glActiveTexture(GL_TEXTURE0 + 3);
         glBindTexture(GL_TEXTURE_2D, shadow_tex);
@@ -420,9 +445,9 @@ int main(void)
         uniform(&planet_shader, "viewMat", view_mat.v);
         uniform(&planet_shader, "modelMat", planet_mat.v);
         uniform(&planet_shader, "light_dir", light_dir.v);
-        uniform(&planet_shader, "day_tex", zero);
-        uniform(&planet_shader, "clouds_tex", one);
-        uniform(&planet_shader, "night_tex", two);
+        uniform1i(&planet_shader, "day_tex", 0);
+        uniform1i(&planet_shader, "clouds_tex", 1);
+        uniform1i(&planet_shader, "night_tex", 2);
         uniform(&planet_shader, "cloud_disp", cloud_disp);
         uniform(&planet_shader, "view_dir", camera_pos.v);
         use_tex(&earth_day,0);
@@ -435,10 +460,11 @@ int main(void)
         uniform(&ring_shader, "projMat", proj_mat.v);
         uniform(&ring_shader, "viewMat", view_mat.v);
         uniform(&ring_shader, "modelMat", near_ring_mat.v);
+        uniform(&ring_shader, "lightMat", light_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
-        uniform(&ring_shader, "tex", zero);
+        uniform1i(&ring_shader, "tex", 0);
         uniform(&ring_shader, "minDist", ring_mindist);
-        uniform(&ring_shader, "shadow_map", three);
+        uniform1i(&ring_shader, "shadow_map", 3);
         use_tex(&ring_tex,0);
         glActiveTexture(GL_TEXTURE0 + 3);
         glBindTexture(GL_TEXTURE_2D, shadow_tex);

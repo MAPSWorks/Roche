@@ -40,6 +40,12 @@ void uniform(Shader *s, const char *name, void *value)
 	}
 }
 
+void uniform1i(Shader *s, const char *name, int value)
+{
+    int a[] = {value};
+    uniform(s, name, a);
+}
+
 void use_shader(Shader *s)
 {
 	glUseProgram(s->program);
