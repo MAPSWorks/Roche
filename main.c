@@ -175,7 +175,7 @@ mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float 
 {
     mat4 light_mat = mat4_iden();
     light_up = vec3_norm(light_up);
-    light_dir = vec3_norm(light_dir);
+    light_dir = vec3_inv(vec3_norm(light_dir));
     vec3 light_right = vec3_norm(vec3_cross(light_dir, light_up));
     light_dir = vec3_mul(light_dir,ring_outer);
     light_up = vec3_mul(light_up, planet_size);
@@ -235,6 +235,7 @@ int main(void)
     create_shader(&ring_shader);
     create_shader(&planet_shader);
     create_shader(&skybox_shader);
+    create_shader(&shadowmap_shader);
 
     load_shader_from_file(&ring_shader, "ring.vert", "ring.frag");
     load_shader_from_file(&planet_shader, "planet.vert", "planet.frag");
@@ -321,12 +322,20 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        printf("Framebuffer failed.\n");
+    }
+
     vec3 light_up = vec3n(0,0,1);
     vec3 rings_up = vec3n(0,0,1);
 
     int zero[] = {0};
     int one[] = {1};
     int two[] = {2};
+    int three[] = {3};
 
     while (!glfwWindowShouldClose(window))
     {
@@ -399,7 +408,10 @@ int main(void)
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         uniform(&ring_shader, "minDist", ring_mindist);
+        uniform(&ring_shader, "shadow_map", three);
         use_tex(&ring_tex,0);
+        glActiveTexture(GL_TEXTURE0 + 3);
+        glBindTexture(GL_TEXTURE_2D, shadow_tex);
         render_obj(&ring_obj, render_rings);
 
         // PLANET RENDER
@@ -426,7 +438,10 @@ int main(void)
         uniform(&ring_shader, "ring_color", ring_color);
         uniform(&ring_shader, "tex", zero);
         uniform(&ring_shader, "minDist", ring_mindist);
+        uniform(&ring_shader, "shadow_map", three);
         use_tex(&ring_tex,0);
+        glActiveTexture(GL_TEXTURE0 + 3);
+        glBindTexture(GL_TEXTURE_2D, shadow_tex);
         render_obj(&ring_obj, render_rings);
 
         mySleep(10);
