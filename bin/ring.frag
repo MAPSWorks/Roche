@@ -20,20 +20,21 @@ vec2 poissonDisk[5] = vec2[](
 );
 
 #define BIAS 0.004
-#define PCF_SIZE 2048.0
+#define PCF_SIZE 4096.0
 
 void main(void)
 {
-    float dist = length(pass_uv);
-    if (dist < minDist || dist > 1.0) discard;
-    float matter = texture(tex, vec2((dist-minDist)/(1.0-minDist),0.0)).r;
-    vec4 lightpos = (lightMat*pass_position);
-    vec3 shadow_coords = (lightpos.xyz/lightpos.w)*vec3(0.5) + vec3(0.5);
-    shadow_coords.z -= BIAS;
+  float dist = length(pass_uv);
+  if (dist < minDist || dist > 1.0) discard;
+  float matter = texture(tex, vec2((dist-minDist)/(1.0-minDist),0.0)).r;
 
-    float shadow=0.0;
-    for (int i=0;i<5;++i)
-    	shadow += texture(shadow_map,shadow_coords + vec3(poissonDisk[i]/PCF_SIZE, 0.0));
+  vec4 lightpos = (lightMat*pass_position);
+  vec3 shadow_coords = (lightpos.xyz/lightpos.w)*vec3(0.5) + vec3(0.5);
+  shadow_coords.z -= BIAS;
+
+  float shadow=0.0;
+  for (int i=0;i<5;++i)
+    shadow += texture(shadow_map,shadow_coords + vec3(poissonDisk[i]/PCF_SIZE, 0.0));
 	shadow *= 0.20;
 	out_color = matter*ring_color*vec4(vec3(shadow),1.0);
 }

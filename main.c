@@ -152,23 +152,25 @@ void generate_sphere(Object *obj, int exterior)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-mat4 computeRingMatrix(vec3 toward_view, vec3 rings_up, float size)
+void computeRingMatrix(vec3 toward_view, vec3 rings_up, float size, mat4 *near_mat, mat4 *far_mat)
 {
-    mat4 ring_mat = mat4_iden();
+    *near_mat = mat4_iden();
+    *far_mat = mat4_iden();
     rings_up = vec3_norm(rings_up);
     toward_view = vec3_norm(toward_view);
 
     vec3 rings_right = vec3_norm(vec3_cross(rings_up, toward_view));
-
     vec3 rings_x = vec3_norm(vec3_cross(rings_up, rings_right));
     int i;
     for (i=0;i<3;++i)
     {
-        ring_mat.v[i*4] = rings_x.v[i];
-        ring_mat.v[i*4+1] = rings_right.v[i];
-        ring_mat.v[i*4+2] = rings_up.v[i];
+        near_mat->v[i] = rings_x.v[i]*size;
+        near_mat->v[4+i] = rings_right.v[i]*size;
+        near_mat->v[8+i] = rings_up.v[i]*size;
+        far_mat->v[i] = -rings_x.v[i]*size;
+        far_mat->v[4+i] = -rings_right.v[i]*size;
+        far_mat->v[8+i] = -rings_up.v[i]*size;
     }
-    return mat4_scale(ring_mat,vec3_mul(vec3n(1,1,1),size));
 }
 
 mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float ring_outer)
@@ -306,7 +308,7 @@ int main(void)
 
     float exposure[] = {1.0};
 
-    const int shadowtex_size = 2048;
+    const int shadowtex_size = 4096;
     GLuint shadow_fbo;
     GLuint shadow_tex;
     glGenFramebuffers(1, &shadow_fbo);
@@ -314,11 +316,15 @@ int main(void)
 
     glGenTextures(1, &shadow_tex);
     glBindTexture(GL_TEXTURE_2D, shadow_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, shadowtex_size, shadowtex_size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, shadowtex_size, shadowtex_size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float buf[] = {1000000.0,0.0,0.0,0.0};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, buf);
 
     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
     glDrawBuffer(GL_NONE);
@@ -329,7 +335,7 @@ int main(void)
     }
 
     vec3 light_up = vec3n(0,0,1);
-    vec3 rings_up = vec3n(0,0,1);
+    vec3 rings_up = vec3n(1,1,2);
 
     float sensibility = 0.001;
 
@@ -380,10 +386,14 @@ int main(void)
         else if (exposure[0] > 1.0) exposure[0] = 1.0;
 
         mat4 light_mat = computeLightMatrix(light_dir, light_up, planet_size, ring_outer);
-        vec3 toward_view = vec3_cpy(vec3_add(camera_pos, vec3_inv(camera_dir)));
+        vec3 toward_view = vec3_inv(camera_pos);
         
-        mat4 far_ring_mat = computeRingMatrix(toward_view, rings_up, ring_outer);
-        mat4 near_ring_mat = computeRingMatrix(vec3_inv(toward_view), rings_up, ring_outer);
+        mat4 far_ring_mat, near_ring_mat;
+        computeRingMatrix(toward_view, rings_up, ring_outer, &near_ring_mat, &far_ring_mat);
+
+        float zero[] = {0.0};
+        float one[] = {1.0};
+        float two[] = {2.0};
 
         glViewport(0,0,shadowtex_size, shadowtex_size);
         glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
@@ -391,19 +401,24 @@ int main(void)
 
         use_shader(&shadowmap_shader);
         uniform(&shadowmap_shader, "lightMat", light_mat.v);
-        uniform(&shadowmap_shader, "minDist", ring_mindist);
         uniform1i(&shadowmap_shader, "tex", 0);
 
         use_tex(&ring_tex, 0);
         uniform(&shadowmap_shader, "modelMat", far_ring_mat.v);
+        uniform(&shadowmap_shader, "minDist", ring_mindist);
+        uniform(&shadowmap_shader, "maxDist", one);
         render_obj(&ring_obj, render_rings);
 
         use_tex(&default_tex, 0);
         uniform(&shadowmap_shader, "modelMat", planet_mat.v);
+        uniform(&shadowmap_shader, "minDist", zero);
+        uniform(&shadowmap_shader, "maxDist", two);
         render_obj(&planet_obj, render_planet);
 
         use_tex(&ring_tex, 0);
         uniform(&shadowmap_shader, "modelMat", near_ring_mat.v);
+        uniform(&shadowmap_shader, "minDist", ring_mindist);
+        uniform(&shadowmap_shader, "maxDist", one);
         render_obj(&ring_obj, render_rings);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -444,15 +459,19 @@ int main(void)
         uniform(&planet_shader, "projMat", proj_mat.v);
         uniform(&planet_shader, "viewMat", view_mat.v);
         uniform(&planet_shader, "modelMat", planet_mat.v);
+        uniform(&planet_shader, "lightMat", light_mat.v);
         uniform(&planet_shader, "light_dir", light_dir.v);
         uniform1i(&planet_shader, "day_tex", 0);
         uniform1i(&planet_shader, "clouds_tex", 1);
         uniform1i(&planet_shader, "night_tex", 2);
+        uniform1i(&planet_shader, "shadow_map", 3);
         uniform(&planet_shader, "cloud_disp", cloud_disp);
         uniform(&planet_shader, "view_dir", camera_pos.v);
         use_tex(&earth_day,0);
         use_tex(&earth_clouds,1);
         use_tex(&earth_night,2);
+        glActiveTexture(GL_TEXTURE0 + 3);
+        glBindTexture(GL_TEXTURE_2D, shadow_tex);
         render_obj(&planet_obj, render_planet);
 
         // NEAR RING RENDER
