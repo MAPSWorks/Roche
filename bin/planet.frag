@@ -7,7 +7,6 @@ in mat4 pass_tbn;
 uniform sampler2D day_tex;
 uniform sampler2D clouds_tex;
 uniform sampler2D night_tex;
-uniform sampler2DShadow shadow_map;
 uniform float cloud_disp;
 
 uniform vec3 light_dir;
@@ -28,17 +27,6 @@ out vec4 out_color;
 #define M_PI 3.1415926535897932384626433832795
 
 float max_angle = acos(CLOUD_ALT_RATIO)/(2*M_PI);
-
-vec2 poissonDisk[5] = vec2[](
-  vec2( 0.0, 0.0),
-  vec2( -0.94201624, -0.39906216 ),
-  vec2( 0.94558609, -0.76890725 ),
-  vec2( -0.094184101, -0.92938870 ),
-  vec2( 0.34495938, 0.29387760 )
-);
-
-#define BIAS 0.004
-#define PCF_SIZE 4096.0
 
 void main(void)
 {
@@ -69,14 +57,5 @@ void main(void)
 	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
 
 	vec4 lightpos = (lightMat*pass_position);
-	if ((mat3(lightMat)*pass_normal).z < 0.0) {
-		vec3 shadow_coords = (lightpos.xyz/lightpos.w)*vec3(0.5) + vec3(0.5);
-		shadow_coords.z -= BIAS;
-		float shadow=0.0;
-		for (int i=0;i<5;++i)
-			shadow += texture(shadow_map,shadow_coords + vec3(poissonDisk[i]/PCF_SIZE, 0.0)) + RING_SHADOW_AMBIENT;
-		shadow *= 0.20;
-		shadow = clamp(shadow, AMBIENT_LIGHT, 1.0);
-		out_color *= vec4(vec3(shadow),1.0);
-	}
+	
 }
