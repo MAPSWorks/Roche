@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #include "vecmath.h"
 #include "opengl.h"
@@ -192,7 +193,7 @@ mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float 
     return light_mat;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     if (!glfwInit())
         return -1;
@@ -205,8 +206,20 @@ int main(void)
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
     glfwWindowHint(GLFW_SAMPLES, 16);
 
-	GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-    //GLFWwindow* window = glfwCreateWindow(768, 768, "Roche", NULL, NULL);
+    GLFWwindow* window;
+    int fullscreen;
+
+    if (argc >= 2 && strcmp(argv[1], "-w")==0)
+    {
+	   window = glfwCreateWindow(768, 768, "Roche", NULL, NULL);
+       fullscreen = 0;
+    }
+    else
+    {
+       window = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+       fullscreen = 1;
+    }
+
     if (!window)
     {
         glfwTerminate();
@@ -352,14 +365,17 @@ int main(void)
 		if (escape_key == GLFW_PRESS) break;
 
         double moveX, moveY;
-        glfwGetCursorPos(window, &moveX, &moveY);
-        moveX -= width/2;
-        moveY -= height/2;
-        camera_angle.v[0] -= moveX*sensibility;
-        camera_angle.v[1] -= moveY*sensibility;
-        if (camera_angle.v[1] > PI/2) camera_angle.v[1] = PI/2;
-        if (camera_angle.v[1] < -PI/2) camera_angle.v[1] = -PI/2;
-        glfwSetCursorPos(window, width/2, height/2);
+        if (fullscreen || glfwGetKey(window, GLFW_KEY_TAB))
+        {
+            glfwGetCursorPos(window, &moveX, &moveY);
+            moveX -= width/2;
+            moveY -= height/2;
+            camera_angle.v[0] -= moveX*sensibility;
+            camera_angle.v[1] -= moveY*sensibility;
+            if (camera_angle.v[1] > PI/2) camera_angle.v[1] = PI/2;
+            if (camera_angle.v[1] < -PI/2) camera_angle.v[1] = -PI/2;
+            glfwSetCursorPos(window, width/2, height/2);
+        }
 
         vec3 camera_dir = vec3n(cos(camera_angle.v[0])*cos(camera_angle.v[1]), sin(camera_angle.v[0])*cos(camera_angle.v[1]),sin(camera_angle.v[1]));
         vec3 camera_right = vec3_norm(vec3_cross(camera_dir, camera_up));
