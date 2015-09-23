@@ -1,61 +1,68 @@
 #version 330
+// PIXEL ATTRIBUTES
 in vec2 pass_uv;
 in vec3 pass_normal;
 in vec4 pass_position;
-in mat4 pass_tbn;
+out vec4 out_color;
 
+// TEXTURES
 uniform sampler2D day_tex;
 uniform sampler2D clouds_tex;
 uniform sampler2D night_tex;
-uniform float cloud_disp;
+uniform sampler2D ring_tex;
 
-uniform vec3 light_dir;
-uniform vec3 view_dir;
+// GLOBAL VARIABLES
+uniform float cloud_disp; // Amount of displacement of cloud on x axis
+uniform float ring_inner; // Ring's inner radius
+uniform float ring_outer; // Ring's outer radius
+uniform vec3 light_dir; // Towards the light source
+uniform vec3 view_dir; // Towards the camera
+uniform vec3 ring_vec; // Normal vector of the ring plane
+uniform vec3 sky_color; // dat's right
 
-uniform mat4 lightMat;
+// GAUSS KERNEL /W LERP
+uniform float offset[3] = float[]( 0.0, 1.3846153846, 3.2307692308 );
+uniform float weight[3] = float[]( 0.2270270270, 0.3162162162, 0.0702702703 );
+// Ring texture size for gaussian offsets
+float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 
-vec3 sky_color = vec3(0.6,0.8,1.0);
-
-out vec4 out_color;
-
-#define CLOUD_ALT_RATIO 0.997
-#define CLOUD_SHADOW 0.8
-#define ATMO_RATIO 0.984
+// This should be uniform variables
 #define AMBIENT_LIGHT 0.04
-#define RING_SHADOW_AMBIENT 0.4
-
-#define M_PI 3.1415926535897932384626433832795
-
-float max_angle = acos(CLOUD_ALT_RATIO)/(2*M_PI);
+#define RING_AMBIENT 0.25
 
 void main(void)
 {
+	// TEXTURE LOOKUPS
+	vec3 day = texture(day_tex,pass_uv).rgb;
+	vec3 night = texture(night_tex, pass_uv).rgb;
+	float cloud = texture(clouds_tex, pass_uv + vec2(cloud_disp,0.0)).r;
+
+	// LIGHT CALCULATION
 	float rawlight = dot(-light_dir, pass_normal);
 	float light = clamp(rawlight,AMBIENT_LIGHT,1.0);
-	vec3 day = texture(day_tex,pass_uv).rgb;
-	vec2 cloud_offset = pass_uv + vec2(cloud_disp,0.0);
-
-	vec4 to_light = vec4(normalize(light_dir-pass_position.xyz),1.0);
-	vec3 lightnorm = (pass_tbn*to_light).xyz;
-	vec2 shadow_tex_offset = lightnorm.xy*max_angle*vec2(1.0,0.5);
-
+	
+	// ATMOSPHERE RENDERING
 	vec4 to_viewer = vec4(normalize(view_dir-pass_position.xyz),1.0);
-	vec3 viewnorm = (pass_tbn*to_viewer).xyz;
-	vec2 cloud_tex_offset = viewnorm.xy*max_angle*vec2(1.0,0.5);
-	float cloud_shadow = max(0.0,texture(clouds_tex, cloud_offset + shadow_tex_offset).r);
-	day *= max(0.0,1.0 - cloud_shadow*CLOUD_SHADOW);
-
-	float angle = 1.0 - dot(pass_normal, to_viewer.xyz);
-	angle = pow(angle, 3);
-
-	float cloud = texture(clouds_tex, cloud_offset + cloud_tex_offset).r;
-	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
-	vec3 color = mix(day*light  + nightlights*texture(night_tex, pass_uv).rgb, vec3(light), cloud);
+	float angle = pow(1.0 - dot(pass_normal, to_viewer.xyz), 3);
 	float rim = (angle*angle*angle);
 
+	// TEXTURE COMPOSITION
+	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
+	vec3 color = mix(day*light  + nightlights*night, vec3(light), cloud);
 	color = mix(color, sky_color*light, angle);
 	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
-
-	vec4 lightpos = (lightMat*pass_position);
 	
+	// SHADOW CALCULATION (RAYTRACING)
+	float t = dot(pass_position.xyz, ring_vec)/dot(light_dir,ring_vec);
+	vec4 projPos = vec4(pass_position.xyz-t*light_dir,1.0);
+	float dist = length(projPos.xyz);
+	float shadow = 0.0;
+	float tex_offset = (dist-ring_inner)/(ring_outer-ring_inner);
+	for (int i=0;i<3;++i) // Size 5 gauss filter
+	{
+		shadow += texture(ring_tex, vec2(tex_offset + offset[i]*ringtex_size,0.0)).r * weight[i];
+		shadow += texture(ring_tex, vec2(tex_offset - offset[i]*ringtex_size,0.0)).r * weight[i];
+	} 
+	shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
+	out_color.xyz *= mix(shadow,1.0,nightlights);
 }

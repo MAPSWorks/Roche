@@ -46,45 +46,50 @@ void uniform1i(Shader *s, const char *name, int value)
     uniform(s, name, a);
 }
 
+void uniform1f(Shader *s, const char *name, float value)
+{
+    float a[] = {value};
+    uniform(s, name, a);
+}
+
 void use_shader(Shader *s)
 {
 	glUseProgram(s->program);
 }
-void load_shader(Shader *s, const char* vert_source, const char* frag_source)
+int load_shader(Shader *s, const char* vert_source, const char* frag_source)
 {
+    const int LOG_SIZE = 1024;
 	GLuint vertex_id, fragment_id;
     GLint success;
-    GLchar infoLog[512];
+    GLchar infoLog[LOG_SIZE];
 
     vertex_id = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_id, 1, &vert_source, NULL);
     glCompileShader(vertex_id);
     glGetShaderiv(vertex_id, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertex_id, 512, NULL, infoLog);
-        fprintf(stderr,"VERTEX SHADER FAILED TO COMPILE :\n%s\n", infoLog);
-    }
-    
+    glGetShaderInfoLog(vertex_id, LOG_SIZE, NULL, infoLog);
+    if (strlen(infoLog)) printf("VERTEX SHADER LOG :\n%s\n", infoLog);
+    if (!success) printf("VERTEX SHADER FAILED TO COMPILE\n");
+
     fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment_id, 1, &frag_source, NULL);
     glCompileShader(fragment_id);
     glGetShaderiv(fragment_id, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fragment_id, 512, NULL, infoLog);
-        fprintf(stderr,"FRAGMENT SHADER FAILED TO COMPILE :\n%s\n", infoLog);
-    }
+    glGetShaderInfoLog(fragment_id, LOG_SIZE, NULL, infoLog);
+    if (strlen(infoLog)) printf("FRAGMENT SHADER LOG :\n%s\n", infoLog);
+    if (!success) printf("FRAGMENT SHADER FAILED TO COMPILE\n");
     
     glAttachShader(s->program, vertex_id);
     glAttachShader(s->program, fragment_id);
 
     glLinkProgram(s->program);
     glGetProgramiv(s->program, GL_LINK_STATUS, &success);
+    glGetShaderInfoLog(s->program, LOG_SIZE, NULL, infoLog);
+    if (strlen(infoLog)) printf("SHADER PROGRAM LOG :\n%s\n", infoLog);
     if (!success)
     {
-        glGetProgramInfoLog(s->program, 512, NULL, infoLog);
-        fprintf(stderr,"SHADER PROGRAM FAILED TO LINK :\n%s\n", infoLog);
+        printf("SHADER PROGRAM FAILED TO LINK\n");
+        return 0;
     }
     
     glDeleteShader(vertex_id);
@@ -129,6 +134,7 @@ void load_shader(Shader *s, const char* vert_source, const char* frag_source)
     						 || type == GL_FLOAT_MAT3
 						 	 || type == GL_FLOAT_MAT4;
 	}
+    return 1;
 }
 
 void load_shader_from_file(Shader *s,const char* vert_filename, const char* frag_filename)
@@ -136,7 +142,15 @@ void load_shader_from_file(Shader *s,const char* vert_filename, const char* frag
 	char *vert_source, *frag_source;
     read_file(vert_filename, &vert_source);
     read_file(frag_filename, &frag_source);
-    load_shader(s, vert_source, frag_source);
+    printf("Compiling and linking %s and %s...\n", vert_filename, frag_filename);
+    if (load_shader(s, vert_source, frag_source))
+    {
+        printf("Success!\n");
+    }
+    else
+    {
+        printf("Failure.\n");
+    }
     free(vert_source);
     free(frag_source);
 }

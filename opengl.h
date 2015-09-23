@@ -57,10 +57,11 @@ Shader;
 
 void create_shader(Shader *s);
 void delete_shader(Shader *s);
-void load_shader(Shader *s,const char* vert_source, const char* frag_source);
+int load_shader(Shader *s,const char* vert_source, const char* frag_source);
 void load_shader_from_file(Shader *s,const char* vert_filename, const char* frag_filename);
 void uniform(Shader *s, const char *name, void *value);
 void uniform1i(Shader *s, const char *name, int value);
+void uniform1f(Shader *s, const char *name, float value);
 void use_shader(Shader *s);
 
 #endif

@@ -103,22 +103,20 @@ void render_rings()
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
 }
 
-void generate_sphere(Object *obj, int exterior)
+void generate_sphere(Object *obj, int theta_res, int phi_res, int exterior)
 {
-    const int res = 64;
-
     float theta, phi;
 
     glGenBuffers(1, &obj->vbo);
     glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
-    glBufferData(GL_ARRAY_BUFFER, (res+1)*(res+1)*PLANET_STRIDE, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (theta_res+1)*(phi_res+1)*PLANET_STRIDE, NULL, GL_STATIC_DRAW);
 
     int offset = 0;
-    for (phi=0;phi<=1.0;phi += 1.0/res)
+    for (phi=0;phi<=1.0;phi += 1.0/phi_res)
     {
         float cosphi = cos(PI*(phi-0.5));
         float sinphi = sin(PI*(phi-0.5));
-        for (theta=0;theta<=1.0;theta += 1.0/res)
+        for (theta=0;theta<=1.0;theta += 1.0/theta_res)
         {
             float costheta = cos(theta*PI*2);
             float sintheta = sin(theta*PI*2);
@@ -133,17 +131,17 @@ void generate_sphere(Object *obj, int exterior)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,offset*24,NULL,GL_STATIC_DRAW);
     int i,j;
     offset=0;
-    for (i=0;i<res;++i)
+    for (i=0;i<phi_res;++i)
     {
-        for (j=0;j<res;++j)
+        for (j=0;j<theta_res;++j)
         {
             int i1 = i+1;
             int j1 = j+1;
-            int indices[] = {i*(res+1) + j, i1*(res+1) + j, i1*(res+1) + j1, i1*(res+1)+j1, i*(res+1) + j1, i*(res+1) + j};
+            int indices[] = {i*(phi_res+1) + j, i1*(phi_res+1) + j, i1*(phi_res+1) + j1, i1*(phi_res+1)+j1, i*(phi_res+1) + j1, i*(phi_res+1) + j};
             if (!exterior)
             {
-                indices[1] = i*(res+1) + j1;
-                indices[4] = i1*(res+1) + j;
+                indices[1] = i*(phi_res+1) + j1;
+                indices[4] = i1*(phi_res+1) + j;
             }
             glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset*24, 24, indices);
             offset++;
@@ -279,8 +277,8 @@ int main(int argc, char **argv)
     update_ind_obj(&ring_obj, 12, ring_ind);
 
     Object planet_obj, skybox_obj;
-    generate_sphere(&planet_obj, 1);
-    generate_sphere(&skybox_obj, 0);
+    generate_sphere(&planet_obj, 128,128, 1);
+    generate_sphere(&skybox_obj, 16,16, 0);
 
     Texture earth_day, earth_clouds, earth_night, skybox;
     tex_load_from_file(&earth_day, "earth_land.png", 3);
@@ -304,7 +302,7 @@ int main(int argc, char **argv)
 
     float ring_outer = 0.6;
     float ring_inner = 0.4;
-    float ring_mindist[] = {ring_inner/ring_outer};
+    float ring_mindist = ring_inner/ring_outer;
     float planet_size = 0.3;
     vec3 planet_scale = vec3_mul(vec3n(1,1,1),planet_size);
 
@@ -314,13 +312,14 @@ int main(int argc, char **argv)
     skybox_mat = mat4_scale(skybox_mat,vec3_mul(vec3n(1,1,1),1800));
 
     //float ring_color[] = {0.89, 0.84, 0.68, 1.0};
+    vec3 sky_color= vec3n(0.6,0.8,1.0);
     float ring_color[] = {0.6, 0.6, 0.6, 1.0};   
-    float cloud_disp[] = {0.0};
+    float cloud_disp = 0.0;
 
-    float exposure[] = {1.0};
+    float exposure = 1.0;
 
     vec3 light_up = vec3n(0,0,1);
-    vec3 rings_up = vec3n(1,1,2);
+    vec3 rings_up = vec3_norm(vec3n(1,-1,2));
 
     float sensibility = 0.001;
 
@@ -331,10 +330,18 @@ int main(int argc, char **argv)
 
     float planet_angle = 0.0;
 
+    float light_angle = 0.0;
+
     while (!glfwWindowShouldClose(window))
     {
 		escape_key = glfwGetKey(window, GLFW_KEY_ESCAPE);
 		if (escape_key == GLFW_PRESS) break;
+
+        light_dir.v[0] = cos(light_angle);
+        light_dir.v[1] = sin(light_angle);
+        light_dir.v[2] = cos(light_angle*0.5)+0.5;
+        light_dir = vec3_norm(light_dir);
+        light_angle += 0.002;
 
         double moveX, moveY;
         if (fullscreen || glfwGetKey(window, GLFW_KEY_TAB))
@@ -363,15 +370,15 @@ int main(int argc, char **argv)
         quat q = quat_rot(vec3n(0,0,1), planet_angle);
         mat4 planet_mat = quat_tomatrix(q);
         planet_mat = mat4_scale(planet_mat, planet_scale);
-        planet_angle += 0.001;
+        planet_angle -= 0.001;
         
-        cloud_disp[0] += 0.0004;
+        cloud_disp += 0.0004;
 
-        if (glfwGetKey(window, GLFW_KEY_E)) exposure[0] -= 0.006;
-        if (glfwGetKey(window, GLFW_KEY_Q)) exposure[0] += 0.006;
+        if (glfwGetKey(window, GLFW_KEY_E)) exposure -= 0.006;
+        if (glfwGetKey(window, GLFW_KEY_Q)) exposure += 0.006;
 
-        if (exposure[0] <0.0) exposure[0] = 0.0;
-        else if (exposure[0] > 1.0) exposure[0] = 1.0;
+        if (exposure <0.0) exposure = 0.0;
+        else if (exposure > 1.0) exposure = 1.0;
 
         mat4 light_mat = computeLightMatrix(light_dir, light_up, planet_size, ring_outer);
         vec3 toward_view = vec3_inv(camera_pos);
@@ -391,7 +398,7 @@ int main(int argc, char **argv)
         uniform(&skybox_shader, "projMat", proj_mat.v);
         uniform(&skybox_shader, "viewMat", view_mat.v);
         uniform(&skybox_shader, "modelMat", skybox_mat.v);
-        uniform(&skybox_shader, "exposure", exposure);
+        uniform1f(&skybox_shader, "exposure", exposure);
         uniform1i(&skybox_shader, "tex", 0);
         use_tex(&skybox,0);
         render_obj(&skybox_obj, render_planet); 
@@ -404,7 +411,7 @@ int main(int argc, char **argv)
         uniform(&ring_shader, "lightMat", light_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform1i(&ring_shader, "tex", 0);
-        uniform(&ring_shader, "minDist", ring_mindist);
+        uniform1f(&ring_shader, "minDist", ring_mindist);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
@@ -413,16 +420,21 @@ int main(int argc, char **argv)
         uniform(&planet_shader, "projMat", proj_mat.v);
         uniform(&planet_shader, "viewMat", view_mat.v);
         uniform(&planet_shader, "modelMat", planet_mat.v);
-        uniform(&planet_shader, "lightMat", light_mat.v);
+        uniform(&planet_shader, "ring_vec", rings_up.v);
         uniform(&planet_shader, "light_dir", light_dir.v);
+        uniform1f(&planet_shader, "cloud_disp", cloud_disp);
+        uniform(&planet_shader, "view_dir", camera_pos.v);
+        uniform(&planet_shader, "sky_color", sky_color.v);
+        uniform1f(&planet_shader, "ring_inner", ring_inner);
+        uniform1f(&planet_shader, "ring_outer", ring_outer);
         uniform1i(&planet_shader, "day_tex", 0);
         uniform1i(&planet_shader, "clouds_tex", 1);
         uniform1i(&planet_shader, "night_tex", 2);
-        uniform(&planet_shader, "cloud_disp", cloud_disp);
-        uniform(&planet_shader, "view_dir", camera_pos.v);
+        uniform1i(&planet_shader, "ring_tex", 3);
         use_tex(&earth_day,0);
         use_tex(&earth_clouds,1);
         use_tex(&earth_night,2);
+        use_tex(&ring_tex, 3);
         render_obj(&planet_obj, render_planet);
 
         // NEAR RING RENDER
@@ -433,7 +445,7 @@ int main(int argc, char **argv)
         uniform(&ring_shader, "lightMat", light_mat.v);
         uniform(&ring_shader, "ring_color", ring_color);
         uniform1i(&ring_shader, "tex", 0);
-        uniform(&ring_shader, "minDist", ring_mindist);
+        uniform1f(&ring_shader, "minDist", ring_mindist);
         use_tex(&ring_tex,0);
         render_obj(&ring_obj, render_rings);
 
