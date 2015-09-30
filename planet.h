@@ -39,7 +39,7 @@ typedef struct
 Skybox;
 
 void planet_load(Planet *planet);
-void planet_render(Planet *planet, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj);
+void planet_render(Planet *planet, mat4 proj_mat, mat4 view_mat, vec3 view_pos, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj);
 void skybox_load(Skybox *s);
 void skybox_render(Skybox *s, mat4 proj_mat, mat4 view_mat, Shader *skybox_shader, Object *o);
 

@@ -200,12 +200,8 @@ int main(int argc, char **argv)
     vec3 camera_angle = vec3n(0.0,0.0,0.0);
     vec3 camera_up = vec3n(0.0,0.0,1.0);
 
-    vec3 light_up = vec3n(0,0,1);
-    vec3 rings_up = vec3_norm(vec3n(1,-1,2));
-
     float sensibility = 0.001;
     float speed = 0.006;
-    float planet_angle = 0.0;
     float light_angle = 0.0;
 
     while (!glfwWindowShouldClose(window))
@@ -251,7 +247,7 @@ int main(int argc, char **argv)
         mat4 view_mat = mat4_lookAt(camera_pos, vec3_add(camera_pos, camera_dir), camera_up);
 
         skybox_render(&skybox, proj_mat, view_mat, &skybox_shader, &skybox_obj);
-        planet_render(&earth, proj_mat, view_mat, camera_dir, light_dir, &planet_shader, &ring_shader, &planet_obj, &ring_obj);
+        planet_render(&earth, proj_mat, view_mat, camera_pos, light_dir, &planet_shader, &ring_shader, &planet_obj, &ring_obj);
 
         mySleep(10);
         

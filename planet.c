@@ -134,7 +134,7 @@ void planet_load(Planet *p)
     tex_load_from_file(&p->night, p->night_filename, 3);
 }
 
-void planet_render(Planet *p, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj)
+void planet_render(Planet *p, mat4 proj_mat, mat4 view_mat, vec3 view_pos, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj)
 {
  	quat q = quat_rot(p->rot_axis, p->rot_epoch);
     mat4 planet_mat = quat_tomatrix(q);
@@ -143,7 +143,7 @@ void planet_render(Planet *p, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 
     mat4 light_mat = computeLightMatrix(light_dir, vec3n(0,0,1), p->radius, p->ring_outer);
     
     mat4 far_ring_mat, near_ring_mat;
-    computeRingMatrix(view_dir, p->ring_upvector, p->ring_outer, &near_ring_mat, &far_ring_mat);
+    computeRingMatrix(vec3_add(p->pos, vec3_inv(view_pos)), p->ring_upvector, p->ring_outer, &near_ring_mat, &far_ring_mat);
 
     if (p->has_rings)
     {
@@ -168,7 +168,7 @@ void planet_render(Planet *p, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 
     uniform(planet_shader, "ring_vec", p->ring_upvector.v);
     uniform(planet_shader, "light_dir", light_dir.v);
     uniform1f(planet_shader, "cloud_disp", p->cloud_epoch);
-    uniform(planet_shader, "view_dir", view_dir.v);
+    uniform(planet_shader, "view_pos", view_pos.v);
     uniform(planet_shader, "sky_color", p->atmos_color.v);
     uniform1f(planet_shader, "ring_inner", p->ring_inner);
     uniform1f(planet_shader, "ring_outer", p->ring_outer);

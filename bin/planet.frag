@@ -16,7 +16,7 @@ uniform float cloud_disp; // Amount of displacement of cloud on x axis
 uniform float ring_inner; // Ring's inner radius
 uniform float ring_outer; // Ring's outer radius
 uniform vec3 light_dir; // Towards the light source
-uniform vec3 view_dir; // Towards the camera
+uniform vec3 view_pos; // Position of the camera
 uniform vec3 ring_vec; // Normal vector of the ring plane
 uniform vec3 sky_color; // dat's right
 
@@ -42,8 +42,8 @@ void main(void)
 	float light = clamp(rawlight,AMBIENT_LIGHT,1.0);
 	
 	// ATMOSPHERE RENDERING
-	vec4 to_viewer = vec4(normalize(view_dir-pass_position.xyz),1.0);
-	float angle = pow(1.0 - dot(pass_normal, to_viewer.xyz), 3);
+	vec3 to_viewer = normalize(view_pos-pass_position.xyz);
+	float angle = pow(1.0 - dot(pass_normal, to_viewer), 3);
 	float rim = (angle*angle*angle);
 
 	// TEXTURE COMPOSITION
