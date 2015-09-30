@@ -9,12 +9,13 @@ ROCHE=bin/roche.exe
 
 roche:$(ROCHE)
 
-bin/roche.exe: obj/main.o obj/glew.o obj/lodepng.o obj/opengl.o obj/util.o obj/vecmath.o
+bin/roche.exe: obj/main.o obj/glew.o obj/lodepng.o obj/opengl.o obj/util.o obj/vecmath.o obj/planet.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 obj/opengl.o: opengl.h
 obj/util.o: util.h
 obj/vecmath.o: vecmath.h
+obj/planet.o: planet.h
 
 obj/%.o: %.c
 	$(CC) -o $@ -c $< $(CFLAGS)

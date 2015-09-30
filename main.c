@@ -8,6 +8,7 @@
 
 #include "vecmath.h"
 #include "opengl.h"
+#include "planet.h"
 
 #ifdef LINUX
 #include <unistd.h>
@@ -25,6 +26,8 @@ void mySleep(int sleepMs)
     Sleep(sleepMs);
 #endif
 }
+
+#define PLANET_STRIDE 24
 
 void generate_sphere(Object *obj, int theta_res, int phi_res, int exterior)
 {
@@ -173,19 +176,22 @@ int main(int argc, char **argv)
     earth.ring_outer = 0.6;
     earth.ring_upvector = vec3_norm(vec3n(1,1,2));
     earth.ring_seed = 1909802985;
-    earth.ring_color = vec3(0.6,0.6,0.6);
-    earth.has_ring = 1;
-    earth.atmos_color = vec3(0.6,0.8,1.0);
+    earth.ring_color = vec3n(0.6,0.6,0.6);
+    earth.has_rings = 1;
+    earth.atmos_color = vec3n(0.6,0.8,1.0);
     earth.cloud_epoch = 0.0;
-    earth.day_filename = "earth_land.png";
-    earth.night_filename = "earth_night.png";
-    earth.clouds_filename = "earth_clouds.png";
+    strcpy(earth.day_filename, "earth_land.png");
+    strcpy(earth.night_filename,"earth_night.png");
+    strcpy(earth.clouds_filename, "earth_clouds.png");
     
     Skybox skybox;
-    skybox.tex_filename = "space_skybox.png";
+    strcpy(skybox.tex_filename,"space_skybox.png");
     skybox.rot_axis = vec3n(1,0,0);
     skybox.rot_angle = 60.0;
     skybox.size = 1800;
+
+    planet_load(&earth);
+    skybox_load(&skybox);
     
     // GLOBAL SETTINGS
     vec3 light_dir = vec3_norm(vec3n(1.0, -2.0, -0.8));
@@ -244,51 +250,8 @@ int main(int argc, char **argv)
         mat4 proj_mat = mat4_pers(40,ratio, 0.01,2000);
         mat4 view_mat = mat4_lookAt(camera_pos, vec3_add(camera_pos, camera_dir), camera_up);
 
-        // FAR RING RENDER
-        use_shader(&ring_shader);
-        uniform(&ring_shader, "projMat", proj_mat.v);
-        uniform(&ring_shader, "viewMat", view_mat.v);
-        uniform(&ring_shader, "modelMat", far_ring_mat.v);
-        uniform(&ring_shader, "lightMat", light_mat.v);
-        uniform(&ring_shader, "ring_color", ring_color);
-        uniform1i(&ring_shader, "tex", 0);
-        uniform1f(&ring_shader, "minDist", ring_mindist);
-        use_tex(&ring_tex,0);
-        render_obj(&ring_obj, render_rings);
-
-        // PLANET RENDER
-        use_shader(&planet_shader);
-        uniform(&planet_shader, "projMat", proj_mat.v);
-        uniform(&planet_shader, "viewMat", view_mat.v);
-        uniform(&planet_shader, "modelMat", planet_mat.v);
-        uniform(&planet_shader, "ring_vec", rings_up.v);
-        uniform(&planet_shader, "light_dir", light_dir.v);
-        uniform1f(&planet_shader, "cloud_disp", cloud_disp);
-        uniform(&planet_shader, "view_dir", camera_pos.v);
-        uniform(&planet_shader, "sky_color", sky_color.v);
-        uniform1f(&planet_shader, "ring_inner", ring_inner);
-        uniform1f(&planet_shader, "ring_outer", ring_outer);
-        uniform1i(&planet_shader, "day_tex", 0);
-        uniform1i(&planet_shader, "clouds_tex", 1);
-        uniform1i(&planet_shader, "night_tex", 2);
-        uniform1i(&planet_shader, "ring_tex", 3);
-        use_tex(&earth_day,0);
-        use_tex(&earth_clouds,1);
-        use_tex(&earth_night,2);
-        use_tex(&ring_tex, 3);
-        render_obj(&planet_obj, render_planet);
-
-        // NEAR RING RENDER
-        use_shader(&ring_shader);
-        uniform(&ring_shader, "projMat", proj_mat.v);
-        uniform(&ring_shader, "viewMat", view_mat.v);
-        uniform(&ring_shader, "modelMat", near_ring_mat.v);
-        uniform(&ring_shader, "lightMat", light_mat.v);
-        uniform(&ring_shader, "ring_color", ring_color);
-        uniform1i(&ring_shader, "tex", 0);
-        uniform1f(&ring_shader, "minDist", ring_mindist);
-        use_tex(&ring_tex,0);
-        render_obj(&ring_obj, render_rings);
+        skybox_render(&skybox, proj_mat, view_mat, &skybox_shader, &skybox_obj);
+        planet_render(&earth, proj_mat, view_mat, camera_dir, light_dir, &planet_shader, &ring_shader, &planet_obj, &ring_obj);
 
         mySleep(10);
         

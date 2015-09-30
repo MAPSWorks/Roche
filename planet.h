@@ -16,7 +16,7 @@ typedef struct
 	vec3 ring_upvector;
 	int ring_seed;
 	vec3 ring_color;
-	int has_ring;
+	int has_rings;
 
 	vec3 atmos_color;
 	float cloud_epoch;

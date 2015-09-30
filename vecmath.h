@@ -1,6 +1,8 @@
 #ifndef VECMATH_H
 #define VECMATH_H
 
+#define PI 3.1415926
+
 typedef struct 
 {
     float v[3];

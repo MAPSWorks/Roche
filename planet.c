@@ -1,4 +1,8 @@
 #include "planet.h"
+#include "vecmath.h"
+#include "opengl.h"
+
+#include <stdlib.h>
 
 mat4 computeLightMatrix(vec3 light_dir, vec3 light_up, float planet_size, float ring_outer)
 {
@@ -41,8 +45,6 @@ void computeRingMatrix(vec3 toward_view, vec3 rings_up, float size, mat4 *near_m
 }
 
 #define RING_ITERATIONS 100
-
-#define PI 3.1415926
 
 void generate_rings(unsigned char *buffer, int size, int seed)
 {
@@ -127,21 +129,21 @@ void planet_load(Planet *p)
     image_tex(&p->ring, 1, ringsize, 1, (void*)rings);
     free(rings);
     
-    tex_load_from_file(&p->day, day_filename, 3);
-    tex_load_from_file(&p->clouds, clouds_filename, 3);
-    tex_load_from_file(&p->night, night_filename, 3);
+    tex_load_from_file(&p->day, p->day_filename, 3);
+    tex_load_from_file(&p->clouds, p->clouds_filename, 3);
+    tex_load_from_file(&p->night, p->night_filename, 3);
 }
 
-void planet_render(Planet *planet, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj)
+void planet_render(Planet *p, mat4 proj_mat, mat4 view_mat, vec3 view_dir, vec3 light_dir, Shader *planet_shader, Shader *ring_shader, Object *planet_obj, Object *ring_obj)
 {
  	quat q = quat_rot(p->rot_axis, p->rot_epoch);
     mat4 planet_mat = quat_tomatrix(q);
-    planet_mat = mat4_scale(planet_mat, p->radius);
+    planet_mat = mat4_scale(planet_mat, vec3_mul(vec3n(1,1,1),p->radius));
 
     mat4 light_mat = computeLightMatrix(light_dir, vec3n(0,0,1), p->radius, p->ring_outer);
     
     mat4 far_ring_mat, near_ring_mat;
-    computeRingMatrix(toward_view, p->rings_up, p->ring_outer, &near_ring_mat, &far_ring_mat);
+    computeRingMatrix(view_dir, p->ring_upvector, p->ring_outer, &near_ring_mat, &far_ring_mat);
 
     if (p->has_rings)
     {
@@ -163,10 +165,10 @@ void planet_render(Planet *planet, mat4 proj_mat, mat4 view_mat, vec3 view_dir, 
     uniform(planet_shader, "projMat", proj_mat.v);
     uniform(planet_shader, "viewMat", view_mat.v);
     uniform(planet_shader, "modelMat", planet_mat.v);
-    uniform(planet_shader, "ring_vec", p->rings_up.v);
+    uniform(planet_shader, "ring_vec", p->ring_upvector.v);
     uniform(planet_shader, "light_dir", light_dir.v);
     uniform1f(planet_shader, "cloud_disp", p->cloud_epoch);
-    uniform(planet_shader, "view_dir", view_dir);
+    uniform(planet_shader, "view_dir", view_dir.v);
     uniform(planet_shader, "sky_color", p->atmos_color.v);
     uniform1f(planet_shader, "ring_inner", p->ring_inner);
     uniform1f(planet_shader, "ring_outer", p->ring_outer);
@@ -198,7 +200,7 @@ void planet_render(Planet *planet, mat4 proj_mat, mat4 view_mat, vec3 view_dir, 
 
 void skybox_load(Skybox *s)
 {
-    tex_load_from_file(&s->tex, tex_filename, 3);
+    tex_load_from_file(&s->tex, s->tex_filename, 3);
 }
 
 void skybox_render(Skybox *s, mat4 proj_mat, mat4 view_mat, Shader *skybox_shader, Object *o)
@@ -212,7 +214,7 @@ void skybox_render(Skybox *s, mat4 proj_mat, mat4 view_mat, Shader *skybox_shade
     uniform(skybox_shader, "projMat", proj_mat.v);
     uniform(skybox_shader, "viewMat", view_mat.v);
     uniform(skybox_shader, "modelMat", skybox_mat.v);
-    uniform1i(&skybox_shader, "tex", 0);
+    uniform1i(skybox_shader, "tex", 0);
     use_tex(&s->tex,0);
     render_obj(o, render_planet); 
 
