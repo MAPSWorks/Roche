@@ -9,6 +9,5 @@ out vec4 out_color;
 
 void main(void)
 {
-    vec3 color = texture(tex, pass_uv).rgb;
-	out_color = vec4((clamp(color, 1.0-exposure, 1.0) - 1.0 + exposure)/exposure,1.0);
+    out_color = vec4(texture(tex, pass_uv).rgb,1.0);
 }
