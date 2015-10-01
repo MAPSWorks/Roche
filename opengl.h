@@ -4,31 +4,36 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-typedef struct 
+class Texture
 {
+
+public:
+    void create();
+    void destroy();
+    void use(int unit);
+    void image(int channels, int width, int height, void* data);
+    void load_from_file(const char *filename, int channels);
+
+private:
     GLuint id;
     GLenum target;
-} 
-Texture;
+};
 
-void create_tex(Texture *tex);
-void delete_tex(Texture *tex);
-void use_tex(Texture *tex, int unit);
-void image_tex(Texture *tex,int channels, int width, int height, void* data);
-void tex_load_from_file(Texture *tex, const char *filename, int channels);
-
-typedef struct 
+class Renderable
 {
+
+private:
     GLuint vbo,ibo;
     int count;
-} 
-Object;
 
-void create_obj(Object *obj);
-void delete_obj(Object *obj);
-void update_verts_obj(Object *obj, size_t size, void* data);
-void update_ind_obj(Object *obj, size_t size, int* data);
-void render_obj(Object *obj, void (*render_fun)(void));
+public:
+    void create();
+    void destroy();
+    void update_verts(size_t size, void* data);
+    void update_ind(size_t size, int* data);
+    void render(void (*render_fun)(void));
+    void generate_sphere(int theta_res, int phi_res, int exterior);
+};
 
 typedef union
 {
@@ -47,21 +52,22 @@ typedef struct
 }
 Uniform;
 
-typedef struct 
-{
+class Shader {
+
+private:
     GLuint program;
     Uniform *uniforms;
     int uniform_count;
-} 
-Shader;
 
-void create_shader(Shader *s);
-void delete_shader(Shader *s);
-int load_shader(Shader *s,const char* vert_source, const char* frag_source);
-void load_shader_from_file(Shader *s,const char* vert_filename, const char* frag_filename);
-void uniform(Shader *s, const char *name, void *value);
-void uniform1i(Shader *s, const char *name, int value);
-void uniform1f(Shader *s, const char *name, float value);
-void use_shader(Shader *s);
+public:
+    void create();
+    void destroy();
+    int load(const char* vert_source, const char* frag_source);
+    void load_from_file(const char* vert_filename, const char* frag_filename);
+    void uniform(const char *name, void *value);
+    void uniform(const char *name, int value);
+    void uniform(const char *name, float value);
+    void use();
+};
 
 #endif
