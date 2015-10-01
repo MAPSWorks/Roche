@@ -1,6 +1,8 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-void read_file(const char* filename, char** buffer_ptr);
+#include <string>
+
+std::string read_file(std::string filename);
 
 #endif

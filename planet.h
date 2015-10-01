@@ -11,6 +11,7 @@
 class Planet
 {
 public:
+    std::string name;
 	glm::vec3 pos;
 	glm::vec3 rot_axis;
 	float rot_epoch;
@@ -26,13 +27,20 @@ public:
 	glm::vec3 atmos_color;
 	float cloud_epoch;
 
-	Texture day,night,clouds,ring;
+	
 	std::string day_filename;
 	std::string night_filename;
 	std::string clouds_filename;
 
+    Planet();
+
     void load();
-    void render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_dir, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj);
+    void render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj);
+    void unload();
+
+private:
+    Texture day,night,clouds,ring;
+    bool loaded;
 };
 
 class Skybox
