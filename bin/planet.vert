@@ -9,6 +9,7 @@ uniform mat4 modelMat;
 out vec2 pass_uv;
 out vec4 pass_position;
 out vec3 pass_normal;
+out vec3 pass_lpos;
 
 void main(void)
 {
@@ -16,5 +17,6 @@ void main(void)
 	vec3 normal = normalize(in_position.xyz);
 	pass_normal = normalize(mat3(modelMat)*normal);
 	pass_position = modelMat*in_position;
+    pass_lpos = mat3(modelMat)*in_position.xyz;
 	gl_Position = projMat*viewMat*pass_position;
 }

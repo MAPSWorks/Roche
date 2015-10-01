@@ -3,6 +3,7 @@
 in vec2 pass_uv;
 in vec3 pass_normal;
 in vec4 pass_position;
+in vec3 pass_lpos;
 out vec4 out_color;
 
 // TEXTURES
@@ -53,8 +54,8 @@ void main(void)
 	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
 	
 	// SHADOW CALCULATION (RAYTRACING)
-	float t = dot(pass_position.xyz, ring_vec)/dot(light_dir,ring_vec);
-	vec4 projPos = vec4(pass_position.xyz-t*light_dir,1.0);
+	float t = dot(pass_lpos.xyz, ring_vec)/dot(light_dir,ring_vec);
+	vec4 projPos = vec4(pass_lpos.xyz-t*light_dir,1.0);
 	float dist = length(projPos.xyz);
 	float shadow = 0.0;
 	float tex_offset = (dist-ring_inner)/(ring_outer-ring_inner);

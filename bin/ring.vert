@@ -12,6 +12,6 @@ out vec4 pass_position;
 void main(void)
 {
 	pass_uv = in_uv;
-    pass_position = modelMat*in_position;
-	gl_Position = projMat*viewMat*pass_position;
+    pass_position = vec4(mat3(modelMat)*in_position.xyz,1.0);
+	gl_Position = projMat*viewMat*modelMat*in_position;
 }

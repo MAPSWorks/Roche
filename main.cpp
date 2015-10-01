@@ -169,6 +169,8 @@ int main(int argc, char **argv)
         light_dir = glm::normalize(light_dir);
         light_angle += 0.002;
 
+        earth.pos[0] += 0.001;
+
         double moveX, moveY;
         if (fullscreen || glfwGetKey(window, GLFW_KEY_TAB))
         {

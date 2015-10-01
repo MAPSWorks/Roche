@@ -11,7 +11,7 @@
 
 glm::mat4 computeLightMatrix(glm::vec3 light_dir, glm::vec3 light_up, float planet_size, float ring_outer)
 {
-    glm::mat4 light_mat = glm::mat4(1.0);
+    glm::mat4 light_mat;
     light_up = glm::normalize(light_up);
     light_dir = - glm::normalize(light_dir);
     glm::vec3 light_right = glm::normalize(glm::cross(light_dir, light_up));
@@ -30,8 +30,8 @@ glm::mat4 computeLightMatrix(glm::vec3 light_dir, glm::vec3 light_up, float plan
 
 void computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 *near_mat, glm::mat4 *far_mat)
 {
-    *near_mat = glm::mat4(1.0);
-    *far_mat = glm::mat4(1.0);
+    glm::mat4 near_mat_temp = glm::mat4(1.0);
+    glm::mat4 far_mat_temp = glm::mat4(1.0);
     rings_up = glm::normalize(rings_up);
     toward_view = glm::normalize(toward_view);
 
@@ -40,13 +40,15 @@ void computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, gl
     int i;
     for (i=0;i<3;++i)
     {
-        (*near_mat)[0][i] = rings_x[i]*size;
-        (*near_mat)[1][i] = rings_right[i]*size;
-        (*near_mat)[2][i] = rings_up[i]*size;
-        (*far_mat)[0][i] = -rings_x[i]*size;
-        (*far_mat)[1][i] = -rings_right[i]*size;
-        (*far_mat)[2][i] = -rings_up[i]*size;
+        near_mat_temp[0][i] = rings_x[i]*size;
+        near_mat_temp[1][i] = rings_right[i]*size;
+        near_mat_temp[2][i] = rings_up[i]*size;
+        far_mat_temp[0][i] = -rings_x[i]*size;
+        far_mat_temp[1][i] = -rings_right[i]*size;
+        far_mat_temp[2][i] = -rings_up[i]*size;
     }
+    *near_mat *= near_mat_temp;
+    *far_mat *= far_mat_temp;
 }
 
 #define RING_ITERATIONS 100
@@ -141,13 +143,17 @@ void Planet::load()
 
 void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_dir, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj)
 {
- 	glm::quat q = glm::rotate(glm::quat(), rot_epoch, rot_axis);
-    glm::mat4 planet_mat = mat4_cast(q);
-    planet_mat = glm::scale(planet_mat, glm::vec3(radius));
+    glm::mat4 planet_mat = glm::translate(glm::mat4(), pos);
 
+ 	glm::quat q = glm::rotate(glm::quat(), rot_epoch, rot_axis);
+    planet_mat *= mat4_cast(q);
+    planet_mat = glm::scale(planet_mat, glm::vec3(radius));
+    
     glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), radius, ring_outer);
     
     glm::mat4 far_ring_mat, near_ring_mat;
+    far_ring_mat = glm::translate(far_ring_mat, pos);
+    near_ring_mat = glm::translate(near_ring_mat, pos);
     computeRingMatrix(pos - view_pos, ring_upvector, ring_outer, &near_ring_mat, &far_ring_mat);
 
     if (has_rings)
