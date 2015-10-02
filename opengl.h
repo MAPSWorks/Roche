@@ -15,10 +15,10 @@ public:
   void use(int unit);
   void image(int channels, int width, int height, void* data);
   void load_from_file(const std::string &filename, int channels);
+  GLuint getId();
 
 private:
   GLuint id;
-  GLenum target;
 };
 
 class Renderable

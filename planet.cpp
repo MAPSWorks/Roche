@@ -9,6 +9,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "util.h"
+
 glm::mat4 computeLightMatrix(glm::vec3 light_dir, glm::vec3 light_up, float planet_size, float ring_outer)
 {
   glm::mat4 light_mat;
@@ -143,9 +145,13 @@ void Planet::load()
     ring.image(1, ringsize, 1, (void*)rings);
     delete [] rings;
     
-    day.load_from_file(day_filename.c_str(), 3);
-    clouds.load_from_file(clouds_filename.c_str(), 3);
-    night.load_from_file(night_filename.c_str(), 3);
+    day.create();
+    clouds.create();
+    night.create();
+    load_DDS(day_filename, day);
+    load_DDS(clouds_filename,clouds);
+    load_DDS(night_filename, night);
+
     loaded = true;
   }
 }
@@ -234,7 +240,8 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
 
 void Skybox::load()
 {
-  tex.load_from_file(tex_filename.c_str(), 3);
+  tex.create();
+  load_DDS(tex_filename, tex);
 }
 
 void Skybox::render(glm::mat4 proj_mat, glm::mat4 view_mat, Shader &skybox_shader, Renderable &o)

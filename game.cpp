@@ -190,7 +190,7 @@ void Game::loadShaders()
 
 void Game::loadSkybox()
 {
-  skybox.tex_filename = "space_skybox.png";
+  skybox.tex_filename = "space_skybox.dds";
   skybox.rot_axis = glm::vec3(1,0,0);
   skybox.rot_angle = 60.0;
   skybox.size = 200;
@@ -213,9 +213,9 @@ void Game::loadPlanetFiles()
   earth.has_rings = 1;
   earth.atmos_color = glm::vec3(0.6,0.8,1.0);
   earth.cloud_epoch = 0.0;
-  earth.day_filename = "earth_land.png";
-  earth.night_filename = "earth_night.png";
-  earth.clouds_filename = "earth_clouds.png";
+  earth.day_filename = "earth_land.dds";
+  earth.night_filename = "earth_night.dds";
+  earth.clouds_filename = "earth_clouds.dds";
   
   planets.push_back(earth);
   planets.back().load();

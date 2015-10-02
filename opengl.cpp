@@ -200,7 +200,6 @@ void Shader::load_from_file(const std::string &vert_filename, const std::string 
 void Texture::create()
 {
   glGenTextures(1, &id);
-  target = GL_TEXTURE_2D;
 }
 void Texture::destroy()
 {
@@ -209,7 +208,11 @@ void Texture::destroy()
 void Texture::use(int unit)
 {
   glActiveTexture(GL_TEXTURE0 + unit);
-  glBindTexture(target, id);
+  glBindTexture(GL_TEXTURE_2D, id);
+}
+GLuint Texture::getId()
+{
+  return id;
 }
 GLenum format(int channels)
 {
@@ -224,16 +227,16 @@ GLenum format(int channels)
 }
 void Texture::image(int channels, int width, int height, void* data)
 {
-  glBindTexture(target, id);
-  glTexImage2D(target, 0, format(channels), width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
-  glGenerateMipmap(target);
-  glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glBindTexture(GL_TEXTURE_2D, id);
+  glTexImage2D(GL_TEXTURE_2D, 0, format(channels), width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
-  float aniso = 0.0f;
+  float aniso;
   glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-  glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-  glBindTexture(target, 0);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+  glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Texture::load_from_file(const std::string &filename, int channels)
