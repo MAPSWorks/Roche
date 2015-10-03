@@ -29,7 +29,7 @@ float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 
 // This should be uniform variables
 #define AMBIENT_LIGHT 0.04
-#define RING_AMBIENT 0.0
+#define RING_AMBIENT 0.2
 
 void main(void)
 {
@@ -50,9 +50,7 @@ void main(void)
 	// TEXTURE COMPOSITION
 	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
 	vec3 color = mix(day*light  + nightlights*night, vec3(light), cloud);
-	color = mix(color, sky_color*light, angle);
-	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
-	
+
 	// SHADOW CALCULATION (RAYTRACING)
 	float t = dot(pass_lpos.xyz, ring_vec)/dot(light_dir,ring_vec);
 	vec4 projPos = vec4(pass_lpos.xyz-t*light_dir,1.0);
@@ -64,7 +62,12 @@ void main(void)
 		shadow += texture(ring_tex, vec2(tex_offset + offset[i]*ringtex_size,0.0)).r * weight[i];
 		shadow += texture(ring_tex, vec2(tex_offset - offset[i]*ringtex_size,0.0)).r * weight[i];
 	}
-	shadow = 1.0 - (1.0-shadow)*light;
+	//shadow = 1.0 - (1.0-shadow)*light;
 	shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
-	out_color.xyz *= mix(shadow,1.0,nightlights);
+	color *= mix(shadow,1.0,nightlights);
+
+	// ATMOSPHERE CALCULATION
+	color = mix(color, sky_color*light, angle);
+	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
+	
 }

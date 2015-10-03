@@ -9,80 +9,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vector>
-
-
-Window::Window()
-{
-
-}
-
-Window::~Window()
-{
-  glfwTerminate();
-}
-
-void Window::create()
-{
-  if (!glfwInit())
-    exit(-1);
-
-  GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-  const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-  glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-  glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-  glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-  glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-  glfwWindowHint(GLFW_SAMPLES, 16);
-
-   win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-
-  if (!win)
-  {
-    glfwTerminate();
-    exit(-1);
-  }
-
-  glfwMakeContextCurrent(win);
-  GLenum err = glewInit();
-  if (GLEW_OK != err)
-  {
-  std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
-  }
-
-  int width, height;
-  glfwGetFramebufferSize(win, &width, &height);
-  glViewport(0, 0, width, height);
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
-  glEnable(GL_BLEND);
-  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_CULL_FACE);
-  glCullFace(GL_FRONT);
-  glEnableVertexAttribArray(0);
-  glEnableVertexAttribArray(1);
-}
-
-void Window::update()
-{
-  glfwSwapBuffers(win);
-  glfwPollEvents();
-}
-
-GLFWwindow *Window::getWindow()
-{
-  return win;
-}
-
-float Window::getAspectRatio()
-{
-  int width,height;
-  glfwGetWindowSize(win, &width, &height);
-  return width/ (float)height;
-}
+#include <deque>
+#include <mutex>
+#include <atomic>
+#include <thread>
 
 Camera::Camera()
 {
-  polarPos = glm::vec3(0,0,10);
+  polarPos = glm::vec3(0.7,0.2,1.2);
   center = glm::vec3(0,0,0);
   up = glm::vec3(0,0,1);
 
@@ -91,7 +25,7 @@ Camera::Camera()
   far = 1000.0;
 }
 
-const glm::vec3 &Camera::getPolarPosition()
+glm::vec3 &Camera::getPolarPosition()
 {
   return polarPos;
 }
@@ -135,8 +69,11 @@ void Camera::update(float ratio)
 
 Game::Game()
 {
-  sensibility = 0.002;
+  sensibility = 0.0004;
   light_position = glm::vec3(0,5,0);
+  viewSpeed = glm::vec3(0,0,0);
+  maxViewSpeed = 0.2;
+  viewSmoothness = 0.85;
 }
 
 Game::~Game()
@@ -147,16 +84,98 @@ Game::~Game()
   ring_obj.destroy();
   planet_obj.destroy();
   skybox_obj.destroy();
+  glfwTerminate();
+
+  for (auto it=planetLoaders.begin();it != planetLoaders.end();++it)
+  {
+    it->mutex.unlock();
+    it->stopthread = true;
+  }
+  for (auto it=plThreads.begin();it != plThreads.end();++it)
+  {
+    it->join();
+  }
+}
+
+void plThread(PlanetLoader *pl)
+{
+  glfwMakeContextCurrent(pl->context);
+  while (!pl->stopthread)
+  {
+    pl->mutex.lock();
+    if (pl->planet)
+    {
+      pl->planet->load();
+      pl->planet = NULL;
+    }
+  }
+  glfwDestroyWindow(pl->context);
 }
 
 void Game::init()
 {
-  window.create();
+  if (!glfwInit())
+    exit(-1);
+
+  GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+  const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+  glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+  glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+  glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+  glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+  glfwWindowHint(GLFW_SAMPLES, 16);
+
+  win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+
+  if (!win)
+  {
+    glfwTerminate();
+    exit(-1);
+  }
+
+  glfwMakeContextCurrent(win);
+  glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+
+  const int plCount = 1;
+  for (int i=0;i<plCount;++i)
+  {
+    planetLoaders.emplace_back();
+    planetLoaders.back().context = glfwCreateWindow(1,1,"",NULL,win);
+    if (!planetLoaders.back().context)
+    {
+      std::cout << "Can't create context for texture loading" << std::endl;
+      exit(-1);
+    }
+    planetLoaders.back().planet = NULL;
+    planetLoaders.back().stopthread = false;
+    planetLoaders.back().mutex.lock();
+    plThreads.emplace_back(plThread, &planetLoaders.back());
+  }
+
+  GLenum err = glewInit();
+  if (GLEW_OK != err)
+  {
+  std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
+  }
+
+  int width, height;
+  glfwGetFramebufferSize(win, &width, &height);
+  glViewport(0, 0, width, height);
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
+  glEnable(GL_BLEND);
+  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_CULL_FACE);
+  glCullFace(GL_FRONT);
+  glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+
   generateModels();
   loadShaders();
   loadSkybox();
   loadPlanetFiles();
-  glfwGetCursorPos(window.getWindow(), &preMousePosX, &preMousePosY);
+  glfwGetCursorPos(win, &preMousePosX, &preMousePosY);
+  ratio = width/(float)height;
 }
 
 void Game::generateModels()
@@ -199,52 +218,71 @@ void Game::loadSkybox()
 
 void Game::loadPlanetFiles()
 {
-  Planet earth;
-  earth.name = "Earth";
-  earth.pos = glm::vec3(0,0,0);
-  earth.rot_axis = glm::vec3(0,0,1);
-  earth.rot_epoch = 0.0;
-  earth.radius = 0.3;
-  earth.ring_inner = 0.4;
-  earth.ring_outer = 0.6;
-  earth.ring_upvector = glm::normalize(glm::vec3(1,1,2));
-  earth.ring_seed = 1909802985;
-  earth.ring_color = glm::vec4(0.6,0.6,0.6,1.0);
-  earth.has_rings = 1;
-  earth.atmos_color = glm::vec3(0.6,0.8,1.0);
-  earth.cloud_epoch = 0.0;
-  earth.day_filename = "earth_land.dds";
-  earth.night_filename = "earth_night.dds";
-  earth.clouds_filename = "earth_clouds.dds";
+  planets.emplace_back();
+  Planet *earth = &planets.back();
+
+  earth->name = "Earth";
+  earth->pos = glm::vec3(0,0,0);
+  earth->rot_axis = glm::vec3(0,0,1);
+  earth->rot_epoch = 0.0;
+  earth->radius = 0.3;
+  earth->ring_inner = 0.4;
+  earth->ring_outer = 0.6;
+  earth->ring_upvector = glm::normalize(glm::vec3(1,1,2));
+  earth->ring_seed = 1909802985;
+  earth->ring_color = glm::vec4(0.6,0.6,0.6,1.0);
+  earth->has_rings = 1;
+  earth->atmos_color = glm::vec3(0.6,0.8,1.0);
+  earth->cloud_epoch = 0.0;
+  earth->day_filename = "earth_land.dds";
+  earth->night_filename = "earth_night.dds";
+  earth->clouds_filename = "earth_clouds.dds";
   
-  planets.push_back(earth);
+  for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
+  {
+    if (!it->planet)
+    {
+      it->planet = &planets.back();
+      it->mutex.unlock();
+      return;
+    }
+  }
   planets.back().load();
 }
 
 void Game::update()
 {
   double posX, posY;
-  double moveX, moveY;
-  GLFWwindow *win = window.getWindow();
+  glm::vec2 move;
   glfwGetCursorPos(win, &posX, &posY);
-  glm::vec3 camera_pos = glm::vec3(camera.getPolarPosition());
-  moveX = posX-preMousePosX;
-  moveY = posY-preMousePosY;
+  move.x = -posX+preMousePosX;
+  move.y = posY-preMousePosY;
 
   if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
   {
-    camera_pos.x -= moveX*sensibility;
-    camera_pos.y += moveY*sensibility;
-    if (camera_pos.y > PI/2 - 0.0001) camera_pos.y = PI/2 - 0.0001;
-    if (camera_pos.y < -PI/2 + 0.0001) camera_pos.y = -PI/2 + 0.0001;
+    viewSpeed.x += move.x*sensibility;
+    viewSpeed.y += move.y*sensibility;
+    for (int i=0;i<2;++i)
+    {
+      if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
+      if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
+    }
   }
   else if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_3))
   {
-    camera_pos.z *= 1.0 + (moveY*sensibility);
-    if (camera_pos.z < 0.4) camera_pos.z = 0.4;
+    viewSpeed.z += (move.y*sensibility);
   }
 
-  camera.setPolarPosition(camera_pos);
+  camera.getPolarPosition().x += viewSpeed.x;
+  camera.getPolarPosition().y += viewSpeed.y;
+  camera.getPolarPosition().z *= 1.0+viewSpeed.z;
+
+  viewSpeed *= viewSmoothness;
+
+  if (camera.getPolarPosition().y > PI/2 - 0.0001) camera.getPolarPosition().y = PI/2 - 0.0001;
+  if (camera.getPolarPosition().y < -PI/2 + 0.0001) camera.getPolarPosition().y = -PI/2 + 0.0001;
+  if (camera.getPolarPosition().z < 0.4) camera.getPolarPosition().z = 0.4;
+
   preMousePosX = posX;
   preMousePosY = posY;
 }
@@ -252,7 +290,8 @@ void Game::update()
 void Game::render()
 {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  camera.update(window.getAspectRatio());
+  
+  camera.update(ratio);
   glm::mat4 proj_mat = camera.getProjMat();
   glm::mat4 view_mat = camera.getViewMat();
   skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
@@ -260,11 +299,11 @@ void Game::render()
   {
     it->render(proj_mat, view_mat, camera.getPosition(), light_position, planet_shader, ring_shader, planet_obj, ring_obj);
   }
-  window.update();
+  glfwSwapBuffers(win);
+  glfwPollEvents();
 }
 
 bool Game::isRunning()
 {
-  GLFWwindow *win = window.getWindow();
   return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
 }

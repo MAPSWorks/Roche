@@ -5,9 +5,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <fstream>
+#include <cstring>
+
 #include <iostream>
 #include <string>
 #include <cmath>
+
+#include <thread>
 
 #define PLANET_STRIDE 24
 
@@ -199,20 +204,22 @@ void Shader::load_from_file(const std::string &vert_filename, const std::string 
 
 void Texture::create()
 {
+  mutex.lock();
   glGenTextures(1, &id);
+  mutex.unlock();
 }
 void Texture::destroy()
 {
+  mutex.lock();
   glDeleteTextures(1, &id);
+  mutex.unlock();
 }
 void Texture::use(int unit)
 {
+  mutex.lock();
   glActiveTexture(GL_TEXTURE0 + unit);
   glBindTexture(GL_TEXTURE_2D, id);
-}
-GLuint Texture::getId()
-{
-  return id;
+  mutex.unlock();
 }
 GLenum format(int channels)
 {
@@ -227,6 +234,7 @@ GLenum format(int channels)
 }
 void Texture::image(int channels, int width, int height, void* data)
 {
+  mutex.lock();
   glBindTexture(GL_TEXTURE_2D, id);
   glTexImage2D(GL_TEXTURE_2D, 0, format(channels), width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
   glGenerateMipmap(GL_TEXTURE_2D);
@@ -237,6 +245,7 @@ void Texture::image(int channels, int width, int height, void* data)
   glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
   glBindTexture(GL_TEXTURE_2D, 0);
+  mutex.unlock();
 }
 
 void Texture::load_from_file(const std::string &filename, int channels)
@@ -254,6 +263,111 @@ void Texture::load_from_file(const std::string &filename, int channels)
     image(channels, width, height, data);
   }
   delete [] data;
+}
+
+typedef unsigned int DWORD;
+
+struct DDS_PIXELFORMAT {
+  DWORD dwSize;
+  DWORD dwFlags;
+  DWORD dwFourCC;
+  DWORD dwRGBBitCount;
+  DWORD dwRBitMask;
+  DWORD dwGBitMask;
+  DWORD dwBBitMask;
+  DWORD dwABitMask;
+};
+
+typedef struct {
+  DWORD           dwSize;
+  DWORD           dwFlags;
+  DWORD           dwHeight;
+  DWORD           dwWidth;
+  DWORD           dwPitchOrLinearSize;
+  DWORD           dwDepth;
+  DWORD           dwMipMapCount;
+  DWORD           dwReserved1[11];
+  DDS_PIXELFORMAT ddspf;
+  DWORD           dwCaps;
+  DWORD           dwCaps2;
+  DWORD           dwCaps3;
+  DWORD           dwCaps4;
+  DWORD           dwReserved2;
+} DDS_HEADER;
+
+void Texture::load_DDS(const std::string &filename)
+{
+  std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+  if (!in) throw(errno);
+
+  char buf[4];
+  in.seekg(0,std::ios::beg);
+  in.read(buf, 4);
+  if (strncmp(buf, "DDS ", 4))
+  {
+    std::cout << filename << " isn't a DDS file" << std::endl;
+    return;
+  } 
+
+  DDS_HEADER header;
+  in.read((char*)&header, 124);
+  char *fourCC;
+  fourCC = (char*)&(header.ddspf.dwFourCC);
+
+  GLenum pixelFormat;
+  int bytesPer16Pixels = 16;
+  int mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:0;
+
+  if (!strncmp(fourCC, "DXT5", 4))
+  {
+    bytesPer16Pixels = 16;
+    pixelFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+  }
+  else
+  {
+    std::cout << "DDS format not supported for " << filename << std::endl;
+    return;
+  }
+  int *mipmapOffsets = new int[mipmapCount+1];
+  mipmapOffsets[0] = 128;
+  for (int i=1;i<=mipmapCount;++i)
+  {
+    int width = header.dwWidth/(1<<(i-1));
+    int height = header.dwHeight/(1<<(i-1));
+    mipmapOffsets[i] = mipmapOffsets[i-1] + ((width+3)/4)*((height+3)/4)*bytesPer16Pixels;
+  }
+
+  mutex.lock();
+  glGenTextures(1, &id);
+  glBindTexture(GL_TEXTURE_2D, id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  float aniso;
+  glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapCount);
+  mutex.unlock();
+  
+  for (int i=mipmapCount;i>=0;--i)
+  {
+    int width = header.dwWidth/(1<<i);
+    int height = header.dwHeight/(1<<i);
+    if (width == 0) width = 1;
+    if (height == 0) height = 1;
+    int imageSize = ((width+3)/4)*((height+3)/4)*bytesPer16Pixels;
+
+    char *buffer = new char[imageSize];
+    in.seekg(mipmapOffsets[i], std::ios::beg);
+    in.read(buffer, imageSize);
+    mutex.lock();
+    glBindTexture(GL_TEXTURE_2D, id);
+    glCompressedTexImage2D(GL_TEXTURE_2D, i, pixelFormat, width,height, 0, imageSize, buffer);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, i);
+    mutex.unlock();
+    delete [] buffer;
+  }
+
 }
 
 void Renderable::create()

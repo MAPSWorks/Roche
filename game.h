@@ -9,22 +9,12 @@
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
-#include <vector>
+#include <deque>
+#include <mutex>
+#include <atomic>
+#include <thread>
 
 #define PI        3.14159265358979323846264338327950288 
-
-class Window
-{
-public:
-    Window();
-    ~Window();
-    void create();
-    void update();
-    float getAspectRatio();
-    GLFWwindow *getWindow();
-private:
-    GLFWwindow *win;
-};
 
 class Camera
 {
@@ -33,7 +23,7 @@ public:
     void update(float ratio);
     void setCenter(glm::vec3 center);
     void setPolarPosition(glm::vec3 pos);
-    const glm::vec3 &getPolarPosition();
+    glm::vec3 &getPolarPosition();
     const glm::vec3 &getPosition();
     void setUp(glm::vec3 up);
     const glm::mat4 &getProjMat();
@@ -52,6 +42,14 @@ private:
 
 };
 
+typedef struct
+{
+    std::mutex mutex;
+    GLFWwindow *context;
+    Planet *planet;
+    std::atomic<bool> stopthread;
+} PlanetLoader;
+
 class Game
 {
 public:
@@ -68,18 +66,24 @@ private:
     void loadSkybox();
     void loadPlanetFiles();
 
-    std::vector<Planet> planets;
+    std::deque<PlanetLoader> planetLoaders;
+    std::deque<std::thread> plThreads;
+
+    std::deque<Planet> planets;
     glm::vec3 light_position;
     Renderable skybox_obj, planet_obj, ring_obj;
     Shader skybox_shader, planet_shader, ring_shader;
     Skybox skybox;
 
     double preMousePosX, preMousePosY;
+    glm::vec3 viewSpeed;
+    float maxViewSpeed, viewSmoothness;
 
     float sensibility;
 
-    Window window;
     Camera camera;
+    GLFWwindow *win;
+    float ratio;
 
 };
 

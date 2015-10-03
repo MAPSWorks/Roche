@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 
 #include <string>
+#include <mutex>
 
 class Texture
 {
@@ -15,10 +16,11 @@ public:
   void use(int unit);
   void image(int channels, int width, int height, void* data);
   void load_from_file(const std::string &filename, int channels);
-  GLuint getId();
+  void load_DDS(const std::string &filename);
 
 private:
   GLuint id;
+  std::mutex mutex;
 };
 
 class Renderable

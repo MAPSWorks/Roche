@@ -4,14 +4,14 @@ LIB_FOLDERS=lib/
 INC_FOLDERS=include/
 
 CFLAGS=-Wall -I$(INC_FOLDERS) -DGLEW_STATIC
-CXXFLAGS=-Wall -I$(INC_FOLDERS) -DGLEW_STATIC -std=c++11
-LDFLAGS=-L$(LIB_FOLDERS) -lglfw3 -lopengl32 -lglu32 -lgdi32 -static-libgcc -static-libstdc++
+CXXFLAGS=-Wall -I$(INC_FOLDERS) -DGLEW_STATIC -std=c++11 -pthread
+LDFLAGS=-L$(LIB_FOLDERS) -lglfw3 -lopengl32 -lglu32 -lgdi32 -static-libgcc -static-libstdc++ -pthread
 
 ROCHE=bin/roche.exe
 
 roche:$(ROCHE)
 
-bin/roche.exe: obj/main.o obj/glew.o obj/lodepng.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
+bin/roche.exe: obj/main.o obj/lodepng.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 obj/%.o: %.c
