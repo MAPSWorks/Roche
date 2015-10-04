@@ -46,7 +46,7 @@ typedef struct
 {
     std::mutex mutex;
     GLFWwindow *context;
-    Planet *planet;
+    std::atomic<bool> waiting;
     std::atomic<bool> stopthread;
 } PlanetLoader;
 
@@ -65,9 +65,13 @@ private:
     void loadShaders();
     void loadSkybox();
     void loadPlanetFiles();
+    void loadTexture(Texture *tex);
 
     std::deque<PlanetLoader> planetLoaders;
     std::deque<std::thread> plThreads;
+
+    std::deque<Texture*> texturesToLoad;
+    std::mutex texsMutex;
 
     std::deque<Planet> planets;
     glm::vec3 light_position;

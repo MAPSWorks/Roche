@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "game.h"
+#include "opengl.h"
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -88,8 +89,8 @@ Game::~Game()
 
   for (auto it=planetLoaders.begin();it != planetLoaders.end();++it)
   {
-    it->mutex.unlock();
     it->stopthread = true;
+    it->mutex.unlock();
   }
   for (auto it=plThreads.begin();it != plThreads.end();++it)
   {
@@ -97,17 +98,27 @@ Game::~Game()
   }
 }
 
-void plThread(PlanetLoader *pl)
+void plThread(PlanetLoader *pl, std::deque<Texture*> *texs, std::mutex *m)
 {
   glfwMakeContextCurrent(pl->context);
+  pl->waiting = true;
   while (!pl->stopthread)
   {
     pl->mutex.lock();
-    if (pl->planet)
+    pl->waiting = false;
+    m->lock();
+    bool empty = texs->empty();
+    while (!empty)
     {
-      pl->planet->load();
-      pl->planet = NULL;
-    }
+      Texture *t = texs->front();
+      texs->pop_front();
+      m->unlock();
+      t->load();
+      m->lock();
+      empty = texs->empty();
+    } 
+    m->unlock();
+    pl->waiting = true;
   }
   glfwDestroyWindow(pl->context);
 }
@@ -136,7 +147,7 @@ void Game::init()
   glfwMakeContextCurrent(win);
   glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 
-  const int plCount = 1;
+  const int plCount = 4;
   for (int i=0;i<plCount;++i)
   {
     planetLoaders.emplace_back();
@@ -146,10 +157,9 @@ void Game::init()
       std::cout << "Can't create context for texture loading" << std::endl;
       exit(-1);
     }
-    planetLoaders.back().planet = NULL;
     planetLoaders.back().stopthread = false;
     planetLoaders.back().mutex.lock();
-    plThreads.emplace_back(plThread, &planetLoaders.back());
+    plThreads.emplace_back(plThread, &planetLoaders.back(), &texturesToLoad, &texsMutex);
   }
 
   GLenum err = glewInit();
@@ -209,10 +219,11 @@ void Game::loadShaders()
 
 void Game::loadSkybox()
 {
-  skybox.tex_filename = "space_skybox.dds";
+  skybox.tex.setFilename("space_skybox.dds");
   skybox.rot_axis = glm::vec3(1,0,0);
   skybox.rot_angle = 60.0;
   skybox.size = 200;
+  loadTexture(&skybox.tex);
   skybox.load();
 }
 
@@ -234,20 +245,29 @@ void Game::loadPlanetFiles()
   earth->has_rings = 1;
   earth->atmos_color = glm::vec3(0.6,0.8,1.0);
   earth->cloud_epoch = 0.0;
-  earth->day_filename = "earth_land.dds";
-  earth->night_filename = "earth_night.dds";
-  earth->clouds_filename = "earth_clouds.dds";
+  earth->day.setFilename("earth_land.dds");
+  earth->night.setFilename("earth_night.dds");
+  earth->clouds.setFilename("earth_clouds.dds");
+  loadTexture(&earth->day);
+  loadTexture(&earth->night);
+  loadTexture(&earth->clouds);
   
+  planets.back().load();
+}
+
+void Game::loadTexture(Texture *tex)
+{
+  texsMutex.lock();
+  texturesToLoad.push_back(tex);
+  texsMutex.unlock();
   for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
   {
-    if (!it->planet)
+    if (it->waiting)
     {
-      it->planet = &planets.back();
       it->mutex.unlock();
       return;
     }
   }
-  planets.back().load();
 }
 
 void Game::update()

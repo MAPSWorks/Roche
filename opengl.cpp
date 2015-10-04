@@ -248,6 +248,7 @@ void Texture::image(int channels, int width, int height, void* data)
   mutex.unlock();
 }
 
+/*
 void Texture::load_from_file(const std::string &filename, int channels)
 {
   unsigned int error;
@@ -263,6 +264,12 @@ void Texture::load_from_file(const std::string &filename, int channels)
     image(channels, width, height, data);
   }
   delete [] data;
+}
+*/
+
+void Texture::setFilename(const std::string &filename)
+{
+  this->filename = filename;
 }
 
 typedef unsigned int DWORD;
@@ -295,7 +302,7 @@ typedef struct {
   DWORD           dwReserved2;
 } DDS_HEADER;
 
-void Texture::load_DDS(const std::string &filename)
+void Texture::load()
 {
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
   if (!in) throw(errno);

@@ -14,24 +14,22 @@ class Planet
 {
 public:
   std::string name;
-	glm::vec3 pos;
-	glm::vec3 rot_axis;
-	float rot_epoch;
-	float radius;
+  glm::vec3 pos;
+  glm::vec3 rot_axis;
+  float rot_epoch;
+  float radius;
 
-	float ring_inner;
-	float ring_outer;
-	glm::vec3 ring_upvector;
-	int ring_seed;
-	glm::vec4 ring_color;
-	int has_rings;
+  float ring_inner;
+  float ring_outer;
+  glm::vec3 ring_upvector;
+  int ring_seed;
+  glm::vec4 ring_color;
+  int has_rings;
 
-	glm::vec3 atmos_color;
-	float cloud_epoch;
+  glm::vec3 atmos_color;
+  float cloud_epoch;
 
-	std::string day_filename;
-	std::string night_filename;
-	std::string clouds_filename;
+  Texture day,night,clouds,ring;
 
   Planet();
 
@@ -40,7 +38,6 @@ public:
   void unload();
 
 private:
-  Texture day,night,clouds,ring;
   std::atomic<bool> loaded;
 };
 
@@ -48,7 +45,6 @@ class Skybox
 {
 public:
   Texture tex;
-  std::string tex_filename;
   glm::vec3 rot_axis;
   float rot_angle;
   float size;

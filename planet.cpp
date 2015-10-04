@@ -144,10 +144,6 @@ void Planet::load()
     ring.create();
     ring.image(1, ringsize, 1, (void*)rings);
     delete [] rings;
-    
-    day.load_DDS(day_filename);
-    clouds.load_DDS(clouds_filename);
-    night.load_DDS(night_filename);
 
     loaded = true;
   }
@@ -237,7 +233,7 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
 
 void Skybox::load()
 {
-  tex.load_DDS(tex_filename);
+
 }
 
 void Skybox::render(glm::mat4 proj_mat, glm::mat4 view_mat, Shader &skybox_shader, Renderable &o)

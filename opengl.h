@@ -15,12 +15,13 @@ public:
   void destroy();
   void use(int unit);
   void image(int channels, int width, int height, void* data);
-  void load_from_file(const std::string &filename, int channels);
-  void load_DDS(const std::string &filename);
+  void setFilename(const std::string &filename);
+  void load();
 
 private:
   GLuint id;
   std::mutex mutex;
+  std::string filename;
 };
 
 class Renderable
