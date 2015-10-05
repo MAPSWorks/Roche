@@ -130,6 +130,15 @@ void render_rings()
 
 Planet::Planet()
 {
+  has_rings = false;
+  ring_upvector = glm::vec3(0,0,1);
+  cloud_epoch = 0;
+  ecc = 0;
+  inc = 0;
+  lan = 0;
+  arg = 0;
+  m0 = 0;
+  
   loaded = false;
 }
 

@@ -66,6 +66,8 @@ private:
     void loadSkybox();
     void loadPlanetFiles();
     void loadTexture(Texture *tex);
+    void loadPlanet(Planet *p);
+    void unloadPlanet(Planet *p);
 
     std::deque<PlanetLoader> planetLoaders;
     std::deque<std::thread> plThreads;
@@ -74,6 +76,8 @@ private:
     std::mutex texsMutex;
 
     std::deque<Planet> planets;
+    Planet *focusedPlanet;
+
     glm::vec3 light_position;
     Renderable skybox_obj, planet_obj, ring_obj;
     Shader skybox_shader, planet_shader, ring_shader;

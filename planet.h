@@ -24,10 +24,13 @@ public:
   glm::vec3 ring_upvector;
   int ring_seed;
   glm::vec4 ring_color;
-  int has_rings;
+  bool has_rings;
 
   glm::vec3 atmos_color;
   float cloud_epoch;
+
+  //Orbital elements
+  float ecc, sma, inc, lan, arg, m0;
 
   Texture day,night,clouds,ring;
 

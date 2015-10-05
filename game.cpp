@@ -64,8 +64,8 @@ const glm::mat4 &Camera::getViewMat()
 void Camera::update(float ratio)
 {
   projMat = glm::perspective((float)(fovy/180*PI),ratio, near, far);
-  pos = glm::vec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]);
-  viewMat = glm::lookAt(pos+center, center, up);
+  pos = glm::vec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]) + center;
+  viewMat = glm::lookAt(pos, center, up);
 }
 
 Game::Game()
@@ -248,13 +248,22 @@ void Game::loadPlanetFiles()
   earth->day.setFilename("earth_land.dds");
   earth->night.setFilename("earth_night.dds");
   earth->clouds.setFilename("earth_clouds.dds");
-  loadTexture(&earth->day);
-  loadTexture(&earth->night);
-  loadTexture(&earth->clouds);
-  
-  planets.back().load();
+  loadPlanet(&planets.back());
+
+  focusedPlanet =  &planets.back();
 }
 
+void Game::loadPlanet(Planet *p)
+{
+  p->load();
+  loadTexture(&p->day);
+  loadTexture(&p->night);
+  loadTexture(&p->clouds);
+}
+void Game::unloadPlanet(Planet *p)
+{
+  p->unload();
+}
 void Game::loadTexture(Texture *tex)
 {
   texsMutex.lock();
@@ -277,6 +286,9 @@ void Game::update()
   glfwGetCursorPos(win, &posX, &posY);
   move.x = -posX+preMousePosX;
   move.y = posY-preMousePosY;
+
+  camera.setCenter(focusedPlanet->pos);
+  focusedPlanet->pos.x += 0.04;
 
   if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
   {
