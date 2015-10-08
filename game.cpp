@@ -17,13 +17,13 @@
 
 Camera::Camera()
 {
-  polarPos = glm::vec3(0.7,0.2,1.2);
+  polarPos = glm::vec3(0.0,0.0,8000);
   center = glm::vec3(0,0,0);
   up = glm::vec3(0,0,1);
 
   fovy = 50;
-  near = 0.02;
-  far = 1000.0;
+  near = 20;
+  far = 20000000.0;
 }
 
 glm::vec3 &Camera::getPolarPosition()
@@ -75,6 +75,7 @@ Game::Game()
   viewSpeed = glm::vec3(0,0,0);
   maxViewSpeed = 0.2;
   viewSmoothness = 0.85;
+  epoch = 0.0;
 }
 
 Game::~Game()
@@ -222,7 +223,7 @@ void Game::loadSkybox()
   skybox.tex.setFilename("space_skybox.dds");
   skybox.rot_axis = glm::vec3(1,0,0);
   skybox.rot_angle = 60.0;
-  skybox.size = 200;
+  skybox.size = 15000000;
   loadTexture(&skybox.tex);
   skybox.load();
 }
@@ -230,15 +231,21 @@ void Game::loadSkybox()
 void Game::loadPlanetFiles()
 {
   planets.emplace_back();
+  Planet *sun = &planets.back();
+  sun->name = "Sun";
+  sun->pos = glm::vec3(0,0,0);
+  sun->GM = 132712440018;
+
+  planets.emplace_back();
   Planet *earth = &planets.back();
 
   earth->name = "Earth";
   earth->pos = glm::vec3(0,0,0);
   earth->rot_axis = glm::vec3(0,0,1);
-  earth->rot_epoch = 0.0;
-  earth->radius = 0.3;
-  earth->ring_inner = 0.4;
-  earth->ring_outer = 0.6;
+  earth->rot_rate =7.292115E-5;
+  earth->radius = 6371.01;
+  earth->ring_inner = 10000;
+  earth->ring_outer = 16000;
   earth->ring_upvector = glm::normalize(glm::vec3(1,1,2));
   earth->ring_seed = 1909802985;
   earth->ring_color = glm::vec4(0.6,0.6,0.6,1.0);
@@ -248,9 +255,16 @@ void Game::loadPlanetFiles()
   earth->day.setFilename("earth_land.dds");
   earth->night.setFilename("earth_night.dds");
   earth->clouds.setFilename("earth_clouds.dds");
+  earth->parent = sun;
+  earth->ecc = 1.616998394251595E-02;
+  earth->sma = 1.495125338678499E+08;
+  earth->m0 = 3.571060381240151E+02;
+  earth->inc = 2.343719926157708E+01;
+  earth->lan = 4.704173983490563E-03;
+  earth->arg = 1.042446186418036E+02;
   loadPlanet(&planets.back());
 
-  focusedPlanet =  &planets.back();
+  focusedPlanet = earth;
 }
 
 void Game::loadPlanet(Planet *p)
@@ -281,6 +295,10 @@ void Game::loadTexture(Texture *tex)
 
 void Game::update()
 {
+  focusedPlanet->update(epoch);
+  std::cout << "x=" << focusedPlanet->pos.x << ";y=" << focusedPlanet->pos.y << ";z=" << focusedPlanet->pos.z << std::endl;
+  epoch += 86400;
+
   double posX, posY;
   glm::vec2 move;
   glfwGetCursorPos(win, &posX, &posY);
@@ -288,7 +306,6 @@ void Game::update()
   move.y = posY-preMousePosY;
 
   camera.setCenter(focusedPlanet->pos);
-  focusedPlanet->pos.x += 0.04;
 
   if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
   {
@@ -313,7 +330,7 @@ void Game::update()
 
   if (camera.getPolarPosition().y > PI/2 - 0.0001) camera.getPolarPosition().y = PI/2 - 0.0001;
   if (camera.getPolarPosition().y < -PI/2 + 0.0001) camera.getPolarPosition().y = -PI/2 + 0.0001;
-  if (camera.getPolarPosition().z < 0.4) camera.getPolarPosition().z = 0.4;
+  if (camera.getPolarPosition().z < focusedPlanet->radius) camera.getPolarPosition().z = focusedPlanet->radius;
 
   preMousePosX = posX;
   preMousePosY = posY;
@@ -327,10 +344,11 @@ void Game::render()
   glm::mat4 proj_mat = camera.getProjMat();
   glm::mat4 view_mat = camera.getViewMat();
   skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
-  for (auto it=planets.begin();it != planets.end(); ++it)
+  /*for (auto it=planets.begin();it != planets.end(); ++it)
   {
     it->render(proj_mat, view_mat, camera.getPosition(), light_position, planet_shader, ring_shader, planet_obj, ring_obj);
-  }
+  }*/
+  focusedPlanet->render(proj_mat, view_mat, camera.getPosition(), light_position, planet_shader, ring_shader, planet_obj, ring_obj);
   glfwSwapBuffers(win);
   glfwPollEvents();
 }

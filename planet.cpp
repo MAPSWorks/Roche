@@ -174,7 +174,7 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
 {
   glm::mat4 planet_mat = glm::translate(glm::mat4(), pos);
 
-  glm::quat q = glm::rotate(glm::quat(), rot_epoch, rot_axis);
+  glm::quat q = glm::rotate(glm::quat(), rot_angle, rot_axis);
   planet_mat *= mat4_cast(q);
   planet_mat = glm::scale(planet_mat, glm::vec3(radius));
 
@@ -259,4 +259,26 @@ void Skybox::render(glm::mat4 proj_mat, glm::mat4 view_mat, Shader &skybox_shade
   skybox_shader.uniform("tex", 0);
   tex.use(0);
   o.render(render_planet); 
+}
+
+// MATH STUFF
+
+#define PI        3.14159265358979323846264338327950288 
+
+void Planet::update(double epoch)
+{
+  rot_angle = epoch*rot_rate;
+  if (parent != NULL)
+  {
+    double meanAnomaly = sqrt(parent->GM / (sma*sma*sma))*epoch + m0;
+    double En = (ecc<0.8)?meanAnomaly:PI;
+    const int it = 10;
+    for (int i=0;i<it;++i)
+      En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
+    double trueAnomaly = atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
+    double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
+    glm::dvec3 posInPlane = glm::vec3(sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
+    glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::quat(), arg*PI/180.0,glm::vec3(0,0,1)),inc*PI/180, glm::vec3(1,0,0)),lan*PI/180, glm::vec3(1,0,0));
+    pos = q*posInPlane;
+  }
 }

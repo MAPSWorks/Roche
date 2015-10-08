@@ -69,20 +69,25 @@ private:
     void loadPlanet(Planet *p);
     void unloadPlanet(Planet *p);
 
+    std::deque<Planet> planets;
+    Planet *focusedPlanet;
+    double epoch;
+
+    // THREADING RELATED STUFF
     std::deque<PlanetLoader> planetLoaders;
     std::deque<std::thread> plThreads;
 
     std::deque<Texture*> texturesToLoad;
     std::mutex texsMutex;
 
-    std::deque<Planet> planets;
-    Planet *focusedPlanet;
-
+    // RENDERING RELATED STUFF
     glm::vec3 light_position;
     Renderable skybox_obj, planet_obj, ring_obj;
     Shader skybox_shader, planet_shader, ring_shader;
     Skybox skybox;
 
+
+    // INTERACTION RELATED STUFF
     double preMousePosX, preMousePosY;
     glm::vec3 viewSpeed;
     float maxViewSpeed, viewSmoothness;

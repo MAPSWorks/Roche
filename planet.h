@@ -16,7 +16,8 @@ public:
   std::string name;
   glm::vec3 pos;
   glm::vec3 rot_axis;
-  float rot_epoch;
+  float rot_rate;
+  float rot_angle;
   float radius;
 
   float ring_inner;
@@ -30,13 +31,16 @@ public:
   float cloud_epoch;
 
   //Orbital elements
-  float ecc, sma, inc, lan, arg, m0;
+  double ecc, sma, inc, lan, arg, m0;
+  double GM;
 
+  Planet *parent;
   Texture day,night,clouds,ring;
 
   Planet();
 
   void load();
+  void update(double epoch);
   void render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj);
   void unload();
 
