@@ -82,8 +82,9 @@ private:
 
     // RENDERING RELATED STUFF
     glm::vec3 light_position;
-    Renderable skybox_obj, planet_obj, ring_obj;
-    Shader skybox_shader, planet_shader, ring_shader;
+    Renderable skybox_obj, planet_obj, ring_obj, flare_obj;
+    Texture flare_tex;
+    Shader skybox_shader, planet_shader, ring_shader, sun_shader, flare_shader;
     Skybox skybox;
 
 

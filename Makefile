@@ -11,7 +11,7 @@ ROCHE=bin/roche.exe
 
 roche:$(ROCHE)
 
-bin/roche.exe: obj/main.o obj/lodepng.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
+bin/roche.exe: obj/main.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 obj/%.o: %.c

@@ -76,7 +76,7 @@ void Shader::destroy()
   if (uniforms) delete [] uniforms;
   glDeleteProgram(program);
 }
-void Shader::uniform(const std::string &name, void *value)
+void Shader::uniform(const std::string &name,const void *value)
 {
   int i;
   for (i=0;i<uniform_count;++i)
@@ -193,6 +193,7 @@ int Shader::load(const std::string &vert_source, const std::string &frag_source)
 
 void Shader::load_from_file(const std::string &vert_filename, const std::string &frag_filename)
 {
+  create();
   std::string vert_source = read_file(vert_filename);
   std::string frag_source = read_file(frag_filename);
   std::cout << "Compiling and linking " << vert_filename << " and " << frag_filename << "..." << std::endl;
@@ -305,7 +306,11 @@ typedef struct {
 void Texture::load()
 {
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-  if (!in) throw(errno);
+  if (!in)
+  {
+    std::cout << "Can't open file " << filename << std::endl;
+    throw(errno);
+  }
 
   char buf[4];
   in.seekg(0,std::ios::beg);
@@ -360,8 +365,8 @@ void Texture::load()
   {
     int width = header.dwWidth/(1<<i);
     int height = header.dwHeight/(1<<i);
-    if (width == 0) width = 1;
-    if (height == 0) height = 1;
+    if (width <= 0) width = 1;
+    if (height <= 0) height = 1;
     int imageSize = ((width+3)/4)*((height+3)/4)*bytesPer16Pixels;
 
     char *buffer = new char[imageSize];
@@ -399,10 +404,11 @@ void Renderable::update_ind(size_t size, int* data)
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*4, data, GL_STATIC_DRAW);
   count = size;
 }
-void Renderable::render(void (*render_fun)(void))
+void Renderable::render()
 {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-  render_fun();
+  glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
+  glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
   glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, NULL);
 }

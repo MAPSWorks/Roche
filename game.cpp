@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vector>
@@ -14,6 +15,8 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+
+#define MAX_VIEW_DIST 2000000
 
 Camera::Camera()
 {
@@ -23,7 +26,7 @@ Camera::Camera()
 
   fovy = 50;
   near = 20;
-  far = 20000000.0;
+  far = MAX_VIEW_DIST;
 }
 
 glm::vec3 &Camera::getPolarPosition()
@@ -86,6 +89,7 @@ Game::~Game()
   ring_obj.destroy();
   planet_obj.destroy();
   skybox_obj.destroy();
+  flare_obj.destroy();
   glfwTerminate();
 
   for (auto it=planetLoaders.begin();it != planetLoaders.end();++it)
@@ -191,7 +195,7 @@ void Game::init()
 
 void Game::generateModels()
 {
-  float ring_pos[] = 
+  float ring_vert[] = 
   { 0.0,-1.0,0.0,1.0,-0.0,-1.0,
    +1.0,-1.0,0.0,1.0,+1.0,-1.0,
    +1.0,+1.0,0.0,1.0,+1.0,+1.0,
@@ -201,29 +205,42 @@ void Game::generateModels()
   int ring_ind[] = {0,1,2,2,3,0,0,3,2,2,1,0};
 
   ring_obj.create();
-  ring_obj.update_verts(24*4, ring_pos);
+  ring_obj.update_verts(24*4, ring_vert);
   ring_obj.update_ind(12, ring_ind);
 
   planet_obj.generate_sphere(128,128, 1);
   skybox_obj.generate_sphere(16,16,0);
+
+  float flare_vert[] =
+  { -1.0, -1.0, 0.0,1.0,0.0,0.0,
+    +1.0, -1.0, 0.0,1.0,1.0,0.0,
+    +1.0, +1.0, 0.0,1.0,1.0,1.0,
+    -1.0, +1.0, 0.0,1.0,0.0,1.0
+  };
+
+  flare_obj.create();
+  flare_obj.update_verts(24*4, flare_vert);
+  flare_obj.update_ind(12, ring_ind);
+
+  flare_tex.setFilename("tex/flare.dds");
+  loadTexture(&flare_tex);
 }
 
 void Game::loadShaders()
 {
-  ring_shader.create();
-  planet_shader.create();
-  skybox_shader.create();
   ring_shader.load_from_file("ring.vert", "ring.frag");
   planet_shader.load_from_file("planet.vert", "planet.frag");
+  sun_shader.load_from_file("planet.vert", "sun.frag");
   skybox_shader.load_from_file("skybox.vert", "skybox.frag");
+  flare_shader.load_from_file("flare.vert", "flare.frag");
 }
 
 void Game::loadSkybox()
 {
-  skybox.tex.setFilename("space_skybox.dds");
+  skybox.tex.setFilename("tex/skybox.dds");
   skybox.rot_axis = glm::vec3(1,0,0);
   skybox.rot_angle = 60.0;
-  skybox.size = 15000000;
+  skybox.size = 100;
   loadTexture(&skybox.tex);
   skybox.load();
 }
@@ -235,6 +252,10 @@ void Game::loadPlanetFiles()
   sun->name = "Sun";
   sun->pos = glm::vec3(0,0,0);
   sun->GM = 132712440018;
+  sun->radius = 696000;
+  sun->day.setFilename("tex/sun/diffuse.dds");
+  sun->is_sun = true;
+  loadPlanet(sun);
 
   planets.emplace_back();
   Planet *earth = &planets.back();
@@ -252,9 +273,11 @@ void Game::loadPlanetFiles()
   earth->has_rings = 1;
   earth->atmos_color = glm::vec3(0.6,0.8,1.0);
   earth->cloud_epoch = 0.0;
-  earth->day.setFilename("earth_land.dds");
-  earth->night.setFilename("earth_night.dds");
-  earth->clouds.setFilename("earth_clouds.dds");
+  earth->day.setFilename("tex/earth/diffuse.dds");
+  earth->night.setFilename("tex/earth/night.dds");
+  earth->clouds.setFilename("tex/earth/clouds.dds");
+  earth->has_night_tex = true;
+  earth->has_clouds_tex = true;
   earth->parent = sun;
   earth->ecc = 1.616998394251595E-02;
   earth->sma = 1.495125338678499E+08;
@@ -262,17 +285,24 @@ void Game::loadPlanetFiles()
   earth->inc = 2.343719926157708E+01;
   earth->lan = 4.704173983490563E-03;
   earth->arg = 1.042446186418036E+02;
-  loadPlanet(&planets.back());
+  loadPlanet(earth);
 
   focusedPlanet = earth;
+
+  Planet::no_night.create();
+  Planet::no_clouds.create();
+  unsigned char black[4] = {0,0,0,255};
+  unsigned char trans[4] = {255,255,255,0};
+  Planet::no_night.image(0,1,1, black);
+  Planet::no_clouds.image(0,1,1,trans);
 }
 
 void Game::loadPlanet(Planet *p)
 {
   p->load();
   loadTexture(&p->day);
-  loadTexture(&p->night);
-  loadTexture(&p->clouds);
+  if (p->has_night_tex) loadTexture(&p->night);
+  if (p->has_clouds_tex) loadTexture(&p->clouds);
 }
 void Game::unloadPlanet(Planet *p)
 {
@@ -295,8 +325,11 @@ void Game::loadTexture(Texture *tex)
 
 void Game::update()
 {
-  focusedPlanet->update(epoch);
-  std::cout << "x=" << focusedPlanet->pos.x << ";y=" << focusedPlanet->pos.y << ";z=" << focusedPlanet->pos.z << std::endl;
+  for (auto it=planets.begin();it != planets.end(); ++it)
+  {
+    it->update(epoch);
+  }
+  //std::cout << "x=" << focusedPlanet->pos.x << ";y=" << focusedPlanet->pos.y << ";z=" << focusedPlanet->pos.z << std::endl;
   epoch += 86400;
 
   double posX, posY;
@@ -305,7 +338,7 @@ void Game::update()
   move.x = -posX+preMousePosX;
   move.y = posY-preMousePosY;
 
-  camera.setCenter(focusedPlanet->pos);
+  camera.setCenter(glm::vec3(0,0,0));
 
   if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
   {
@@ -328,8 +361,16 @@ void Game::update()
 
   viewSpeed *= viewSmoothness;
 
-  if (camera.getPolarPosition().y > PI/2 - 0.0001) camera.getPolarPosition().y = PI/2 - 0.0001;
-  if (camera.getPolarPosition().y < -PI/2 + 0.0001) camera.getPolarPosition().y = -PI/2 + 0.0001;
+  if (camera.getPolarPosition().y > PI/2 - 0.001)
+  {
+    camera.getPolarPosition().y = PI/2 - 0.001;
+    viewSpeed.y = 0;
+  }
+  if (camera.getPolarPosition().y < -PI/2 + 0.001)
+  {
+    camera.getPolarPosition().y = -PI/2 + 0.001;
+    viewSpeed.y = 0;
+  }
   if (camera.getPolarPosition().z < focusedPlanet->radius) camera.getPolarPosition().z = focusedPlanet->radius;
 
   preMousePosX = posX;
@@ -343,12 +384,44 @@ void Game::render()
   camera.update(ratio);
   glm::mat4 proj_mat = camera.getProjMat();
   glm::mat4 view_mat = camera.getViewMat();
-  skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
-  /*for (auto it=planets.begin();it != planets.end(); ++it)
+
+  std::vector<Planet*> flares; // Planets to be rendered as flares (too far away)
+  std::vector<Planet*> mesh; // Planets to be rendered as their whole mesh
+
+  for (auto it=planets.begin();it != planets.end(); ++it)
   {
-    it->render(proj_mat, view_mat, camera.getPosition(), light_position, planet_shader, ring_shader, planet_obj, ring_obj);
-  }*/
-  focusedPlanet->render(proj_mat, view_mat, camera.getPosition(), light_position, planet_shader, ring_shader, planet_obj, ring_obj);
+    glm::vec3 dist = it->pos - focusedPlanet->pos - camera.getPosition();
+    if (glm::length(dist) >= MAX_VIEW_DIST)
+      flares.push_back(&*it);
+    else
+      mesh.push_back(&*it);
+  }
+
+  glDepthMask(GL_FALSE);
+  //skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
+  flare_shader.use();
+  flare_shader.uniform("ratio", ratio);
+  flare_shader.uniform("tex", 0);
+  flare_tex.use(0);
+  for (auto it=flares.begin();it != flares.end(); ++it)
+  {
+    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4((*it)->pos - focusedPlanet->pos, 1.0);
+    if (posOnScreen.z > 0)
+    {
+      flare_shader.uniform("size", 0.2f);
+      flare_shader.uniform("color", glm::value_ptr(glm::vec4(0.6,0.8,1.0,1.0)));
+
+      glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
+      flare_shader.uniform("pos", glm::value_ptr(pOS));
+      flare_obj.render();
+    }
+  }
+  glDepthMask(GL_TRUE);
+
+  for (auto it=mesh.begin();it != mesh.end(); ++it)
+  {
+    (*it)->render(proj_mat, view_mat, camera.getPosition(), light_position, focusedPlanet->pos ,planet_shader, sun_shader, ring_shader, planet_obj, ring_obj);
+  }
   glfwSwapBuffers(win);
   glfwPollEvents();
 }

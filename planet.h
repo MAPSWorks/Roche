@@ -36,13 +36,17 @@ public:
 
   Planet *parent;
   Texture day,night,clouds,ring;
+  bool has_clouds_tex, has_night_tex;
+  bool is_sun;
 
   Planet();
 
   void load();
   void update(double epoch);
-  void render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj);
+  void render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, glm::vec3 focused_planet_pos, Shader &planet_shader, Shader &sun_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj);
   void unload();
+
+  static Texture no_night,no_clouds;
 
 private:
   std::atomic<bool> loaded;

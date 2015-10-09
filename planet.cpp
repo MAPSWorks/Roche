@@ -11,6 +11,9 @@
 
 #include "util.h"
 
+Texture Planet::no_night;
+Texture Planet::no_clouds;
+
 glm::mat4 computeLightMatrix(glm::vec3 light_dir, glm::vec3 light_up, float planet_size, float ring_outer)
 {
   glm::mat4 light_mat;
@@ -114,31 +117,39 @@ void generate_rings(unsigned char *buffer, int size, int seed)
   free(ref_buffer);
 }
 
-#define PLANET_STRIDE 24
-
-void render_planet()
-{
-  glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,PLANET_STRIDE,(GLvoid*)0);
-  glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,PLANET_STRIDE,(GLvoid*)16);
-}
-
-void render_rings()
-{
-  glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
-  glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
-}
-
 Planet::Planet()
 {
-  has_rings = false;
+  name = "undefined";
+  pos = glm::vec3(0,0,0);
+  rot_axis = glm::vec3(0,0,1);
+  rot_rate = 0;
+  rot_angle = 0;
+  radius = 1000;
+
+  ring_inner = 2000;
+  ring_outer = 4000;
   ring_upvector = glm::vec3(0,0,1);
+  ring_seed = 0;
+  ring_color = glm::vec4(0.6,0.6,0.6,1.0);
+  has_rings = false;
+
+  atmos_color = glm::vec3(0.0,0.0,0.0);
   cloud_epoch = 0;
+
   ecc = 0;
+  sma = 10000;
   inc = 0;
   lan = 0;
   arg = 0;
   m0 = 0;
-  
+  GM = 100000;
+
+  parent = NULL;
+  has_clouds_tex = false;
+  has_night_tex = false;
+
+  is_sun = false;
+
   loaded = false;
 }
 
@@ -170,9 +181,13 @@ void Planet::unload()
   }
 }
 
-void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, Shader &planet_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj)
+void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, glm::vec3 focused_planet_pos, Shader &planet_shader, Shader &sun_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj)
 {
-  glm::mat4 planet_mat = glm::translate(glm::mat4(), pos);
+  Shader &pshad = is_sun?sun_shader:planet_shader;
+
+  glm::vec3 render_pos = pos-focused_planet_pos;
+
+  glm::mat4 planet_mat = glm::translate(glm::mat4(), render_pos);
 
   glm::quat q = glm::rotate(glm::quat(), rot_angle, rot_axis);
   planet_mat *= mat4_cast(q);
@@ -183,9 +198,9 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
   glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), radius, ring_outer);
   
   glm::mat4 far_ring_mat, near_ring_mat;
-  far_ring_mat = glm::translate(far_ring_mat, pos);
-  near_ring_mat = glm::translate(near_ring_mat, pos);
-  computeRingMatrix(pos - view_pos, ring_upvector, ring_outer, &near_ring_mat, &far_ring_mat);
+  far_ring_mat = glm::translate(far_ring_mat, render_pos);
+  near_ring_mat = glm::translate(near_ring_mat, render_pos);
+  computeRingMatrix(render_pos - view_pos, ring_upvector, ring_outer, &near_ring_mat, &far_ring_mat);
 
   if (has_rings)
   {
@@ -199,30 +214,30 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
     ring_shader.uniform( "tex", 0);
     ring_shader.uniform( "minDist", ring_inner/ring_outer);
     ring.use(0);
-    ring_obj.render(render_rings);
+    ring_obj.render();
   }
 
   // PLANET RENDER
-  planet_shader.use();
-  planet_shader.uniform( "projMat", glm::value_ptr(proj_mat));
-  planet_shader.uniform( "viewMat", glm::value_ptr(view_mat));
-  planet_shader.uniform( "modelMat", glm::value_ptr(planet_mat));
-  planet_shader.uniform( "ring_vec", glm::value_ptr(ring_upvector));
-  planet_shader.uniform( "light_dir", glm::value_ptr(light_dir));
-  planet_shader.uniform( "cloud_disp", cloud_epoch);
-  planet_shader.uniform( "view_pos", glm::value_ptr(view_pos));
-  planet_shader.uniform( "sky_color", glm::value_ptr(atmos_color));
-  planet_shader.uniform( "ring_inner", ring_inner);
-  planet_shader.uniform( "ring_outer", ring_outer);
-  planet_shader.uniform( "day_tex", 0);
-  planet_shader.uniform( "clouds_tex", 1);
-  planet_shader.uniform( "night_tex", 2);
-  planet_shader.uniform( "ring_tex", 3);
+  pshad.use();
+  pshad.uniform( "projMat", glm::value_ptr(proj_mat));
+  pshad.uniform( "viewMat", glm::value_ptr(view_mat));
+  pshad.uniform( "modelMat", glm::value_ptr(planet_mat));
+  pshad.uniform( "ring_vec", glm::value_ptr(ring_upvector));
+  pshad.uniform( "light_dir", glm::value_ptr(light_dir));
+  pshad.uniform( "cloud_disp", cloud_epoch);
+  pshad.uniform( "view_pos", glm::value_ptr(view_pos));
+  pshad.uniform( "sky_color", glm::value_ptr(atmos_color));
+  pshad.uniform( "ring_inner", ring_inner);
+  pshad.uniform( "ring_outer", ring_outer);
+  pshad.uniform( "day_tex", 0);
+  pshad.uniform( "clouds_tex", 1);
+  pshad.uniform( "night_tex", 2);
+  pshad.uniform( "ring_tex", 3);
   day.use(0);
-  clouds.use(1);
-  night.use(2);
-  ring.use(3);
-  planet_obj.render(render_planet);
+  if (has_clouds_tex) clouds.use(1); else no_clouds.use(1);
+  if (has_night_tex) night.use(2); else no_night.use(2);
+  if (has_rings) ring.use(3); else no_clouds.use(3);
+  planet_obj.render();
 
   if (has_rings)
   {
@@ -236,7 +251,7 @@ void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, 
     ring_shader.uniform( "tex", 0);
     ring_shader.uniform( "minDist", ring_inner/ring_outer);
     ring.use(0);
-    ring_obj.render(render_rings);
+    ring_obj.render();
   }
 }
 
@@ -258,7 +273,7 @@ void Skybox::render(glm::mat4 proj_mat, glm::mat4 view_mat, Shader &skybox_shade
   skybox_shader.uniform("modelMat", glm::value_ptr(skybox_mat));
   skybox_shader.uniform("tex", 0);
   tex.use(0);
-  o.render(render_planet); 
+  o.render(); 
 }
 
 // MATH STUFF
@@ -278,7 +293,7 @@ void Planet::update(double epoch)
     double trueAnomaly = atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
     double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
     glm::dvec3 posInPlane = glm::vec3(sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-    glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::quat(), arg*PI/180.0,glm::vec3(0,0,1)),inc*PI/180, glm::vec3(1,0,0)),lan*PI/180, glm::vec3(1,0,0));
+    glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg*PI/180.0,glm::dvec3(0,0,1)),inc*PI/180, glm::dvec3(1,0,0)),lan*PI/180, glm::dvec3(1,0,0));
     pos = q*posInPlane;
   }
 }

@@ -36,7 +36,7 @@ public:
   void destroy();
   void update_verts(size_t size, void* data);
   void update_ind(size_t size, int* data);
-  void render(void (*render_fun)(void));
+  void render();
   void generate_sphere(int theta_res, int phi_res, int exterior);
 };
 
@@ -69,7 +69,7 @@ public:
   void destroy();
   int load(const std::string &vert_source, const std::string &frag_source);
   void load_from_file(const std::string &vert_filename, const std::string &frag_filename);
-  void uniform(const std::string &name, void *value);
+  void uniform(const std::string &name, const void *value);
   void uniform(const std::string &name, int value);
   void uniform(const std::string &name, float value);
   void use();
