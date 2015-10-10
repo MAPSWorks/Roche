@@ -80,6 +80,8 @@ private:
     std::deque<Texture*> texturesToLoad;
     std::mutex texsMutex;
 
+    int thread_count;
+
     // RENDERING RELATED STUFF
     glm::vec3 light_position;
     Renderable skybox_obj, planet_obj, ring_obj, flare_obj;

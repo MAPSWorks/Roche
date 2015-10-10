@@ -20,7 +20,7 @@ public:
 
 private:
   GLuint id;
-  std::mutex mutex;
+  static std::mutex mutex;
   std::string filename;
 };
 

@@ -152,8 +152,8 @@ void Game::init()
   glfwMakeContextCurrent(win);
   glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 
-  const int plCount = 4;
-  for (int i=0;i<plCount;++i)
+  thread_count = 0;
+  for (int i=0;i<thread_count;++i)
   {
     planetLoaders.emplace_back();
     planetLoaders.back().context = glfwCreateWindow(1,1,"",NULL,win);
@@ -310,16 +310,23 @@ void Game::unloadPlanet(Planet *p)
 }
 void Game::loadTexture(Texture *tex)
 {
-  texsMutex.lock();
-  texturesToLoad.push_back(tex);
-  texsMutex.unlock();
-  for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
+  if (thread_count)
   {
-    if (it->waiting)
+    texsMutex.lock();
+    texturesToLoad.push_back(tex);
+    texsMutex.unlock();
+    for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
     {
-      it->mutex.unlock();
-      return;
+      if (it->waiting)
+      {
+        it->mutex.unlock();
+        return;
+      }
     }
+  }
+  else
+  {
+    tex->load();
   }
 }
 
