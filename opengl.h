@@ -7,21 +7,48 @@
 #include <string>
 #include <mutex>
 
+class TexMipmapData;
+
 class Texture
 {
 
 public:
+  Texture();
   void create();
   void destroy();
   void use(int unit);
-  void image(int channels, int width, int height, void* data);
-  void setFilename(const std::string &filename);
-  void load();
+  void update(const TexMipmapData &data);
+  void genMipmaps();
 
 private:
   GLuint id;
-  static std::mutex mutex;
-  std::string filename;
+  int max_level, base_level;
+};
+
+class TexMipmapData
+{
+public:
+  TexMipmapData(
+    bool compressed,
+    Texture *tex,
+    int level,
+    GLenum internalFormat,
+    int width,
+    int height,
+    int sizeOrType,
+    void *data);
+  ~TexMipmapData();
+  void updateTexture();
+private:
+  Texture *tex;
+  bool compressed;
+  int level;
+  GLenum internalFormat;
+  int width;
+  int height;
+  int sizeOrType;
+  void *data;
+  friend class Texture;
 };
 
 class Renderable

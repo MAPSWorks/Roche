@@ -36,6 +36,7 @@ public:
 
   Planet *parent;
   Texture day,night,clouds,ring;
+  std::string day_filename, clouds_filename, night_filename;
   bool has_clouds_tex, has_night_tex;
   bool is_sun;
 

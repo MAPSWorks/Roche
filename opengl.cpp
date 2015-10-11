@@ -18,8 +18,6 @@
 
 #define PI        3.14159265358979323846264338327950288 
 
-std::mutex Texture::mutex;
-
 void Renderable::generate_sphere(int theta_res, int phi_res, int exterior)
 {
   float theta, phi;
@@ -51,7 +49,7 @@ void Renderable::generate_sphere(int theta_res, int phi_res, int exterior)
   for (i=0;i<phi_res;++i)
   {
     for (j=0;j<theta_res;++j)
-    {
+    { 
       int i1 = i+1;
       int j1 = j+1;
       int indices[] = {i*(phi_res+1) + j, i1*(phi_res+1) + j, i1*(phi_res+1) + j1, i1*(phi_res+1)+j1, i*(phi_res+1) + j1, i*(phi_res+1) + j};
@@ -67,7 +65,6 @@ void Renderable::generate_sphere(int theta_res, int phi_res, int exterior)
   count = offset*6;
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
-
 
 void Shader::create()
 {
@@ -205,24 +202,39 @@ void Shader::load_from_file(const std::string &vert_filename, const std::string 
   }
 }
 
+Texture::Texture()
+{
+  max_level = -1;
+  base_level = -1;
+}
+
 void Texture::create()
 {
-  mutex.lock();
   glGenTextures(1, &id);
-  mutex.unlock();
+  glBindTexture(GL_TEXTURE_2D, id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  float aniso;
+  glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+
 }
 void Texture::destroy()
 {
-  mutex.lock();
   glDeleteTextures(1, &id);
-  mutex.unlock();
 }
 void Texture::use(int unit)
 {
-  mutex.lock();
   glActiveTexture(GL_TEXTURE0 + unit);
   glBindTexture(GL_TEXTURE_2D, id);
-  mutex.unlock();
+}
+void Texture::genMipmaps()
+{
+  glBindTexture(GL_TEXTURE_2D, id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);
+  glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
+  glGenerateMipmap(GL_TEXTURE_2D);
+
 }
 GLenum format(int channels)
 {
@@ -235,170 +247,64 @@ GLenum format(int channels)
     default: return GL_RGBA;
   }
 }
-void Texture::image(int channels, int width, int height, void* data)
+
+void Texture::update(const TexMipmapData &data)
 {
-  mutex.lock();
-  glBindTexture(GL_TEXTURE_2D, id);
-  glTexImage2D(GL_TEXTURE_2D, 0, format(channels), width, height, 0, format(channels),GL_UNSIGNED_BYTE, data);
-  glGenerateMipmap(GL_TEXTURE_2D);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-  glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
-  float aniso;
-  glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  mutex.unlock();
-}
-
-/*
-void Texture::load_from_file(const std::string &filename, int channels)
-{
-  unsigned int error;
-  unsigned char *data;
-  unsigned int width, height;
-  if (channels == 3) error = lodepng_decode24_file(&data, &width, &height, filename.c_str());
-  else error = lodepng_decode32_file(&data, &width, &height, filename.c_str());
-  
-  if (error) std::cout << "Error loading file " << filename << ": " << lodepng_error_text(error) << std::endl;
-  else
+  if (data.data) // i'm sorry
   {
-    create();
-    image(channels, width, height, data);
-  }
-  delete [] data;
-}
-*/
-
-void Texture::setFilename(const std::string &filename)
-{
-  this->filename = filename;
-}
-
-typedef unsigned int DWORD;
-
-struct DDS_PIXELFORMAT {
-  DWORD dwSize;
-  DWORD dwFlags;
-  DWORD dwFourCC;
-  DWORD dwRGBBitCount;
-  DWORD dwRBitMask;
-  DWORD dwGBitMask;
-  DWORD dwBBitMask;
-  DWORD dwABitMask;
-};
-
-typedef struct {
-  DWORD           dwSize;
-  DWORD           dwFlags;
-  DWORD           dwHeight;
-  DWORD           dwWidth;
-  DWORD           dwPitchOrLinearSize;
-  DWORD           dwDepth;
-  DWORD           dwMipMapCount;
-  DWORD           dwReserved1[11];
-  DDS_PIXELFORMAT ddspf;
-  DWORD           dwCaps;
-  DWORD           dwCaps2;
-  DWORD           dwCaps3;
-  DWORD           dwCaps4;
-  DWORD           dwReserved2;
-} DDS_HEADER;
-
-#include <sstream>
-
-void Texture::load()
-{
-  std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-  if (!in)
-  {
-    std::cout << "Can't open file " << filename << std::endl;
-    throw(errno);
-  }
-
-  // Reads the first 4 bytes and checks the dds file signature
-  char buf[4];
-  in.seekg(0,std::ios::beg);
-  in.read(buf, 4);
-  if (strncmp(buf, "DDS ", 4))
-  {
-    std::cout << filename << " isn't a DDS file" << std::endl;
-    return;
-  } 
-
-  // Loads the DDS header
-  DDS_HEADER header;
-  in.read((char*)&header, 124);
-  // Extracts the DXT format
-  char *fourCC;
-  fourCC = (char*)&(header.ddspf.dwFourCC);
-
-  GLenum pixelFormat; // format used in the glteximage call
-  int bytesPer16Pixels = 16; // number of bytes for each block of pixels (4x4)
-  int mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1; // number of images in the file
-
-  // Selects the proper pixel format and block size
-  if (!strncmp(fourCC, "DXT5", 4))
-  {
-    bytesPer16Pixels = 16;
-    pixelFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-  }
-  else // only dxt5 is supported yet
-  {
-    std::cout << "DDS format not supported for " << filename << std::endl;
-    return;
-  }
-  // mipmapOffsets[i] is the offset from the beginning of the file where the data of level i is
-  int *mipmapOffsets = new int[mipmapCount];
-  mipmapOffsets[0] = 128; // first level is just after header
-  for (int i=1;i<mipmapCount;++i)
-  {
-    int width = header.dwWidth>>(i-1); // level is half the width & height of the previous one
-    int height = header.dwHeight>>(i-1);
-    if (width <= 0) width = 1;
-    if (height <= 0) height = 1;
-    // offset = previous offset + previous size
-    mipmapOffsets[i] = mipmapOffsets[i-1] + std::max(1,(width+3)/4)*std::max(1,(height+3)/4)*bytesPer16Pixels;
-  }
-  // stores level data (size of biggest level)
-  char *buffer = new char[std::max(1,((int)header.dwWidth+3)/4)*std::max(1,((int)header.dwHeight+3)/4)*bytesPer16Pixels];
-
-  // Texture initialization
-  mutex.lock();
-  glGenTextures(1, &id);
-  glBindTexture(GL_TEXTURE_2D, id);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-  float aniso;
-  glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapCount);
-  mutex.unlock();
-  
-  // Iterates through the mipmap levels from the smallest to the largest
-  for (int i=mipmapCount-1;i>=0;--i)
-  {
-    int width = header.dwWidth>>i;
-    int height = header.dwHeight>>i;
-    if (width <= 0) width = 1;
-    if (height <= 0) height = 1;
-    int imageSize = std::max(1,(width+3)/4)*std::max(1,(height+3)/4)*bytesPer16Pixels;
-
-    // Reads data from file to buffer
-    in.seekg(mipmapOffsets[i], std::ios::beg);
-    in.read(buffer, imageSize);
-
-    // Updates texture
-    mutex.lock();
     glBindTexture(GL_TEXTURE_2D, id);
-    glCompressedTexImage2D(GL_TEXTURE_2D, i, pixelFormat, width,height, 0, imageSize, buffer);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, i);
-    mutex.unlock();
+    if (data.compressed)
+      glCompressedTexImage2D(
+        GL_TEXTURE_2D, 
+        data.level,
+        data.internalFormat,
+        data.width,data.height, 0,
+        data.sizeOrType,
+        data.data);
+    else
+      glTexImage2D(
+        GL_TEXTURE_2D,
+        data.level,
+        data.internalFormat,
+        data.width,data.height, 0,
+        data.internalFormat,
+        data.sizeOrType,
+        data.data);
+    if (base_level == -1 || data.level < base_level)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, data.level);
+    if (max_level == -1 || data.level > max_level)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, data.level);
   }
-  in.close();
-  delete [] buffer;
+}
+
+TexMipmapData::TexMipmapData(
+    bool compressed,
+    Texture *tex,
+    int level,
+    GLenum internalFormat,
+    int width,
+    int height,
+    int sizeOrType,
+    void *data)
+{
+  this->tex = tex;
+  this->level = level;
+  this->internalFormat = internalFormat;
+  this->width = width;
+  this->height = height;
+  this->sizeOrType = sizeOrType;
+  this->data = data;
+  this->compressed = compressed;
+}
+
+TexMipmapData::~TexMipmapData()
+{
+  if (data) delete [] data;
+}
+
+void TexMipmapData::updateTexture()
+{
+  tex->update(*this);
 }
 
 void Renderable::create()

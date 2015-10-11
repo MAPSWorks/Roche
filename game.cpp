@@ -4,6 +4,7 @@
 
 #include "game.h"
 #include "opengl.h"
+#include "util.h"
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -103,29 +104,27 @@ Game::~Game()
   }
 }
 
-void plThread(PlanetLoader *pl, std::deque<Texture*> *texs, std::mutex *m)
+void plThread(TexLoader *pl, std::deque<std::pair<std::string,Texture*>> *texs, std::mutex *ttlm, std::deque<TexMipmapData> *tmd, std::mutex *ttum)
 {
-  glfwMakeContextCurrent(pl->context);
   pl->waiting = true;
   while (!pl->stopthread)
   {
     pl->mutex.lock();
     pl->waiting = false;
-    m->lock();
-    bool empty = texs->empty();
-    while (!empty)
+    ttlm->lock();
+    bool e = texs->empty();
+    while (!e)
     {
-      Texture *t = texs->front();
+      auto p = texs->front();
       texs->pop_front();
-      m->unlock();
-      t->load();
-      m->lock();
-      empty = texs->empty();
+      ttlm->unlock();
+      load_DDS(p.first, p.second, tmd, ttum);
+      ttlm->lock();
+      e = texs->empty();
     } 
-    m->unlock();
+    ttlm->unlock();
     pl->waiting = true;
   }
-  glfwDestroyWindow(pl->context);
 }
 
 void Game::init()
@@ -152,25 +151,19 @@ void Game::init()
   glfwMakeContextCurrent(win);
   glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 
-  thread_count = 0;
+  thread_count = 4;
   for (int i=0;i<thread_count;++i)
   {
     planetLoaders.emplace_back();
-    planetLoaders.back().context = glfwCreateWindow(1,1,"",NULL,win);
-    if (!planetLoaders.back().context)
-    {
-      std::cout << "Can't create context for texture loading" << std::endl;
-      exit(-1);
-    }
     planetLoaders.back().stopthread = false;
     planetLoaders.back().mutex.lock();
-    plThreads.emplace_back(plThread, &planetLoaders.back(), &texturesToLoad, &texsMutex);
+    plThreads.emplace_back(plThread, &planetLoaders.back(), &texturesToLoad, &ttlm,&texturesToUpdate, &ttum);
   }
 
   GLenum err = glewInit();
   if (GLEW_OK != err)
   {
-  std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
+    std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
   }
 
   int width, height;
@@ -191,6 +184,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &preMousePosX, &preMousePosY);
   ratio = width/(float)height;
+  camera.getPolarPosition.z = focusedPlanet->radius*2;
 }
 
 void Game::generateModels()
@@ -222,8 +216,7 @@ void Game::generateModels()
   flare_obj.update_verts(24*4, flare_vert);
   flare_obj.update_ind(12, ring_ind);
 
-  flare_tex.setFilename("tex/flare.dds");
-  loadTexture(&flare_tex);
+  loadTexture("tex/flare.dds", &flare_tex);
 }
 
 void Game::loadShaders()
@@ -237,11 +230,10 @@ void Game::loadShaders()
 
 void Game::loadSkybox()
 {
-  skybox.tex.setFilename("tex/skybox.dds");
   skybox.rot_axis = glm::vec3(1,0,0);
   skybox.rot_angle = 60.0;
   skybox.size = 100;
-  loadTexture(&skybox.tex);
+  loadTexture("tex/skybox.dds", &skybox.tex);
   skybox.load();
 }
 
@@ -253,7 +245,8 @@ void Game::loadPlanetFiles()
   sun->pos = glm::vec3(0,0,0);
   sun->GM = 132712440018;
   sun->radius = 696000;
-  sun->day.setFilename("tex/sun/diffuse.dds");
+  sun->day.create();
+  sun->day_filename = "tex/sun/diffuse.dds";
   sun->is_sun = true;
   loadPlanet(sun);
 
@@ -270,12 +263,15 @@ void Game::loadPlanetFiles()
   earth->ring_upvector = glm::normalize(glm::vec3(1,1,2));
   earth->ring_seed = 1909802985;
   earth->ring_color = glm::vec4(0.6,0.6,0.6,1.0);
-  earth->has_rings = 1;
+  earth->has_rings = true;
   earth->atmos_color = glm::vec3(0.6,0.8,1.0);
   earth->cloud_epoch = 0.0;
-  earth->day.setFilename("tex/earth/diffuse.dds");
-  earth->night.setFilename("tex/earth/night.dds");
-  earth->clouds.setFilename("tex/earth/clouds.dds");
+  earth->day.create();
+  earth->night.create();
+  earth->clouds.create();
+  earth->day_filename = "tex/earth/diffuse.dds";
+  earth->night_filename = "tex/earth/night.dds";
+  earth->clouds_filename = "tex/earth/clouds.dds";
   earth->has_night_tex = true;
   earth->has_clouds_tex = true;
   earth->parent = sun;
@@ -293,28 +289,28 @@ void Game::loadPlanetFiles()
   Planet::no_clouds.create();
   unsigned char black[4] = {0,0,0,255};
   unsigned char trans[4] = {255,255,255,0};
-  Planet::no_night.image(0,1,1, black);
-  Planet::no_clouds.image(0,1,1,trans);
+  TexMipmapData(false, &Planet::no_night, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, black).updateTexture();
+  TexMipmapData(false, &Planet::no_clouds, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
 }
 
 void Game::loadPlanet(Planet *p)
 {
   p->load();
-  loadTexture(&p->day);
-  if (p->has_night_tex) loadTexture(&p->night);
-  if (p->has_clouds_tex) loadTexture(&p->clouds);
+  loadTexture(p->day_filename, &p->day);
+  if (p->has_night_tex) loadTexture(p->night_filename, &p->night);
+  if (p->has_clouds_tex) loadTexture(p->clouds_filename, &p->clouds);
 }
 void Game::unloadPlanet(Planet *p)
 {
   p->unload();
 }
-void Game::loadTexture(Texture *tex)
+void Game::loadTexture(const std::string &filename, Texture *tex)
 {
-  if (thread_count)
+  if (thread_count > 0)
   {
-    texsMutex.lock();
-    texturesToLoad.push_back(tex);
-    texsMutex.unlock();
+    ttlm.lock();
+    texturesToLoad.push_back(std::pair<std::string,Texture*>(filename, tex));
+    ttlm.unlock();
     for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
     {
       if (it->waiting)
@@ -326,7 +322,7 @@ void Game::loadTexture(Texture *tex)
   }
   else
   {
-    tex->load();
+    load_DDS(filename, tex, &texturesToUpdate, &ttum);
   }
 }
 
@@ -386,6 +382,14 @@ void Game::update()
 
 void Game::render()
 {
+  ttum.lock();
+  while (!texturesToUpdate.empty())
+  {
+    texturesToUpdate.front().updateTexture();
+    texturesToUpdate.pop_front();
+  }
+  ttum.unlock();
+
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
   camera.update(ratio);
@@ -405,7 +409,7 @@ void Game::render()
   }
 
   glDepthMask(GL_FALSE);
-  //skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
+  skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
   flare_shader.use();
   flare_shader.uniform("ratio", ratio);
   flare_shader.uniform("tex", 0);

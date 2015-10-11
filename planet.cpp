@@ -11,6 +11,8 @@
 
 #include "util.h"
 
+#include <iostream>
+
 Texture Planet::no_night;
 Texture Planet::no_clouds;
 
@@ -157,14 +159,17 @@ void Planet::load()
 {
   if (!loaded)
   {
-    const int ringsize = 2048;
-    unsigned char *rings = new unsigned char[ringsize];
-    generate_rings(rings, ringsize, ring_seed);
+    if (has_rings)
+    {
+      const int ringsize = 2048;
+      unsigned char *rings = new unsigned char[ringsize];
+      generate_rings(rings, ringsize, ring_seed);
 
-    ring.create();
-    ring.image(1, ringsize, 1, (void*)rings);
-    delete [] rings;
-
+      ring.create();
+      ring.update(TexMipmapData(false, &ring, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings));
+      ring.genMipmaps();
+      delete [] rings;
+    }
     loaded = true;
   }
 }
@@ -278,7 +283,7 @@ void Skybox::render(glm::mat4 proj_mat, glm::mat4 view_mat, Shader &skybox_shade
 
 // MATH STUFF
 
-#define PI        3.14159265358979323846264338327950288 
+#define PI 3.14159265358979323846264338327950288 
 
 void Planet::update(double epoch)
 {
