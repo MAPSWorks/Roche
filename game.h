@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 
 #include "opengl.h"
+#include "concurrent_queue.h"
 #include "planet.h"
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -42,13 +43,6 @@ private:
 
 };
 
-typedef struct
-{
-  std::mutex mutex;
-  std::atomic<bool> waiting;
-  std::atomic<bool> stopthread;
-} TexLoader;
-
 class Game
 {
 public:
@@ -73,14 +67,12 @@ private:
   double epoch;
 
   // THREADING RELATED STUFF
-  std::deque<TexLoader> planetLoaders;
   std::deque<std::thread> plThreads;
+  std::atomic<bool> quit;
 
-  std::deque<std::pair<std::string,Texture*>> texturesToLoad;
-  std::mutex ttlm;
+  concurrent_queue<std::pair<std::string,Texture*>> texturesToLoad;
 
-  std::deque<TexMipmapData> texturesToUpdate;
-  std::mutex ttum;
+  concurrent_queue<TexMipmapData> texturesToUpdate;
 
   int thread_count;
 

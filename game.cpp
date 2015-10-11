@@ -5,6 +5,7 @@
 #include "game.h"
 #include "opengl.h"
 #include "util.h"
+#include "concurrent_queue.h"
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -16,6 +17,7 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <functional>
 
 #define MAX_VIEW_DIST 2000000
 
@@ -80,6 +82,7 @@ Game::Game()
   maxViewSpeed = 0.2;
   viewSmoothness = 0.85;
   epoch = 0.0;
+  quit = false;
 }
 
 Game::~Game()
@@ -93,37 +96,19 @@ Game::~Game()
   flare_obj.destroy();
   glfwTerminate();
 
-  for (auto it=planetLoaders.begin();it != planetLoaders.end();++it)
-  {
-    it->stopthread = true;
-    it->mutex.unlock();
-  }
+  quit = true;
   for (auto it=plThreads.begin();it != plThreads.end();++it)
   {
     it->join();
   }
 }
 
-void plThread(TexLoader *pl, std::deque<std::pair<std::string,Texture*>> *texs, std::mutex *ttlm, std::deque<TexMipmapData> *tmd, std::mutex *ttum)
+void plThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd)
 {
-  pl->waiting = true;
-  while (!pl->stopthread)
+  while (!quit)
   {
-    pl->mutex.lock();
-    pl->waiting = false;
-    ttlm->lock();
-    bool e = texs->empty();
-    while (!e)
-    {
-      auto p = texs->front();
-      texs->pop_front();
-      ttlm->unlock();
-      load_DDS(p.first, p.second, tmd, ttum);
-      ttlm->lock();
-      e = texs->empty();
-    } 
-    ttlm->unlock();
-    pl->waiting = true;
+    auto p = texs.wait_next();
+    load_DDS(p.first, p.second, tmd);
   }
 }
 
@@ -140,8 +125,8 @@ void Game::init()
   glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
   glfwWindowHint(GLFW_SAMPLES, 16);
 
-  win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-
+  //win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+  win = glfwCreateWindow(400, 400, "Roche", NULL, NULL);
   if (!win)
   {
     glfwTerminate();
@@ -149,15 +134,11 @@ void Game::init()
   }
 
   glfwMakeContextCurrent(win);
-  glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 
-  thread_count = 4;
+  thread_count = 0;
   for (int i=0;i<thread_count;++i)
   {
-    planetLoaders.emplace_back();
-    planetLoaders.back().stopthread = false;
-    planetLoaders.back().mutex.lock();
-    plThreads.emplace_back(plThread, &planetLoaders.back(), &texturesToLoad, &ttlm,&texturesToUpdate, &ttum);
+    plThreads.emplace_back(plThread, std::ref(quit), std::ref(texturesToLoad),std::ref(texturesToUpdate));
   }
 
   GLenum err = glewInit();
@@ -308,21 +289,11 @@ void Game::loadTexture(const std::string &filename, Texture *tex)
 {
   if (thread_count > 0)
   {
-    ttlm.lock();
-    texturesToLoad.push_back(std::pair<std::string,Texture*>(filename, tex));
-    ttlm.unlock();
-    for (auto it=planetLoaders.begin();it!=planetLoaders.end();++it)
-    {
-      if (it->waiting)
-      {
-        it->mutex.unlock();
-        return;
-      }
-    }
+    texturesToLoad.push(std::pair<std::string,Texture*>(filename, tex));
   }
   else
   {
-    load_DDS(filename, tex, &texturesToUpdate, &ttum);
+    //load_DDS(filename, tex, texturesToUpdate);
   }
 }
 
@@ -332,7 +303,6 @@ void Game::update()
   {
     it->update(epoch);
   }
-  //std::cout << "x=" << focusedPlanet->pos.x << ";y=" << focusedPlanet->pos.y << ";z=" << focusedPlanet->pos.z << std::endl;
   epoch += 200;
 
   double posX, posY;
@@ -382,13 +352,15 @@ void Game::update()
 
 void Game::render()
 {
-  ttum.lock();
-  while (!texturesToUpdate.empty())
+  /*TexMipmapData d;
+  while (texturesToUpdate.try_next(d))
   {
+    d.updateTexture();
+  }*/ /*
+  if (!texturesToUpdate.empty()) {
     texturesToUpdate.front().updateTexture();
-    texturesToUpdate.pop_front();
-  }
-  ttum.unlock();
+    texturesToUpdate.pop();
+  } */
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   

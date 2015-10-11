@@ -28,6 +28,7 @@ private:
 class TexMipmapData
 {
 public:
+  TexMipmapData();
   TexMipmapData(
     bool compressed,
     Texture *tex,

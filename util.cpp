@@ -52,7 +52,9 @@ typedef struct {
   DWORD           dwReserved2;
 } DDS_HEADER;
 
-void load_DDS(const std::string &filename, Texture *tex,std::deque<TexMipmapData> *tmd, std::mutex *ttum)
+void load_DDS(
+  const std::string &filename,
+  Texture *tex,concurrent_queue<TexMipmapData> &tmd)
 {
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
   if (!in)
@@ -120,9 +122,7 @@ void load_DDS(const std::string &filename, Texture *tex,std::deque<TexMipmapData
     in.read(buffer, imageSize);
 
     // Updates texture
-    ttum->lock();
-    tmd->emplace_back(true, tex, i, pixelFormat, width, height, imageSize, buffer);
-    ttum->unlock();
+    tmd.push(TexMipmapData(true, tex, i, pixelFormat, width, height, imageSize, buffer));
   }
   delete [] mipmapOffsets;
   in.close();

@@ -2,14 +2,12 @@
 #define UTIL_H
 
 #include <string>
-#include <deque>
-#include <mutex>
 #include "opengl.h"
+#include "concurrent_queue.h"
 
 std::string read_file(const std::string &filename);
 void load_DDS(
 	const std::string &filename,
-	Texture *tex,std::deque<TexMipmapData> *tmd,
-	std::mutex *ttum);
+	Texture *tex,concurrent_queue<TexMipmapData> &tmd);
 
 #endif

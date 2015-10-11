@@ -277,6 +277,11 @@ void Texture::update(const TexMipmapData &data)
   }
 }
 
+TexMipmapData::TexMipmapData()
+{
+  data = NULL;
+}
+
 TexMipmapData::TexMipmapData(
     bool compressed,
     Texture *tex,
