@@ -184,7 +184,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &preMousePosX, &preMousePosY);
   ratio = width/(float)height;
-  camera.getPolarPosition.z = focusedPlanet->radius*2;
+  camera.getPolarPosition().z = focusedPlanet->radius*2;
 }
 
 void Game::generateModels()
@@ -333,7 +333,7 @@ void Game::update()
     it->update(epoch);
   }
   //std::cout << "x=" << focusedPlanet->pos.x << ";y=" << focusedPlanet->pos.y << ";z=" << focusedPlanet->pos.z << std::endl;
-  epoch += 86400;
+  epoch += 200;
 
   double posX, posY;
   glm::vec2 move;
