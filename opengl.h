@@ -5,7 +5,7 @@
 #include <GLFW/glfw3.h>
 
 #include <string>
-#include <mutex>
+#include <memory>
 
 class TexMipmapData;
 
@@ -29,6 +29,7 @@ class TexMipmapData
 {
 public:
   TexMipmapData();
+  TexMipmapData(const TexMipmapData& cpy);
   TexMipmapData(
     bool compressed,
     Texture *tex,
@@ -38,7 +39,6 @@ public:
     int height,
     int sizeOrType,
     void *data);
-  ~TexMipmapData();
   void updateTexture();
 private:
   Texture *tex;
@@ -48,7 +48,7 @@ private:
   int width;
   int height;
   int sizeOrType;
-  void *data;
+  std::shared_ptr<void> data;
   friend class Texture;
 };
 

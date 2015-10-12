@@ -1,16 +1,14 @@
 #include "opengl.h"
-#include "lodepng.h"
 #include "util.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <fstream>
-#include <cstring>
-
 #include <iostream>
 #include <string>
+#include <cstring>
 #include <cmath>
+#include <memory>
 
 #include <thread>
 
@@ -260,7 +258,7 @@ void Texture::update(const TexMipmapData &data)
         data.internalFormat,
         data.width,data.height, 0,
         data.sizeOrType,
-        data.data);
+        data.data.get());
     else
       glTexImage2D(
         GL_TEXTURE_2D,
@@ -269,7 +267,7 @@ void Texture::update(const TexMipmapData &data)
         data.width,data.height, 0,
         data.internalFormat,
         data.sizeOrType,
-        data.data);
+        data.data.get());
     if (base_level == -1 || data.level < base_level)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, data.level);
     if (max_level == -1 || data.level > max_level)
@@ -279,7 +277,18 @@ void Texture::update(const TexMipmapData &data)
 
 TexMipmapData::TexMipmapData()
 {
-  data = NULL;
+}
+
+TexMipmapData::TexMipmapData(const TexMipmapData& cpy)
+{
+  this->tex = cpy.tex;
+  this->level = cpy.level;
+  this->internalFormat = cpy.internalFormat;
+  this->width = cpy.width;
+  this->height = cpy.height;
+  this->sizeOrType = cpy.sizeOrType;
+  this->data = cpy.data;
+  this->compressed = cpy.compressed;  
 }
 
 TexMipmapData::TexMipmapData(
@@ -292,19 +301,15 @@ TexMipmapData::TexMipmapData(
     int sizeOrType,
     void *data)
 {
+  std::shared_ptr<char> buf(static_cast<char*>(data));
   this->tex = tex;
   this->level = level;
   this->internalFormat = internalFormat;
   this->width = width;
   this->height = height;
   this->sizeOrType = sizeOrType;
-  this->data = data;
+  this->data = buf;
   this->compressed = compressed;
-}
-
-TexMipmapData::~TexMipmapData()
-{
-  if (data) delete [] data;
 }
 
 void TexMipmapData::updateTexture()

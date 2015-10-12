@@ -34,7 +34,7 @@ class concurrent_queue
     T wait_next()
     {
       std::unique_lock<std::mutex> lock(mtx_);
-      if (container_.empty())
+      while (container_.empty())
         pushed_.wait(lock);
       
       T ret = container_.front();

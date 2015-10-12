@@ -168,7 +168,6 @@ void Planet::load()
       ring.create();
       ring.update(TexMipmapData(false, &ring, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings));
       ring.genMipmaps();
-      delete [] rings;
     }
     loaded = true;
   }

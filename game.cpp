@@ -105,10 +105,17 @@ Game::~Game()
 
 void plThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd)
 {
+  std::pair<std::string,Texture*> st;
   while (!quit)
   {
-    auto p = texs.wait_next();
-    load_DDS(p.first, p.second, tmd);
+    /*auto p = texs.wait_next();
+    load_DDS(p.first, p.second, tmd);*/
+    if (texs.try_next(st))
+    {
+      load_DDS(st.first, st.second, tmd);
+      
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 
@@ -125,8 +132,7 @@ void Game::init()
   glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
   glfwWindowHint(GLFW_SAMPLES, 16);
 
-  //win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
-  win = glfwCreateWindow(400, 400, "Roche", NULL, NULL);
+  win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
   if (!win)
   {
     glfwTerminate();
@@ -197,6 +203,7 @@ void Game::generateModels()
   flare_obj.update_verts(24*4, flare_vert);
   flare_obj.update_ind(12, ring_ind);
 
+  flare_tex.create();
   loadTexture("tex/flare.dds", &flare_tex);
 }
 
@@ -253,7 +260,7 @@ void Game::loadPlanetFiles()
   earth->day_filename = "tex/earth/diffuse.dds";
   earth->night_filename = "tex/earth/night.dds";
   earth->clouds_filename = "tex/earth/clouds.dds";
-  earth->has_night_tex = true;
+  //earth->has_night_tex = true;
   earth->has_clouds_tex = true;
   earth->parent = sun;
   earth->ecc = 1.616998394251595E-02;
@@ -268,8 +275,8 @@ void Game::loadPlanetFiles()
 
   Planet::no_night.create();
   Planet::no_clouds.create();
-  unsigned char black[4] = {0,0,0,255};
-  unsigned char trans[4] = {255,255,255,0};
+  unsigned char *black = new unsigned char[4]{0,0,0,255};
+  unsigned char *trans = new unsigned char[4]{255,255,255,0};
   TexMipmapData(false, &Planet::no_night, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, black).updateTexture();
   TexMipmapData(false, &Planet::no_clouds, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
 }
@@ -293,7 +300,7 @@ void Game::loadTexture(const std::string &filename, Texture *tex)
   }
   else
   {
-    //load_DDS(filename, tex, texturesToUpdate);
+    load_DDS(filename, tex, texturesToUpdate);
   }
 }
 
@@ -352,15 +359,11 @@ void Game::update()
 
 void Game::render()
 {
-  /*TexMipmapData d;
+  TexMipmapData d;
   while (texturesToUpdate.try_next(d))
   {
     d.updateTexture();
-  }*/ /*
-  if (!texturesToUpdate.empty()) {
-    texturesToUpdate.front().updateTexture();
-    texturesToUpdate.pop();
-  } */
+  }
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
@@ -391,7 +394,7 @@ void Game::render()
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4((*it)->pos - focusedPlanet->pos, 1.0);
     if (posOnScreen.z > 0)
     {
-      flare_shader.uniform("size", 0.2f);
+      flare_shader.uniform("size", 0.02f);
       flare_shader.uniform("color", glm::value_ptr(glm::vec4(0.6,0.8,1.0,1.0)));
 
       glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
@@ -399,8 +402,7 @@ void Game::render()
       flare_obj.render();
     }
   }
-  glDepthMask(GL_TRUE);
-
+  glDepthFunc(GL_LESS);
   for (auto it=mesh.begin();it != mesh.end(); ++it)
   {
     (*it)->render(proj_mat, view_mat, camera.getPosition(), light_position, focusedPlanet->pos ,planet_shader, sun_shader, ring_shader, planet_obj, ring_obj);
