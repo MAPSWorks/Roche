@@ -1,5 +1,6 @@
 #include "planet.h"
 #include "opengl.h"
+#include "util.h"
 
 #include <stdlib.h>
 
@@ -9,9 +10,41 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "util.h"
-
 #include <iostream>
+
+OrbitalParameters::OrbitalParameters(double ecc, double sma, double inc, double lan, double arg, double m0)
+{
+  this->ecc = ecc;
+  this->sma = sma;
+  this->inc = inc;
+  this->lan = lan;
+  this->arg = arg;
+  this->m0 = m0;
+}
+double OrbitalParameters::getEccentricity()
+{
+  return ecc;
+}
+double OrbitalParameters::getSemiMajorAxis()
+{
+  return sma;
+}
+double OrbitalParameters::getInclination()
+{
+  return inc;
+}
+double OrbitalParameters::getLongitudeOfAscNode()
+{
+  return lan;
+}
+double OrbitalParameters::getArgumentOfPeriapsis()
+{
+  return arg;
+}
+double OrbitalParameters::getMeanAnomalyAtEpoch()
+{
+  return m0;
+}
 
 Texture Planet::no_night;
 Texture Planet::no_clouds;
@@ -166,7 +199,7 @@ void Planet::load()
       generate_rings(rings, ringsize, ring_seed);
 
       ring.create();
-      ring.update(TexMipmapData(false, &ring, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings));
+      ring.update(TexMipmapData(false, ring, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings));
       ring.genMipmaps();
     }
     loaded = true;
@@ -185,7 +218,14 @@ void Planet::unload()
   }
 }
 
-void Planet::render(glm::mat4 proj_mat, glm::mat4 view_mat, glm::vec3 view_pos, glm::vec3 light_pos, glm::vec3 focused_planet_pos, Shader &planet_shader, Shader &sun_shader, Shader &ring_shader, Renderable &planet_obj, Renderable &ring_obj)
+void Planet::render(
+  const glm::mat4 &proj_mat,
+  const glm::mat4 &view_mat,
+  const glm::vec3 &view_pos,
+  const glm::vec3 &light_pos,
+  const glm::vec3 &focused_planet_pos,
+  Shader &planet_shader, Shader &sun_shader, Shader &ring_shader,
+  Renderable &planet_obj, Renderable &ring_obj)
 {
   Shader &pshad = is_sun?sun_shader:planet_shader;
 

@@ -17,18 +17,38 @@
 
 #define PI        3.14159265358979323846264338327950288 
 
+/// Manages the view of the scene
 class Camera
 {
 public:
   Camera();
+  /// Needed before scene rendering,ratio is the screen w/h ratio
   void update(float ratio);
-  void setCenter(glm::vec3 center);
-  void setPolarPosition(glm::vec3 pos);
+  /// Returns a modifiable reference to the point the view is looking at
+  glm::vec3 &getCenter();
+  /** Returns a modifiable reference to the the polar coordinates of the view
+   * around the center point (theta, phi, distance), theta and phi in radians **/
   glm::vec3 &getPolarPosition();
+  /// Returns the actual position of the camera in cartesian coordinates
   const glm::vec3 &getPosition();
-  void setUp(glm::vec3 up);
+  /// Returns a modifiable reference to the up vector of the view
+  glm::vec3 &getUp();
+  /// Returns the generated projection matrix
   const glm::mat4 &getProjMat();
+  /// Returns the generated view matrix
   const glm::mat4 &getViewMat();
+
+  /// Near frustum plane
+  float getNear();
+  void setNear(float near);
+
+  /// Far frustum plane
+  float getFar();
+  void setFar(float far);
+
+  /// Field of view on y axis
+  float getFovy();
+  void setFovy(float fovy);
 
 private:
   glm::vec3 polarPos;
@@ -38,8 +58,8 @@ private:
   float fovy;
   float near;
   float far;
-  glm::mat4 projMat;
-  glm::mat4 viewMat;
+  glm::mat4 proj_mat;
+  glm::mat4 view_mat;
 
 };
 
@@ -58,35 +78,35 @@ private:
   void loadShaders();
   void loadSkybox();
   void loadPlanetFiles();
-  void loadTexture(const std::string &filename, Texture *tex);
-  void loadPlanet(Planet *p);
-  void unloadPlanet(Planet *p);
+  static void loadTexture(const std::string &filename, Texture &tex);
+  void loadPlanet(Planet &p); // loads all 'heavy data' (textures)
+  void unloadPlanet(Planet &p); // unloads all 'heavy data'
 
-  std::deque<Planet> planets;
-  Planet *focusedPlanet;
-  double epoch;
+  std::deque<Planet> planets; // Main planet collection
+  Planet *focused_planet; // Planet the view follows
+  double epoch; // Seconds since January 1st 2015 00:00
 
   // THREADING RELATED STUFF
-  std::deque<std::thread> plThreads;
-  std::atomic<bool> quit;
+  static std::deque<std::thread> tl_threads; // Texture loading Threads
+  int thread_count; // Number of threads
+  std::atomic<bool> quit; // boolean for killing threads
 
-  concurrent_queue<std::pair<std::string,Texture*>> texturesToLoad;
-
-  concurrent_queue<TexMipmapData> texturesToUpdate;
-
-  int thread_count;
+  /// Textures to load associated with their filename 
+  concurrent_queue<std::pair<std::string,Texture*>> textures_to_load;
+  /// Loaded mipmap levels waiting to be used by opengl
+  concurrent_queue<TexMipmapData> textures_to_update;
 
   // RENDERING RELATED STUFF
   glm::vec3 light_position;
-  Renderable skybox_obj, planet_obj, ring_obj, flare_obj;
+  Renderable skybox_obj, planet_obj, ring_obj, flare_obj; // meshes
   Texture flare_tex;
   Shader skybox_shader, planet_shader, ring_shader, sun_shader, flare_shader;
   Skybox skybox;
 
   // INTERACTION RELATED STUFF
-  double preMousePosX, preMousePosY;
-  glm::vec3 viewSpeed;
-  float maxViewSpeed, viewSmoothness;
+  double pre_mouseposx, pre_mouseposy; // previous cursor position
+  glm::vec3 view_speed;
+  float max_view_speed, view_smoothness;
 
   float sensibility;
 

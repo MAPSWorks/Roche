@@ -6,9 +6,11 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 class TexMipmapData;
 
+/// Stores information for using an opengl texture
 class Texture
 {
 
@@ -22,23 +24,25 @@ public:
 
 private:
   GLuint id;
+  bool created;
   int max_level, base_level;
 };
 
+/// Image data of a texture's mipmap level
 class TexMipmapData
 {
 public:
   TexMipmapData();
   TexMipmapData(const TexMipmapData& cpy);
   TexMipmapData(
-    bool compressed,
-    Texture *tex,
-    int level,
-    GLenum internalFormat,
-    int width,
-    int height,
-    int sizeOrType,
-    void *data);
+    bool compressed, // Indicates if the data is compressed or not (dxt/raw pixel array)
+    Texture &tex, // Reference to the texture
+    int level, // mipmap level to update
+    GLenum internalFormat, // Format of the pixel data
+    int width, // width of image
+    int height, // height of image
+    int size_or_type, // size of pixel array in case of compressed texture, pixel data type otherwise
+    void *data); // pointer to pixel array
   void updateTexture();
 private:
   Texture *tex;
@@ -47,59 +51,62 @@ private:
   GLenum internalFormat;
   int width;
   int height;
-  int sizeOrType;
+  int size_or_type;
   std::shared_ptr<void> data;
   friend class Texture;
 };
 
+/// Opengl buffer containing geometry data
 class Renderable
 {
+public:
+  void create();
+  void destroy();
+  void updateVerts(size_t size, void* data);
+  void updateIndices(size_t size, int* data);
+  void render();
+  void generateSphere(int theta_res, int phi_res, int exterior);
 
 private:
   GLuint vbo,ibo;
   int count;
 
-public:
-  void create();
-  void destroy();
-  void update_verts(size_t size, void* data);
-  void update_ind(size_t size, int* data);
-  void render();
-  void generate_sphere(int theta_res, int phi_res, int exterior);
 };
 
 typedef union
 {
-  void (*vec)(GLint location, GLsizei count, GLvoid *value);
-  void (*mat)(GLint location, GLsizei count, GLboolean transpose, GLvoid *value);
+  void (*vec)(GLint location, GLsizei count, GLvoid *value); // glUniform**v function
+  void (*mat)(GLint location, GLsizei count, GLboolean transpose, GLvoid *value); // glUniformMatrix**v function
 } 
 UniformFunc;
 
 typedef struct 
 {
-  std::string name;
-  GLint location;
-  GLint size;
-  int matrix; // boolean
-  UniformFunc func;
+  std::string name; // uniform name in GLSL program
+  GLint location; // GLSL location of uniform
+  GLint size; // number of components
+  bool matrix; // boolean
+  UniformFunc func; // glUniform function to use when updating uniform
 }
-Uniform;
+Uniform; /// Interface to uniform variable in GLSL
 
+/// Shader program using vertex and fragment shader
 class Shader {
 
 private:
-  GLuint program;
-  Uniform *uniforms;
-  int uniform_count;
+  GLuint program; /// program id
+  std::vector<Uniform> uniforms; /// Uniform variables in this program
 
 public:
   void create();
   void destroy();
-  int load(const std::string &vert_source, const std::string &frag_source);
-  void load_from_file(const std::string &vert_filename, const std::string &frag_filename);
-  void uniform(const std::string &name, const void *value);
-  void uniform(const std::string &name, int value);
-  void uniform(const std::string &name, float value);
+  /// Loads vertex and fragment shaders from strings
+  bool load(const std::string &vert_source, const std::string &frag_source);
+  /// Loads vertex and fragment shaders from files
+  void loadFromFile(const std::string &vert_filename, const std::string &frag_filename);
+  void uniform(const std::string &name, const void *value); /// Sets a Uniform variable's value from a pointer
+  void uniform(const std::string &name, int value); /// Sets a uniform variable's value from an integer
+  void uniform(const std::string &name, float value); /// Sets a uniform variable's value from a float
   void use();
 };
 

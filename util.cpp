@@ -54,7 +54,7 @@ typedef struct {
 
 void load_DDS(
   const std::string &filename,
-  Texture *tex,concurrent_queue<TexMipmapData> &tmd)
+  Texture &tex,concurrent_queue<TexMipmapData> &tmd)
 {
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
   if (!in)

@@ -16,20 +16,18 @@
 
 #define PI        3.14159265358979323846264338327950288 
 
-void Renderable::generate_sphere(int theta_res, int phi_res, int exterior)
+void Renderable::generateSphere(int theta_res, int phi_res, int exterior)
 {
-  float theta, phi;
-
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, (theta_res+1)*(phi_res+1)*PLANET_STRIDE, NULL, GL_STATIC_DRAW);
 
   int offset = 0;
-  for (phi=0;phi<=1.0;phi += 1.0/phi_res)
+  for (float phi=0;phi<=1.0;phi += 1.0/phi_res)
   {
     float cosphi = cos(PI*(phi-0.5));
     float sinphi = sin(PI*(phi-0.5));
-    for (theta=0;theta<=1.0;theta += 1.0/theta_res)
+    for (float theta=0;theta<=1.0;theta += 1.0/theta_res)
     {
       float costheta = cos(theta*PI*2);
       float sintheta = sin(theta*PI*2);
@@ -42,11 +40,10 @@ void Renderable::generate_sphere(int theta_res, int phi_res, int exterior)
   glGenBuffers(1, &ibo);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER,offset*24,NULL,GL_STATIC_DRAW);
-  int i,j;
   offset=0;
-  for (i=0;i<phi_res;++i)
+  for (int i=0;i<phi_res;++i)
   {
-    for (j=0;j<theta_res;++j)
+    for (int j=0;j<theta_res;++j)
     { 
       int i1 = i+1;
       int j1 = j+1;
@@ -70,15 +67,12 @@ void Shader::create()
 }
 void Shader::destroy()
 {
-  if (uniforms) delete [] uniforms;
   glDeleteProgram(program);
 }
 void Shader::uniform(const std::string &name,const void *value)
 {
-  int i;
-  for (i=0;i<uniform_count;++i)
+  for (auto u=uniforms.begin(); u != uniforms.end(); ++u)
   {
-    Uniform *u = &uniforms[i];
     if (name == u->name)
     {
       if (u->matrix)
@@ -106,7 +100,7 @@ void Shader::use()
 {
   glUseProgram(program);
 }
-int Shader::load(const std::string &vert_source, const std::string &frag_source)
+bool Shader::load(const std::string &vert_source, const std::string &frag_source)
 {
   const int LOG_SIZE = 1024;
   GLuint vertex_id, fragment_id;
@@ -142,18 +136,17 @@ int Shader::load(const std::string &vert_source, const std::string &frag_source)
   if (!success)
   {
     std::cout << "SHADER PROGRAM FAILED TO LINK" << std::endl;
-    return 0;
+    return false;
   }
   
   glDeleteShader(vertex_id);
   glDeleteShader(fragment_id);
 
+  int uniform_count;
   glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
-  int i;
-  uniforms = new Uniform[uniform_count];
   int max_char;
   glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_char);
-  for (i=0;i<uniform_count;++i)
+  for (int i=0;i<uniform_count;++i)
   {
     char *buffer = new char[max_char];
     GLsizei len;
@@ -161,9 +154,11 @@ int Shader::load(const std::string &vert_source, const std::string &frag_source)
     GLenum type;
     glGetActiveUniform(program, i, max_char, &len, &size, &type, buffer);
     GLint loc = glGetUniformLocation(program, buffer);
-    uniforms[i].name = std::string(buffer);
-    uniforms[i].location = loc;
-    uniforms[i].size = size;
+    Uniform u;
+    u.name = std::string(buffer);
+    delete buffer;
+    u.location = loc;
+    u.size = size;
     UniformFunc f;
     switch(type)
     {
@@ -180,15 +175,16 @@ int Shader::load(const std::string &vert_source, const std::string &frag_source)
       case GL_FLOAT_MAT4: f.mat = glUniformMatrix4fv; break;
       default : f.vec = glUniform1iv;
     }
-    uniforms[i].func = f;
-    uniforms[i].matrix = type == GL_FLOAT_MAT2
+    u.func = f;
+    u.matrix = type == GL_FLOAT_MAT2
                || type == GL_FLOAT_MAT3
                || type == GL_FLOAT_MAT4;
+    uniforms.push_back(u);
   }
-  return 1;
+  return true;
 }
 
-void Shader::load_from_file(const std::string &vert_filename, const std::string &frag_filename)
+void Shader::loadFromFile(const std::string &vert_filename, const std::string &frag_filename)
 {
   create();
   std::string vert_source = read_file(vert_filename);
@@ -202,24 +198,33 @@ void Shader::load_from_file(const std::string &vert_filename, const std::string 
 
 Texture::Texture()
 {
+  created = false;
   max_level = -1;
   base_level = -1;
 }
 
 void Texture::create()
 {
-  glGenTextures(1, &id);
-  glBindTexture(GL_TEXTURE_2D, id);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-  float aniso;
-  glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+  if (!created)
+  {
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    float aniso;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+    created = true;
+  }
 
 }
 void Texture::destroy()
 {
-  glDeleteTextures(1, &id);
+  if (created)
+  {
+    glDeleteTextures(1, &id);
+    created = false;
+  }
 }
 void Texture::use(int unit)
 {
@@ -228,27 +233,18 @@ void Texture::use(int unit)
 }
 void Texture::genMipmaps()
 {
-  glBindTexture(GL_TEXTURE_2D, id);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);
-  glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
-  glGenerateMipmap(GL_TEXTURE_2D);
-
-}
-GLenum format(int channels)
-{
-  switch (channels)
+  if (created)
   {
-    case 1: return GL_DEPTH_COMPONENT;
-    case 2: return GL_RG;
-    case 3: return GL_RGB;
-    case 4: return GL_RGBA;
-    default: return GL_RGBA;
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);
+    glHint(GL_GENERATE_MIPMAP_HINT,GL_NICEST);
+    glGenerateMipmap(GL_TEXTURE_2D);
   }
 }
 
 void Texture::update(const TexMipmapData &data)
 {
-  if (data.data) // i'm sorry
+  if (created && data.data) // i'm sorry
   {
     glBindTexture(GL_TEXTURE_2D, id);
     if (data.compressed)
@@ -257,7 +253,7 @@ void Texture::update(const TexMipmapData &data)
         data.level,
         data.internalFormat,
         data.width,data.height, 0,
-        data.sizeOrType,
+        data.size_or_type,
         data.data.get());
     else
       glTexImage2D(
@@ -266,7 +262,7 @@ void Texture::update(const TexMipmapData &data)
         data.internalFormat,
         data.width,data.height, 0,
         data.internalFormat,
-        data.sizeOrType,
+        data.size_or_type,
         data.data.get());
     if (base_level == -1 || data.level < base_level)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, data.level);
@@ -286,28 +282,28 @@ TexMipmapData::TexMipmapData(const TexMipmapData& cpy)
   this->internalFormat = cpy.internalFormat;
   this->width = cpy.width;
   this->height = cpy.height;
-  this->sizeOrType = cpy.sizeOrType;
+  this->size_or_type = cpy.size_or_type;
   this->data = cpy.data;
   this->compressed = cpy.compressed;  
 }
 
 TexMipmapData::TexMipmapData(
     bool compressed,
-    Texture *tex,
+    Texture &tex,
     int level,
     GLenum internalFormat,
     int width,
     int height,
-    int sizeOrType,
+    int size_or_type,
     void *data)
 {
   std::shared_ptr<char> buf(static_cast<char*>(data));
-  this->tex = tex;
+  this->tex = &tex;
   this->level = level;
   this->internalFormat = internalFormat;
   this->width = width;
   this->height = height;
-  this->sizeOrType = sizeOrType;
+  this->size_or_type = size_or_type;
   this->data = buf;
   this->compressed = compressed;
 }
@@ -328,12 +324,12 @@ void Renderable::destroy()
   glDeleteBuffers(1, &vbo);
   glDeleteBuffers(1, &ibo);
 }
-void Renderable::update_verts(size_t size, void* data)
+void Renderable::updateVerts(size_t size, void* data)
 {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
 }
-void Renderable::update_ind(size_t size, int* data)
+void Renderable::updateIndices(size_t size, int* data)
 {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*4, data, GL_STATIC_DRAW);

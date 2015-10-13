@@ -14,6 +14,12 @@ roche:$(ROCHE)
 bin/roche.exe: obj/main.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+obj/game.o: game.h opengl.h util.h
+obj/main.o: game.h
+obj/opengl.o: opengl.h util.h
+obj/planet.o: planet.h opengl.h util.h
+obj/util.o: util.h
+
 obj/%.o: %.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
