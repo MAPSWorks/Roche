@@ -95,7 +95,7 @@ void Camera::setFovy(float fovy)
   this->fovy = fovy;
 }
 
-std::deque<std::thread> Game::tl_threads;
+concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
 Game::Game()
 {
@@ -291,12 +291,7 @@ void Game::loadPlanetFiles()
 
   focused_planet = earth;
 
-  Planet::no_night.create();
-  Planet::no_clouds.create();
-  unsigned char *black = new unsigned char[4]{0,0,0,255};
-  unsigned char *trans = new unsigned char[4]{255,255,255,0};
-  TexMipmapData(false, Planet::no_night, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, black).updateTexture();
-  TexMipmapData(false, Planet::no_clouds, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
+  
 }
 
 void Game::loadPlanet(Planet &p)
@@ -325,14 +320,8 @@ void Game::unloadPlanet(Planet &p)
 
 void Game::loadTexture(const std::string &filename, Texture &tex)
 {
-  if (thread_count > 0)
-  {
-    textures_to_load.push(std::pair<std::string,Texture*>(filename, &tex));
-  }
-  else
-  {
-    load_DDS(filename, tex, textures_to_update);
-  }
+
+  textures_to_load.push(std::pair<std::string,Texture*>(filename, &tex));
 }
 
 void Game::update()
@@ -390,6 +379,16 @@ void Game::update()
 
 void Game::render()
 {
+  if (tl_threads.empty())
+  {
+    while (textures_to_load.empty())
+    {
+      auto st = textures_to_load.front();
+      load_DDS(st.first, *st.second, tmd);
+      textures_to_load.pop();
+    }
+  }
+
   TexMipmapData d;
   while (textures_to_update.try_next(d))
   {

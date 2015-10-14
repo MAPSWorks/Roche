@@ -72,27 +72,25 @@ public:
   void update();
   void render();
   bool isRunning();
+  static void loadTexture(const std::string &filename, Texture &tex);
 
 private:
   void generateModels();
   void loadShaders();
   void loadSkybox();
   void loadPlanetFiles();
-  static void loadTexture(const std::string &filename, Texture &tex);
-  void loadPlanet(Planet &p); // loads all 'heavy data' (textures)
-  void unloadPlanet(Planet &p); // unloads all 'heavy data'
 
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
   double epoch; // Seconds since January 1st 2015 00:00
 
   // THREADING RELATED STUFF
-  static std::deque<std::thread> tl_threads; // Texture loading Threads
+  std::deque<std::thread> tl_threads; // Texture loading Threads
   int thread_count; // Number of threads
   std::atomic<bool> quit; // boolean for killing threads
 
   /// Textures to load associated with their filename 
-  concurrent_queue<std::pair<std::string,Texture*>> textures_to_load;
+  static concurrent_queue<std::pair<std::string,Texture*>> textures_to_load;
   /// Loaded mipmap levels waiting to be used by opengl
   concurrent_queue<TexMipmapData> textures_to_update;
 

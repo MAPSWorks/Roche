@@ -7,7 +7,7 @@ in vec3 pass_lpos;
 out vec4 out_color;
 
 // TEXTURES
-uniform sampler2D day_tex;
+uniform sampler2D diffuse_tex;
 uniform sampler2D clouds_tex;
 uniform sampler2D night_tex;
 uniform sampler2D ring_tex;

@@ -69,7 +69,7 @@ void Shader::destroy()
 {
   glDeleteProgram(program);
 }
-void Shader::uniform(const std::string &name,const void *value)
+void Shader::uniform(const std::string &name,const void *value) const
 {
   for (auto u=uniforms.begin(); u != uniforms.end(); ++u)
   {
@@ -84,19 +84,19 @@ void Shader::uniform(const std::string &name,const void *value)
   }
 }
 
-void Shader::uniform(const std::string &name, int value)
+void Shader::uniform(const std::string &name, int value) const
 {
   int a[] = {value};
   uniform(name, a);
 }
 
-void Shader::uniform(const std::string &name, float value)
+void Shader::uniform(const std::string &name, float value) const
 {
   float a[] = {value};
   uniform(name, a);
 }
 
-void Shader::use()
+void Shader::use() const
 {
   glUseProgram(program);
 }
@@ -226,7 +226,7 @@ void Texture::destroy()
     created = false;
   }
 }
-void Texture::use(int unit)
+void Texture::use(int unit) const
 {
   glActiveTexture(GL_TEXTURE0 + unit);
   glBindTexture(GL_TEXTURE_2D, id);
@@ -335,7 +335,7 @@ void Renderable::updateIndices(size_t size, int* data)
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*4, data, GL_STATIC_DRAW);
   count = size;
 }
-void Renderable::render()
+void Renderable::render() const
 {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);

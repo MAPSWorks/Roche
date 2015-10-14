@@ -18,7 +18,7 @@ public:
   Texture();
   void create();
   void destroy();
-  void use(int unit);
+  void use(int unit) const;
   void update(const TexMipmapData &data);
   void genMipmaps();
 
@@ -64,7 +64,7 @@ public:
   void destroy();
   void updateVerts(size_t size, void* data);
   void updateIndices(size_t size, int* data);
-  void render();
+  void render() const;
   void generateSphere(int theta_res, int phi_res, int exterior);
 
 private:
@@ -104,10 +104,10 @@ public:
   bool load(const std::string &vert_source, const std::string &frag_source);
   /// Loads vertex and fragment shaders from files
   void loadFromFile(const std::string &vert_filename, const std::string &frag_filename);
-  void uniform(const std::string &name, const void *value); /// Sets a Uniform variable's value from a pointer
-  void uniform(const std::string &name, int value); /// Sets a uniform variable's value from an integer
-  void uniform(const std::string &name, float value); /// Sets a uniform variable's value from a float
-  void use();
+  void uniform(const std::string &name, const void *value) const; /// Sets a Uniform variable's value from a pointer
+  void uniform(const std::string &name, int value) const; /// Sets a uniform variable's value from an integer
+  void uniform(const std::string &name, float value) const; /// Sets a uniform variable's value from a float
+  void use() const;
 };
 
 #endif
