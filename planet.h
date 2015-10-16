@@ -20,7 +20,7 @@ public:
   glm::mat4 view_mat;
   glm::vec3 view_pos;
   glm::vec3 light_pos;
-  glm::vec3 focused_planet_pos;
+  glm::vec3 view_center;
   Shader &planet_shader, &sun_shader, &ring_shader;
   Renderable &planet_obj, &ring_obj;
 };
@@ -134,8 +134,10 @@ public:
   void update(double epoch);
   void setParentBody(const std::deque<Planet> &planets);
   void render(const RenderContext &rc);
-  const std::string &getName();
   void unload();
+
+  const std::string &getName();
+  const glm::vec3 &getPosition();
 
   OrbitalParameters &getOrbitalParameters();
   PhysicalProperties &getPhysicalProperties();

@@ -97,7 +97,7 @@ void Camera::setFovy(float fovy)
 
 concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
-Game::Game()
+Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj)
 {
   sensibility = 0.0004;
   light_position = glm::vec3(0,5,0);
@@ -131,8 +131,6 @@ void plThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Te
   std::pair<std::string,Texture*> st;
   while (!quit)
   {
-    /*auto p = texs.wait_next();
-    load_DDS(p.first, p.second, tmd);*/
     if (texs.try_next(st))
     {
       load_DDS(st.first, *st.second, tmd);
@@ -294,30 +292,6 @@ void Game::loadPlanetFiles()
   
 }
 
-void Game::loadPlanet(Planet &p)
-{
-  if (!p.loaded)
-  {
-    p.load();
-    p.day.create();
-    loadTexture(p.day_filename, p.day);
-    if (p.has_night_tex) 
-    {
-      p.night.create();
-      loadTexture(p.night_filename, p.night);
-    }
-    if (p.has_clouds_tex)
-    {
-      p.clouds.create();
-      loadTexture(p.clouds_filename, p.clouds);
-    }
-  }
-}
-void Game::unloadPlanet(Planet &p)
-{
-  p.unload();
-}
-
 void Game::loadTexture(const std::string &filename, Texture &tex)
 {
 
@@ -384,7 +358,7 @@ void Game::render()
     while (textures_to_load.empty())
     {
       auto st = textures_to_load.front();
-      load_DDS(st.first, *st.second, tmd);
+      load_DDS(st.first, *st.second, textures_to_update);
       textures_to_load.pop();
     }
   }
@@ -395,6 +369,8 @@ void Game::render()
     d.updateTexture();
   }
 
+  view_center = focused_planet->getPosition();
+
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
   camera.update(ratio);
@@ -402,20 +378,21 @@ void Game::render()
   glm::mat4 view_mat = camera.getViewMat();
 
   std::vector<Planet*> flares; // Planets to be rendered as flares (too far away)
-  std::vector<Planet*> mesh; // Planets to be rendered as their whole mesh
+  std::vector<Planet*> meshes; // Planets to be rendered as their whole mesh
 
-  for (auto it=planets.begin();it != planets.end(); ++it)
+  // Planet sorting between flares and close meshes
+  for (auto p : planets)
   {
-    glm::vec3 dist = it->pos - focused_planet->pos - camera.getPosition();
+    glm::vec3 dist = p.getPosition() - view_center - camera.getPosition();
     if (glm::length(dist) >= MAX_VIEW_DIST)
     {
-      flares.push_back(&*it);
-      unloadPlanet(*it);
+      flares.push_back(&p);
+      p.unload();
     }
     else
     {
-      mesh.push_back(&*it);
-      loadPlanet(*it);
+      meshes.push_back(&p);
+      p.load();
     }
   }
 
@@ -425,9 +402,9 @@ void Game::render()
   flare_shader.uniform("ratio", ratio);
   flare_shader.uniform("tex", 0);
   flare_tex.use(0);
-  for (auto it=flares.begin();it != flares.end(); ++it)
+  for (auto flare : flares)
   {
-    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4((*it)->pos - focused_planet->pos, 1.0);
+    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
     if (posOnScreen.z > 0)
     {
       flare_shader.uniform("size", 0.02f);
@@ -439,9 +416,16 @@ void Game::render()
     }
   }
   glDepthFunc(GL_LESS);
-  for (auto it=mesh.begin();it != mesh.end(); ++it)
+
+  rc.proj_mat = proj_mat;
+  rc.view_mat = view_mat;
+  rc.view_pos = camera.getPosition();
+  rc.light_pos = light_position;
+  rc.view_center = view_center;
+
+  for (auto mesh : meshes)
   {
-    (*it)->render(proj_mat, view_mat, camera.getPosition(), light_position, focused_planet->pos ,planet_shader, sun_shader, ring_shader, planet_obj, ring_obj);
+    mesh->render(rc);
   }
   glfwSwapBuffers(win);
   glfwPollEvents();

@@ -82,6 +82,7 @@ private:
 
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
+  glm::vec3 view_center; // The position the view is centered on
   double epoch; // Seconds since January 1st 2015 00:00
 
   // THREADING RELATED STUFF
@@ -95,6 +96,7 @@ private:
   concurrent_queue<TexMipmapData> textures_to_update;
 
   // RENDERING RELATED STUFF
+  RenderContext rc;
   glm::vec3 light_position;
   Renderable skybox_obj, planet_obj, ring_obj, flare_obj; // meshes
   Texture flare_tex;

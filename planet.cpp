@@ -270,7 +270,7 @@ void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, c
 {
   Shader &pshad = is_star?rc.sun_shader:rc.planet_shader;
 
-  glm::vec3 render_pos = pos-rc.focused_planet_pos;
+  glm::vec3 render_pos = pos-rc.view_center;
 
   glm::mat4 planet_mat = glm::translate(glm::mat4(), render_pos);
 
@@ -441,6 +441,11 @@ PhysicalProperties &Planet::getPhysicalProperties()
 RingProperties &Planet::getRingProperties()
 {
   return ring;
+}
+
+const glm::vec3 &Planet::getPosition()
+{
+  return orbit.getPosition();
 }
 
 void Skybox::load()
