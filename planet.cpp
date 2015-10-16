@@ -139,6 +139,12 @@ RenderContext::RenderContext(Shader &ps, Shader &ss, Shader &rs,
   
 }
 
+OrbitalParameters::OrbitalParameters()
+{
+  this->parent =  NULL;
+  this->position = glm::vec3(0,0,0);
+}
+
 void OrbitalParameters::setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0)
 {
   this->ecc = ecc;
@@ -151,6 +157,12 @@ void OrbitalParameters::setParameters(const std::string &parent_body, double ecc
   this->parent =  NULL;
   this->position = glm::vec3(0,0,0);
 }
+
+bool OrbitalParameters::isParentSet()
+{
+  return this->parent != NULL;
+}
+
 void OrbitalParameters::computePosition(double epoch)
 {
   if (parent)
@@ -314,9 +326,14 @@ void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, c
   rings.render(near_ring_mat, light_mat, rc);
 }
 
-double PhysicalProperties::getGM()
+double PhysicalProperties::getGM() const
 {
   return GM;
+}
+
+float PhysicalProperties::ggetRadius() const
+{
+  return radius;
 }
 
 RingProperties::RingProperties()

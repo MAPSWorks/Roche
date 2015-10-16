@@ -33,6 +33,7 @@ public:
   void computePosition(double epoch); /// Computes the position from current epoch and parent body
   const glm::vec3 &getPosition() const;
   void setParentFromName(const std::deque<Planet> &planets);
+  bool isParentSet();
 private:
   double ecc, sma, inc, lan, arg, m0;
   std::string parent_body;
@@ -93,7 +94,8 @@ public:
   void update(double epoch);
   void render(const glm::vec3 &pos, const RenderContext &rc, const RingProperties &rings);
 
-  double getGM();
+  float getRadius() const;
+  double getGM() const;
 
 private:
   glm::mat4 computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer);

@@ -192,7 +192,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
-  camera.getPolarPosition().z = focused_planet->radius*2;
+  camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getPosition().z*2;
 }
 
 void Game::generateModels()
@@ -300,9 +300,10 @@ void Game::loadTexture(const std::string &filename, Texture &tex)
 
 void Game::update()
 {
-  for (auto it=planets.begin();it != planets.end(); ++it)
+  for (auto p: planets)
   {
-    it->update(epoch);
+    if (!p.getOrbitalParameters.isParentSet()) p.getOrbitalParameters.setParentFromName(planets);
+    p.update(epoch);
   }
   epoch += 200;
 
@@ -345,7 +346,7 @@ void Game::update()
     camera.getPolarPosition().y = -PI/2 + 0.001;
     view_speed.y = 0;
   }
-  if (camera.getPolarPosition().z < focused_planet->radius) camera.getPolarPosition().z = focused_planet->radius;
+  if (camera.getPolarPosition().z < focused_planet->getPhysicalProperties().getRadius()) camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getRadius();
 
   pre_mouseposx = posX;
   pre_mouseposy = posY;
