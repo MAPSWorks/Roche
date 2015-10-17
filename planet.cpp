@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#include "shaun/sweeper.hpp"
+#include <glm/ext.hpp>
+
 #define PI 3.14159265358979323846264338327950288 
 
 Texture PhysicalProperties::no_night;
@@ -142,6 +145,8 @@ RenderContext::RenderContext(Shader &ps, Shader &ss, Shader &rs,
 OrbitalParameters::OrbitalParameters()
 {
   this->parent =  NULL;
+  this->updated = false;
+  this->parent_body = "";
   this->position = glm::vec3(0,0,0);
 }
 
@@ -154,33 +159,33 @@ void OrbitalParameters::setParameters(const std::string &parent_body, double ecc
   this->arg = arg;
   this->m0 = m0;
   this->parent_body = parent_body;
-  this->parent =  NULL;
-  this->position = glm::vec3(0,0,0);
-}
-
-bool OrbitalParameters::isParentSet()
-{
-  return this->parent != NULL;
 }
 
 void OrbitalParameters::computePosition(double epoch)
 {
-  if (parent)
-  { 
-    double meanAnomaly = sqrt(parent->getPhysicalProperties().getGM() / (sma*sma*sma))*epoch + m0;
-    double En = (ecc<0.8)?meanAnomaly:PI;
-    const int it = 10;
-    for (int i=0;i<it;++i)
-      En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
-    double trueAnomaly = atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
-    double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
-    glm::dvec3 posInPlane = glm::vec3(sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-    glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg*PI/180.0,glm::dvec3(0,0,1)),inc*PI/180, glm::dvec3(1,0,0)),lan*PI/180, glm::dvec3(1,0,0));
-    position = q*posInPlane;
-  }
-  else
+  if (!updated)
   {
-    position = glm::vec3(0,0,0);
+    if (parent)
+    {
+      double meanAnomaly = sqrt(parent->getPhysicalProperties().getGM() / (sma*sma*sma))*epoch + m0;
+      double En = (ecc<0.8)?meanAnomaly:PI;
+      const int it = 10;
+      for (int i=0;i<it;++i)
+        En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
+      double trueAnomaly = atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
+      double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
+      glm::dvec3 posInPlane = glm::vec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
+      glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg*PI/180.0,glm::dvec3(0,0,1)),inc*PI/180, glm::dvec3(1,0,0)),lan*PI/180, glm::dvec3(1,0,0));
+      position = q*posInPlane;
+
+      parent->getOrbitalParameters().computePosition(epoch);
+
+      position += parent->getPosition();
+    }
+    else
+    {
+      position = glm::vec3(0,0,0);
+    }
   }
 }
 
@@ -189,17 +194,46 @@ const glm::vec3 &OrbitalParameters::getPosition() const
   return position;
 }
 
-void OrbitalParameters::setParentFromName(const std::deque<Planet> &planets)
+void OrbitalParameters::setParentFromName(std::deque<Planet> &planets)
 {
-  for (auto it: planets)
+  if (parent_body != "")
   {
-    if (it.getName() == parent_body)
+    for (Planet &it: planets)
     {
-      parent = &it;
-      return;
+      if (it.getName() == parent_body)
+      {
+        parent = &it;
+        return;
+      }
     }
+    std::cout << "Can't find parent body " << parent_body << std::endl;
   }
-  std::cout << "Can't find parent body " << parent_body << std::endl;
+}
+
+bool OrbitalParameters::isUpdated()
+{
+  return updated;
+}
+
+void OrbitalParameters::reset()
+{
+  updated = false;
+}
+
+void OrbitalParameters::print() const
+{
+  std::cout << "Parent body:" << parent_body << std::endl;
+  std::cout << "Ecc:" << ecc << std::endl;
+  std::cout << "Sma:" << sma << std::endl;
+  std::cout << "Inc:" << inc << std::endl;
+  std::cout << "Lan:" << lan << std::endl;
+  std::cout << "Arg:" << arg << std::endl;
+  std::cout << "M0:" << m0 << std::endl;
+}
+
+PhysicalProperties::PhysicalProperties()
+{
+
 }
 
 void PhysicalProperties::setProperties(
@@ -216,7 +250,7 @@ void PhysicalProperties::setProperties(
       float cloud_disp_rate)
 {
   this->radius = radius;
-  this->rotation_axis = rot_axis;
+  this->rotation_axis = glm::normalize(rot_axis);
   this->rotation_rate = rotation_rate;
   this->mean_color = mean_color;
   this->atmosphere_color =  atmosphere_color;
@@ -331,9 +365,28 @@ double PhysicalProperties::getGM() const
   return GM;
 }
 
-float PhysicalProperties::ggetRadius() const
+float PhysicalProperties::getRadius() const
 {
   return radius;
+}
+
+void PhysicalProperties::print() const
+{
+  std::cout << "Radius:" << radius << std::endl;
+  std::cout << "Rotation axis:" << glm::to_string(rotation_axis) << std::endl;
+  std::cout << "Rotation rate:" << rotation_rate << std::endl;
+  std::cout << "Mean color:" << glm::to_string(mean_color) << std::endl;
+  std::cout << "Atmosphere color:" << glm::to_string(atmosphere_color) << std::endl;
+  std::cout << "GM:" << GM << std::endl;
+  std::cout << "Is it a star?" << (is_star?"Yes":"No") << std::endl;
+  std::cout << "Diffuse map filename:" << diffuse_filename << std::endl;
+  if (has_night_tex)
+    std::cout << "Night map filename:" << night_filename << std::endl;
+  if (has_cloud_tex)
+  {
+    std::cout << "Cloud map filename:" << cloud_filename << std::endl;
+    std::cout << "Cloud displacement rate:" << cloud_disp_rate << std::endl;
+  }
 }
 
 RingProperties::RingProperties()
@@ -342,6 +395,7 @@ RingProperties::RingProperties()
 }
 void RingProperties::setProperties(float inner, float outer, const glm::vec3 &normal, int seed, const glm::vec4 &color)
 {
+  has_rings = true;
   this->inner = inner;
   this->outer = outer;
   this->up = normal;
@@ -414,9 +468,41 @@ const glm::vec3 &RingProperties::getNormal() const
   return up;
 }
 
+void RingProperties::print() const
+{
+  if (has_rings)
+  {
+    std::cout << "Inner:" << inner << std::endl;
+    std::cout << "Outer:" << outer << std::endl;
+    std::cout << "Normal:" << glm::to_string(up) << std::endl;
+    std::cout << "Seed:" << seed << std::endl;
+    std::cout << "Color:" << glm::to_string(color) << std::endl;
+  }
+  else
+  {
+    std::cout << "No rings" << std::endl;
+  }
+}
+
 Planet::Planet()
 {
   name = "undefined";
+}
+
+void Planet::print() const
+{
+  std::cout << "Planet name:" << name << std::endl;
+  std::cout << "====ORBITAL PARAMETERS===================" << std::endl;
+  orbit.print();
+  std::cout << "====PHYSICAL PROPERTIES==================" << std::endl;
+  phys.print();
+  std::cout << "====RING PROPERTIES======================" << std::endl;
+  ring.print();
+}
+
+const std::string &Planet::getName() const
+{
+  return name;
 }
 
 void Planet::load()
@@ -437,7 +523,7 @@ void Planet::update(double epoch)
   phys.update(epoch);
 }
 
-void Planet::setParentBody(const std::deque<Planet> &planets)
+void Planet::setParentBody(std::deque<Planet> &planets)
 {
   orbit.setParentFromName(planets);
 }
@@ -460,9 +546,115 @@ RingProperties &Planet::getRingProperties()
   return ring;
 }
 
-const glm::vec3 &Planet::getPosition()
+const glm::vec3 &Planet::getPosition() const
 {
   return orbit.getPosition();
+}
+
+template <>
+glm::vec3 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec3 def)
+{
+  glm::vec3 ret;
+  if (swp.is_null())
+    return def;
+  else
+  {
+    for (int i=0;i<3;++i)
+      ret[i] = swp[i].value<shaun::number>();
+    return ret;
+  }
+}
+template <>
+glm::vec4 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec4 def)
+{
+  glm::vec4 ret;
+  if (swp.is_null())
+    return def;
+  else
+  {
+    for (int i=0;i<4;++i)
+      ret[i] = swp[i].value<shaun::number>();
+    return ret;
+  }
+}
+
+template <>
+float Planet::shaun_fieldToType(shaun::sweeper &swp, float def)
+{
+  if (swp.is_null()) return def; else return swp.value<shaun::number>();
+}
+
+template <>
+double Planet::shaun_fieldToType(shaun::sweeper &swp, double def)
+{
+  if (swp.is_null()) return def; else return swp.value<shaun::number>();
+}
+
+template <>
+int Planet::shaun_fieldToType(shaun::sweeper &swp, int def)
+{
+  if (swp.is_null()) return def; else return swp.value<shaun::number>();
+}
+
+template <>
+std::string Planet::shaun_fieldToType(shaun::sweeper &swp, std::string def)
+{
+  if (swp.is_null()) return def; else return std::string(swp.value<shaun::string>());
+}
+
+template <>
+bool Planet::shaun_fieldToType(shaun::sweeper &swp, bool def)
+{
+  if (swp.is_null()) return def; else return swp.value<shaun::boolean>();
+}
+
+void Planet::createFromFile(shaun::sweeper &swp1)
+{
+  shaun::sweeper swp(swp1);
+  this->name = shaun_fieldToType<std::string>(swp("name"), "undefined");
+  auto orbit(swp("orbit"));
+  if (!orbit.is_null())
+  {
+    this->orbit.setParameters(
+      shaun_fieldToType<std::string>(orbit("parent"), ""),
+      shaun_fieldToType<double>(orbit("ecc"), 0.0),
+      shaun_fieldToType<double>(orbit("sma"), 1000.0),
+      shaun_fieldToType<double>(orbit("inc"), 0.0),
+      shaun_fieldToType<double>(orbit("lan"), 0.0),
+      shaun_fieldToType<double>(orbit("arg"), 0.0),
+      shaun_fieldToType<double>(orbit("m0"), 0.0)
+    );
+  }
+
+  auto phys(swp("physicalProperties"));
+  if (!phys.is_null())
+  {
+    this->phys.setProperties(
+      shaun_fieldToType<float>(phys("radius"), 1.0),
+      shaun_fieldToType<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1)),
+      shaun_fieldToType<float>(phys("rot_rate"), 0.0),
+      shaun_fieldToType<glm::vec3>(phys("mean_color"), glm::vec3(1.0)),
+      shaun_fieldToType<glm::vec3>(phys("atmos_color"), glm::vec3(1.0)),
+      shaun_fieldToType<double>(phys("GM"), 1000),
+      shaun_fieldToType<bool>(phys("is_star"), false),
+      shaun_fieldToType<std::string>(phys("diffuse"), ""),
+      shaun_fieldToType<std::string>(phys("night"), ""),
+      shaun_fieldToType<std::string>(phys("cloud"), ""),
+      shaun_fieldToType<float>(phys("cloud_disp_rate"), 0.0)
+    );
+  }
+
+  auto ring(swp("ringProperties"));
+  if (!ring.is_null())
+  {
+    this->ring.setProperties(
+      shaun_fieldToType<float>(ring("inner"), 2.0),
+      shaun_fieldToType<float>(ring("outer"), 4.0),
+      shaun_fieldToType<glm::vec3>(ring("normal"), glm::vec3(0,0,1)),
+      shaun_fieldToType<int>(ring("seed"), 2.0),
+      shaun_fieldToType<glm::vec4>(ring("color"), glm::vec4(0.6,0.6,0.6,1.0))
+    );
+  }
 }
 
 void Skybox::load()

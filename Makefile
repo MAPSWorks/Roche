@@ -11,7 +11,7 @@ ROCHE=bin/roche.exe
 
 roche:$(ROCHE)
 
-bin/roche.exe: obj/main.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o
+bin/roche.exe: obj/main.o obj/glew.o obj/opengl.o obj/util.o obj/planet.o obj/game.o obj/shaun.o obj/sweeper.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 obj/game.o: game.h opengl.h util.h
@@ -28,6 +28,9 @@ obj/%.o: %.cpp
 
 obj/opengl.o: opengl.cpp
 	$(CXX) -o $@ -c $< $(CXXFLAGS) -fpermissive
+
+obj/%.o : shaun/%.cpp
+	$(CXX) -o $@ -c $< $(CXXFLAGS)
 
 clean: 
 	rm -rf obj/*.o

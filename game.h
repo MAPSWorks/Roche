@@ -82,6 +82,7 @@ private:
 
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
+  int focused_planet_id;
   glm::vec3 view_center; // The position the view is centered on
   double epoch; // Seconds since January 1st 2015 00:00
 
@@ -107,6 +108,13 @@ private:
   double pre_mouseposx, pre_mouseposy; // previous cursor position
   glm::vec3 view_speed;
   float max_view_speed, view_smoothness;
+
+  bool is_switching;
+  int switch_frames;
+  int switch_frame_current;
+  float switch_previous_dist;
+  bool planet_switch;
+  Planet *switch_previous_planet;
 
   float sensibility;
 

@@ -34,9 +34,9 @@ float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 void main(void)
 {
 	// TEXTURE LOOKUPS
-	vec3 day = texture(day_tex,pass_uv).rgb;
+	vec3 day = texture(diffuse_tex,pass_uv).rgb;
 	vec3 night = texture(night_tex, pass_uv).rgb;
-	float cloud = texture(clouds_tex, pass_uv + vec2(cloud_disp,0.0)).r;
+	vec4 cloud = texture(clouds_tex, pass_uv + vec2(cloud_disp,0.0));
 
 	// LIGHT CALCULATION
 	float rawlight = dot(-light_dir, pass_normal);
@@ -49,7 +49,7 @@ void main(void)
 
 	// TEXTURE COMPOSITION
 	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
-	vec3 color = mix(day*light  + nightlights*night, vec3(light), cloud);
+	vec3 color = mix(day*light  + nightlights*night, light*cloud.rgb, cloud.a);
 
 	// SHADOW CALCULATION (RAYTRACING)
 	float t = dot(pass_lpos.xyz, ring_vec)/dot(light_dir,ring_vec);

@@ -9,6 +9,8 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include "shaun/sweeper.hpp"
+
 class Planet;
 
 class RenderContext
@@ -32,10 +34,13 @@ public:
   void setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0);
   void computePosition(double epoch); /// Computes the position from current epoch and parent body
   const glm::vec3 &getPosition() const;
-  void setParentFromName(const std::deque<Planet> &planets);
-  bool isParentSet();
+  void setParentFromName(std::deque<Planet> &planets);
+  bool isUpdated();
+  void reset();
+  void print() const;
 private:
   double ecc, sma, inc, lan, arg, m0;
+  bool updated;
   std::string parent_body;
 
   glm::vec3 position;
@@ -46,14 +51,20 @@ class RingProperties
 {
 public:
   RingProperties();
-  void setProperties(float inner, float outer, const glm::vec3 &normal, int seed, const glm::vec4 &color);
+  void setProperties(
+    float inner,
+    float outer,
+    const glm::vec3 &normal,
+    int seed,
+    const glm::vec4 &color);
   void load();
   void unload();
-  void render(const glm::mat4 &model_mat,  const glm::mat4 &light_mat, const RenderContext &rc) const;
+  void render(const glm::mat4 &model_mat, const glm::mat4 &light_mat, const RenderContext &rc) const;
   void useTexture(int unit) const;
   float getInner() const;
   float getOuter() const;
   const glm::vec3 &getNormal() const;
+  void print() const;
   
 private:
   void generateRings(unsigned char *buffer, int size, int seed);
@@ -96,6 +107,7 @@ public:
 
   float getRadius() const;
   double getGM() const;
+  void print() const;
 
 private:
   glm::mat4 computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer);
@@ -132,20 +144,25 @@ class Planet
 {
 public:
   Planet();
+  void createFromFile(shaun::sweeper &swp);
   void load();
   void update(double epoch);
-  void setParentBody(const std::deque<Planet> &planets);
+  void setParentBody(std::deque<Planet> &planets);
   void render(const RenderContext &rc);
   void unload();
+  void print() const;
 
-  const std::string &getName();
-  const glm::vec3 &getPosition();
+  const std::string &getName() const;
+  const glm::vec3 &getPosition() const;
 
   OrbitalParameters &getOrbitalParameters();
   PhysicalProperties &getPhysicalProperties();
   RingProperties &getRingProperties();
 
 private:
+  template <class T>
+  T shaun_fieldToType(shaun::sweeper &swp, T def);
+
   std::string name;
 
   OrbitalParameters orbit;

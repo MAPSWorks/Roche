@@ -20,6 +20,11 @@
 #include <thread>
 #include <functional>
 
+#include "shaun/sweeper.hpp"
+#include "shaun/parser.hpp"
+
+#include <glm/ext.hpp>
+
 #define MAX_VIEW_DIST 20000000
 
 Camera::Camera()
@@ -104,6 +109,13 @@ Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj)
   view_speed = glm::vec3(0,0,0);
   max_view_speed = 0.2;
   view_smoothness = 0.85;
+  view_center = glm::vec3(0,0,0);
+  switch_previous_planet = NULL;
+  planet_switch = false;
+  switch_frames = 100;
+  switch_frame_current = 0;
+  is_switching = false;
+  focused_planet_id = 0;
   epoch = 0.0;
   quit = false;
 }
@@ -192,7 +204,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
-  camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getPosition().z*2;
+  camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getRadius()*4;
 }
 
 void Game::generateModels()
@@ -230,11 +242,11 @@ void Game::generateModels()
 
 void Game::loadShaders()
 {
-  ring_shader.loadFromFile("ring.vert", "ring.frag");
-  planet_shader.loadFromFile("planet.vert", "planet.frag");
-  sun_shader.loadFromFile("planet.vert", "sun.frag");
-  skybox_shader.loadFromFile("skybox.vert", "skybox.frag");
-  flare_shader.loadFromFile("flare.vert", "flare.frag");
+  ring_shader.loadFromFile("shaders/ring.vert", "shaders/ring.frag");
+  planet_shader.loadFromFile("shaders/planet.vert", "shaders/planet.frag");
+  sun_shader.loadFromFile("shaders/planet.vert", "shaders/sun.frag");
+  skybox_shader.loadFromFile("shaders/skybox.vert", "shaders/skybox.frag");
+  flare_shader.loadFromFile("shaders/flare.vert", "shaders/flare.frag");
 }
 
 void Game::loadSkybox()
@@ -249,47 +261,38 @@ void Game::loadSkybox()
 
 void Game::loadPlanetFiles()
 {
-  planets.emplace_back();
-  Planet *sun = &planets.back();
-  sun->name = "Sun";
-  sun->pos = glm::vec3(0,0,0);
-  sun->GM = 132712440018;
-  sun->radius = 696000;
-  sun->day_filename = "tex/sun/diffuse.dds";
-  sun->is_sun = true;
+  try 
+  {
+    shaun::parser p;
+    shaun::object obj = p.parse(read_file("planets.sn").c_str());
+    shaun::sweeper swp(&obj);
 
-  planets.emplace_back();
-  Planet *earth = &planets.back();
+    shaun::sweeper pl(swp("planets"));
+    for (unsigned int i=0;i<pl.value<shaun::list>().elements().size();++i)
+    {
+      planets.emplace_back();
+      try
+      {
+        planets.back().createFromFile(pl[i]);
+      }
+      catch (std::string str)
+      {
+        std::cout << str << std::endl;
+        exit(-1);
+      }
+    }
+    for (Planet &p : planets)
+    {
+      p.getOrbitalParameters().setParentFromName(planets);
+    }
 
-  earth->name = "Earth";
-  earth->pos = glm::vec3(0,0,0);
-  earth->rot_axis = glm::vec3(0,0,1);
-  earth->rot_rate =7.292115E-5;
-  earth->radius = 6371.01;
-  earth->ring_inner = 10000;
-  earth->ring_outer = 16000;
-  earth->ring_upvector = glm::normalize(glm::vec3(1,1,2));
-  earth->ring_seed = 1909802985;
-  earth->ring_color = glm::vec4(0.6,0.6,0.6,1.0);
-  earth->has_rings = true;
-  earth->atmos_color = glm::vec3(0.6,0.8,1.0);
-  earth->cloud_epoch = 0.0;
-  earth->day_filename = "tex/earth/diffuse.dds";
-  earth->night_filename = "tex/earth/night.dds";
-  earth->clouds_filename = "tex/earth/clouds.dds";
-  earth->has_night_tex = true;
-  earth->has_clouds_tex = true;
-  earth->parent = sun;
-  earth->ecc = 1.616998394251595E-02;
-  earth->sma = 1.495125338678499E+08;
-  earth->m0 = 3.571060381240151E+02;
-  earth->inc = 2.343719926157708E+01;
-  earth->lan = 4.704173983490563E-03;
-  earth->arg = 1.042446186418036E+02;
+    focused_planet = &planets[focused_planet_id];
+  } 
+  catch (shaun::parse_error e)
+  {
+    std::cout << e << std::endl;
+  }
 
-  focused_planet = earth;
-
-  
 }
 
 void Game::loadTexture(const std::string &filename, Texture &tex)
@@ -300,12 +303,30 @@ void Game::loadTexture(const std::string &filename, Texture &tex)
 
 void Game::update()
 {
-  for (auto p: planets)
+  for (Planet &p: planets)
   {
-    if (!p.getOrbitalParameters.isParentSet()) p.getOrbitalParameters.setParentFromName(planets);
+    p.getOrbitalParameters().reset();
+  }
+  for (Planet &p: planets)
+  {
     p.update(epoch);
   }
   epoch += 200;
+
+  bool switch_pressed = glfwGetKey(win, GLFW_KEY_TAB);
+  if (switch_pressed && !planet_switch && !is_switching)
+  {
+    switch_previous_planet = focused_planet;
+    focused_planet_id = (focused_planet_id+1)%planets.size();
+    focused_planet = &planets[focused_planet_id];
+    switch_previous_dist = camera.getPolarPosition().z;
+    planet_switch = true;
+    is_switching = true;  
+  }
+  else if (!switch_pressed)
+  {
+    planet_switch = false;
+  }
 
   double posX, posY;
   glm::vec2 move;
@@ -346,7 +367,8 @@ void Game::update()
     camera.getPolarPosition().y = -PI/2 + 0.001;
     view_speed.y = 0;
   }
-  if (camera.getPolarPosition().z < focused_planet->getPhysicalProperties().getRadius()) camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getRadius();
+  float radius = focused_planet->getPhysicalProperties().getRadius();
+  if (camera.getPolarPosition().z < radius) camera.getPolarPosition().z = radius;
 
   pre_mouseposx = posX;
   pre_mouseposy = posY;
@@ -370,7 +392,26 @@ void Game::render()
     d.updateTexture();
   }
 
-  view_center = focused_planet->getPosition();
+  if (switch_frame_current > switch_frames)
+  {
+    is_switching = false;
+    switch_frame_current = 0;
+  }
+
+  if (is_switching)
+  {
+    float t = switch_frame_current/(float)switch_frames;
+    float f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
+    view_center = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
+    float target_dist = focused_planet->getPhysicalProperties().getRadius()*4;
+    camera.getPolarPosition().z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
+
+    ++switch_frame_current;
+  }
+  else
+  {
+    view_center = focused_planet->getPosition();
+  }
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
@@ -382,7 +423,7 @@ void Game::render()
   std::vector<Planet*> meshes; // Planets to be rendered as their whole mesh
 
   // Planet sorting between flares and close meshes
-  for (auto p : planets)
+  for (Planet &p : planets)
   {
     glm::vec3 dist = p.getPosition() - view_center - camera.getPosition();
     if (glm::length(dist) >= MAX_VIEW_DIST)
@@ -403,7 +444,7 @@ void Game::render()
   flare_shader.uniform("ratio", ratio);
   flare_shader.uniform("tex", 0);
   flare_tex.use(0);
-  for (auto flare : flares)
+  for (Planet *flare : flares)
   {
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
     if (posOnScreen.z > 0)
@@ -424,7 +465,7 @@ void Game::render()
   rc.light_pos = light_position;
   rc.view_center = view_center;
 
-  for (auto mesh : meshes)
+  for (Planet *mesh : meshes)
   {
     mesh->render(rc);
   }
