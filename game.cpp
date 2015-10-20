@@ -19,9 +19,11 @@
 #include <atomic>
 #include <thread>
 #include <functional>
+#include <algorithm>
 
 #include "shaun/sweeper.hpp"
 #include "shaun/parser.hpp"
+#include "lodepng.h"
 
 #include <glm/ext.hpp>
 
@@ -100,9 +102,34 @@ void Camera::setFovy(float fovy)
   this->fovy = fovy;
 }
 
+Input::Input(GLFWwindow **win)
+{
+  this->win = win;
+}
+bool Input::isPressed(int key)
+{
+  bool key_pressed = glfwGetKey(*win, key);
+  if (key_pressed && !pressed[key])
+  {
+    pressed[key] = true;
+    return true;
+  } 
+  else if (!key_pressed)
+  {
+    pressed[key] = false;
+    return false;
+  }
+  return false;
+}
+
+bool Input::isHeld(int key)
+{
+  return glfwGetKey(*win,key);
+}
+
 concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
-Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj)
+Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj), input(&win)
 {
   sensibility = 0.0004;
   light_position = glm::vec3(0,5,0);
@@ -111,7 +138,11 @@ Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj)
   view_smoothness = 0.85;
   view_center = glm::vec3(0,0,0);
   switch_previous_planet = NULL;
-  planet_switch = false;
+  save = false;
+
+  time_warp_values = {1,100,10000,1000000};
+  time_warp_index = 0;
+
   switch_frames = 100;
   switch_frame_current = 0;
   is_switching = false;
@@ -136,9 +167,12 @@ Game::~Game()
   {
     it->join();
   }
+  screenshot_thread->join();
+  delete [] screenshot_buffer;
+  delete screenshot_thread;
 }
 
-void plThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd)
+void tlThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd)
 {
   std::pair<std::string,Texture*> st;
   while (!quit)
@@ -146,6 +180,27 @@ void plThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Te
     if (texs.try_next(st))
     {
       load_DDS(st.first, *st.second, tmd);
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
+void ssThread(std::atomic<bool> &quit, unsigned char *buffer, std::atomic<bool> &save, GLFWwindow *win)
+{
+  while (!quit)
+  {
+    if (save)
+    {
+      time_t t = time(0);
+      struct tm *now = localtime(&t);
+      std::stringstream filename;
+      filename << "./screenshots/screenshot_" << (now->tm_year+1900) << "-" << (now->tm_mon+1) << "-" << (now->tm_mday) << "_" << (now->tm_hour) << "-" << (now->tm_min) << "-" << (now->tm_sec) << ".png";
+      int width,height;
+      glfwGetWindowSize(win, &width, &height);
+
+      unsigned int error = lodepng::encode(filename.str(), buffer, width,height);
+      if(error) std::cout << "Can't save screenshot: " << lodepng_error_text(error) << std::endl;
+      save = false;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
@@ -171,14 +226,17 @@ void Game::init()
     exit(-1);
   }
 
+  screenshot_buffer = new unsigned char[mode->width*mode->height*4];
+
   glfwMakeContextCurrent(win);
 
   // THREAD INITIALIZATION
   thread_count = 1;
   for (int i=0;i<thread_count;++i)
   {
-    tl_threads.emplace_back(plThread, std::ref(quit), std::ref(textures_to_load),std::ref(textures_to_update));
+    tl_threads.emplace_back(tlThread, std::ref(quit), std::ref(textures_to_load),std::ref(textures_to_update));
   }
+  screenshot_thread = new std::thread(ssThread, std::ref(quit), screenshot_buffer, std::ref(save), win);
 
   GLenum err = glewInit();
   if (GLEW_OK != err)
@@ -292,14 +350,32 @@ void Game::loadPlanetFiles()
   {
     std::cout << e << std::endl;
   }
-
 }
 
 void Game::loadTexture(const std::string &filename, Texture &tex)
 {
-
   textures_to_load.push(std::pair<std::string,Texture*>(filename, &tex));
 }
+
+class PlanetCompareByDist
+{
+public:
+  PlanetCompareByDist(const glm::vec3 &view_pos)
+  {
+    this->view_pos = view_pos;
+  }
+  bool operator()(Planet *p1, Planet *p2)
+  {
+    return getDist(p1) > getDist(p2);
+  }
+  float getDist(Planet *p)
+  {
+    glm::vec3 temp = p->getPosition() - view_pos;
+    return glm::dot(temp,temp);
+  }
+private:
+  glm::vec3 view_pos;
+};
 
 void Game::update()
 {
@@ -311,21 +387,25 @@ void Game::update()
   {
     p.update(epoch);
   }
-  epoch += 200;
 
-  bool switch_pressed = glfwGetKey(win, GLFW_KEY_TAB);
-  if (switch_pressed && !planet_switch && !is_switching)
+  if (input.isPressed(GLFW_KEY_K))
+  {
+    if (time_warp_index > 0) time_warp_index--;
+  }
+  if (input.isPressed(GLFW_KEY_L))
+  {
+    if (time_warp_index < time_warp_values.size()-1) time_warp_index++;
+  }
+
+  epoch += time_warp_values[time_warp_index];
+
+  if (input.isPressed(GLFW_KEY_TAB) && !is_switching)
   {
     switch_previous_planet = focused_planet;
     focused_planet_id = (focused_planet_id+1)%planets.size();
     focused_planet = &planets[focused_planet_id];
     switch_previous_dist = camera.getPolarPosition().z;
-    planet_switch = true;
     is_switching = true;  
-  }
-  else if (!switch_pressed)
-  {
-    planet_switch = false;
   }
 
   double posX, posY;
@@ -372,6 +452,14 @@ void Game::update()
 
   pre_mouseposx = posX;
   pre_mouseposy = posY;
+
+  if (input.isPressed(GLFW_KEY_F12) && !save)
+  {
+    int width,height;
+    glfwGetWindowSize(win, &width, &height);
+    glReadPixels(0,0,width,height, GL_RGBA, GL_UNSIGNED_BYTE, screenshot_buffer);
+    save = true;
+  }
 }
 
 void Game::render()
@@ -465,10 +553,12 @@ void Game::render()
   rc.light_pos = light_position;
   rc.view_center = view_center;
 
+  std::sort(meshes.begin(),meshes.end(), PlanetCompareByDist(camera.getPosition()+view_center));
   for (Planet *mesh : meshes)
   {
     mesh->render(rc);
   }
+
   glfwSwapBuffers(win);
   glfwPollEvents();
 }

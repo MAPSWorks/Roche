@@ -18,11 +18,10 @@ class shaun
 public:    
     virtual ~shaun() {}
 
-    Type type();
+    virtual Type type() = 0;
 
-    bool is_null();
+    virtual bool is_null();
 protected:
-    Type type_;
 };
 
 
@@ -42,6 +41,8 @@ public:
 
     template<class C>
     C& at(size_t i);
+    
+    size_t size() const;
 private:
     std::vector<std::shared_ptr<shaun> > elements_;
 };
@@ -126,6 +127,8 @@ public:
     C& get(const std::string& name);
 
     Type type_of(const std::string& name);
+    
+    size_t size() const;
 private:
 
     shaun * get_variable(const std::string& name);

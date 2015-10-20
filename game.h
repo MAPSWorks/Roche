@@ -10,6 +10,7 @@
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
+#include <bitset>
 #include <deque>
 #include <mutex>
 #include <atomic>
@@ -63,6 +64,17 @@ private:
 
 };
 
+class Input
+{
+public:
+  Input(GLFWwindow **win);
+  bool isPressed(int key);
+  bool isHeld(int key);
+private:
+  GLFWwindow **win;
+  std::bitset<512> pressed;
+};
+
 class Game
 {
 public:
@@ -75,6 +87,8 @@ public:
   static void loadTexture(const std::string &filename, Texture &tex);
 
 private:
+  bool isPressedOnce(int key);
+
   void generateModels();
   void loadShaders();
   void loadSkybox();
@@ -85,9 +99,13 @@ private:
   int focused_planet_id;
   glm::vec3 view_center; // The position the view is centered on
   double epoch; // Seconds since January 1st 2015 00:00
+  int time_warp_index;
+  std::vector<double> time_warp_values;
 
   // THREADING RELATED STUFF
   std::deque<std::thread> tl_threads; // Texture loading Threads
+  std::thread *screenshot_thread;
+  std::atomic<bool> save; // Indicates if the screenshot thread has to save the framebuffer to a file now
   int thread_count; // Number of threads
   std::atomic<bool> quit; // boolean for killing threads
 
@@ -95,6 +113,8 @@ private:
   static concurrent_queue<std::pair<std::string,Texture*>> textures_to_load;
   /// Loaded mipmap levels waiting to be used by opengl
   concurrent_queue<TexMipmapData> textures_to_update;
+
+  unsigned char *screenshot_buffer;
 
   // RENDERING RELATED STUFF
   RenderContext rc;
@@ -113,12 +133,12 @@ private:
   int switch_frames;
   int switch_frame_current;
   float switch_previous_dist;
-  bool planet_switch;
   Planet *switch_previous_planet;
 
   float sensibility;
 
   Camera camera;
+  Input input;
   GLFWwindow *win;
   float ratio;
 

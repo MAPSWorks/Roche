@@ -21,6 +21,7 @@ public:
 
     Type type() const;
     bool is_null() const;
+    size_t size() const;
 
     sweeper& get(const std::string& path);
     sweeper& operator[](size_t i);
@@ -29,8 +30,7 @@ public:
 private:
     shaun * compute_path(const std::string& path);
 
-    std::string current_name_;
-    shaun * current_;
+    std::string name_;
     shaun * root_;
     
     std::unique_ptr<sweeper> next_;

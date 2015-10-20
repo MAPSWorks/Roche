@@ -12,18 +12,18 @@ planets: [
     name:"Earth"
     orbit:{
       parent:"Sun"
-      ecc:1.616998394251595E-02
-      sma:1.495125338678499E+08
-      inc:2.343719926157708E+01deg
-      lan:4.704173983490563E-03deg
-      arg:1.042446186418036E+02deg
-      m0:3.571060381240151E+02deg
+      ecc:1.608754617940990E-02
+      sma:1.494930654907732E+08
+      inc:2.344603359636712E+01deg
+      lan:3.599965626953215E+02deg
+      arg:1.029548799377086E+02deg
+      m0:3.571527601141020E+02deg
     }
     physicalProperties:{
       radius:6371.01
       rot_axis:[0,0,1]
       rot_rate:7.292115E-5rad
-      mean_color:[0.6,0.8,1.0]
+      mean_color:[0.0,0.2,1.0]
       atmos_color:[0.6,0.8,1.0]
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
@@ -43,12 +43,12 @@ planets: [
     name:"Moon"
     orbit:{
       parent:"Earth"
-      ecc:3.849005238202950E-02
-      sma:3.829181891112684E+05
-      inc:1.863310123183821E+01
-      lan:3.558713755730276E+02
-      arg:3.196462299501181E+02
-      m0:9.030580895061981E+01
+      ecc:5.298940118493898E-02
+      sma:3.844212844766085E+05
+      inc:2.836200854713088E+01deg
+      lan:2.294272126732694E+00deg
+      arg:1.996208811827870E+02deg
+      m0:2.238455175352146E+02deg
     }
     physicalProperties:{
       radius:1737.53
