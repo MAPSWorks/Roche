@@ -16,21 +16,21 @@ class Planet;
 class RenderContext
 {
 public:
-  RenderContext(Shader &planet_shader, Shader &sun_shader, Shader &ring_shader,
-    Renderable &planet_obj, Renderable &ring_obj);
+  RenderContext(Shader &planet_shader, Shader &atmos_shader, Shader &sun_shader, Shader &ring_shader,
+    Renderable &planet_obj, Renderable &atmos_obj, Renderable &ring_obj);
   glm::mat4 proj_mat;
   glm::mat4 view_mat;
   glm::vec3 view_pos;
   glm::vec3 light_pos;
   glm::vec3 view_center;
-  Shader &planet_shader, &sun_shader, &ring_shader;
-  Renderable &planet_obj, &ring_obj;
+  Shader &planet_shader, &atmos_shader, &sun_shader, &ring_shader;
+  Renderable &planet_obj, &atmos_obj, &ring_obj;
 };
 
-class OrbitalParameters
+class Orbit
 {
 public:
-  OrbitalParameters();
+  Orbit();
   void setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0);
   void computePosition(double epoch); /// Computes the position from current epoch and parent body
   const glm::vec3 &getPosition() const;
@@ -47,10 +47,10 @@ private:
   Planet *parent;
 };
 
-class RingProperties
+class Ring
 {
 public:
-  RingProperties();
+  Ring();
   void setProperties(
     float inner,
     float outer,
@@ -84,16 +84,28 @@ private:
   static bool no_rings_init;
 };
 
-class PhysicalProperties
+class Atmosphere
 {
 public:
-  PhysicalProperties();
+  Atmosphere();
+  void setProperties(const glm::vec3 &atmosphere_color, float max_altitude);
+  const glm::vec3 &getColor() const;
+  float getMaxAltitude() const;
+  void print() const;
+private:
+  glm::vec3 color;
+  float max_altitude;
+};
+
+class Body
+{
+public:
+  Body();
   void setProperties(
     float radius,
     const glm::vec3 rot_axis,
     float rotation_rate,
     glm::vec3 mean_color,
-    glm::vec3 atmosphere_color,
     double GM,
     bool is_star,
     const std::string &diffuse_filename,
@@ -103,7 +115,7 @@ public:
   void load();
   void unload();
   void update(double epoch);
-  void render(const glm::vec3 &pos, const RenderContext &rc, const RingProperties &rings);
+  void render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rings, const Atmosphere &atmos);
 
   float getRadius() const;
   double getGM() const;
@@ -117,7 +129,6 @@ private:
   glm::vec3 rotation_axis;
   float rotation_rate; // radians per second
   glm::vec3 mean_color;
-  glm::vec3 atmosphere_color;
   double GM; // km3 s-2
   bool is_star;
   std::string diffuse_filename;
@@ -155,9 +166,10 @@ public:
   const std::string &getName() const;
   const glm::vec3 &getPosition() const;
 
-  OrbitalParameters &getOrbitalParameters();
-  PhysicalProperties &getPhysicalProperties();
-  RingProperties &getRingProperties();
+  Orbit &getOrbit();
+  Body &getBody();
+  Ring &getRing();
+  Atmosphere &getAtmosphere();
 
 private:
   template <class T>
@@ -165,9 +177,10 @@ private:
 
   std::string name;
 
-  OrbitalParameters orbit;
-  PhysicalProperties phys;
-  RingProperties ring;
+  Orbit orbit;
+  Body phys;
+  Ring ring;
+  Atmosphere atmos;
 };
 
 class Skybox

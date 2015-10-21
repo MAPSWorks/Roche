@@ -129,7 +129,7 @@ bool Input::isHeld(int key)
 
 concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
-Game::Game() : rc(planet_shader, sun_shader, ring_shader, planet_obj, ring_obj), input(&win)
+Game::Game() : rc(planet_shader, atmos_shader, sun_shader, ring_shader, planet_obj, atmos_obj, ring_obj), input(&win)
 {
   sensibility = 0.0004;
   light_position = glm::vec3(0,5,0);
@@ -247,8 +247,7 @@ void Game::init()
   int width, height;
   glfwGetFramebufferSize(win, &width, &height);
   glViewport(0, 0, width, height);
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
+  glDepthMask(GL_FALSE);
   glEnable(GL_BLEND);
   glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_CULL_FACE);
@@ -262,7 +261,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
-  camera.getPolarPosition().z = focused_planet->getPhysicalProperties().getRadius()*4;
+  camera.getPolarPosition().z = focused_planet->getBody().getRadius()*4;
 }
 
 void Game::generateModels()
@@ -281,6 +280,7 @@ void Game::generateModels()
   ring_obj.updateIndices(12, ring_ind);
 
   planet_obj.generateSphere(128,128, 1);
+  atmos_obj.generateSphere(128,128, 0);
   skybox_obj.generateSphere(16,16,0);
 
   float flare_vert[] =
@@ -302,6 +302,7 @@ void Game::loadShaders()
 {
   ring_shader.loadFromFile("shaders/ring.vert", "shaders/ring.frag");
   planet_shader.loadFromFile("shaders/planet.vert", "shaders/planet.frag");
+  atmos_shader.loadFromFile("shaders/atmos.vert", "shaders/atmos.frag");
   sun_shader.loadFromFile("shaders/planet.vert", "shaders/sun.frag");
   skybox_shader.loadFromFile("shaders/skybox.vert", "shaders/skybox.frag");
   flare_shader.loadFromFile("shaders/flare.vert", "shaders/flare.frag");
@@ -341,7 +342,8 @@ void Game::loadPlanetFiles()
     }
     for (Planet &p : planets)
     {
-      p.getOrbitalParameters().setParentFromName(planets);
+      p.getOrbit().setParentFromName(planets);
+      p.print();
     }
 
     focused_planet = &planets[focused_planet_id];
@@ -381,7 +383,7 @@ void Game::update()
 {
   for (Planet &p: planets)
   {
-    p.getOrbitalParameters().reset();
+    p.getOrbit().reset();
   }
   for (Planet &p: planets)
   {
@@ -447,7 +449,7 @@ void Game::update()
     camera.getPolarPosition().y = -PI/2 + 0.001;
     view_speed.y = 0;
   }
-  float radius = focused_planet->getPhysicalProperties().getRadius();
+  float radius = focused_planet->getBody().getRadius();
   if (camera.getPolarPosition().z < radius) camera.getPolarPosition().z = radius;
 
   pre_mouseposx = posX;
@@ -491,7 +493,7 @@ void Game::render()
     float t = switch_frame_current/(float)switch_frames;
     float f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
     view_center = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
-    float target_dist = focused_planet->getPhysicalProperties().getRadius()*4;
+    float target_dist = focused_planet->getBody().getRadius()*4;
     camera.getPolarPosition().z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
 
     ++switch_frame_current;
@@ -526,7 +528,7 @@ void Game::render()
     }
   }
 
-  glDepthMask(GL_FALSE);
+  
   skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
   flare_shader.use();
   flare_shader.uniform("ratio", ratio);
@@ -545,7 +547,6 @@ void Game::render()
       flare_obj.render();
     }
   }
-  glDepthFunc(GL_LESS);
 
   rc.proj_mat = proj_mat;
   rc.view_mat = view_mat;

@@ -18,15 +18,15 @@
 
 #define PI 3.14159265358979323846264338327950288 
 
-Texture PhysicalProperties::no_night;
-Texture PhysicalProperties::no_clouds;
-Texture RingProperties::no_rings;
-bool PhysicalProperties::no_tex_init = false;
-bool RingProperties::no_rings_init = false;
+Texture Body::no_night;
+Texture Body::no_clouds;
+Texture Ring::no_rings;
+bool Body::no_tex_init = false;
+bool Ring::no_rings_init = false;
 
 /// RENDER HELPER FUNCTIONS
 
-glm::mat4 PhysicalProperties::computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer)
+glm::mat4 Body::computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer)
 {
   glm::mat4 light_mat;
   glm::vec3 nlight_up = glm::normalize(light_up);
@@ -45,7 +45,7 @@ glm::mat4 PhysicalProperties::computeLightMatrix(const glm::vec3 &light_dir,cons
   return light_mat;
 }
 
-void PhysicalProperties::computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat)
+void Body::computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat)
 {
   glm::mat4 near_mat_temp = glm::mat4(1.0);
   glm::mat4 far_mat_temp = glm::mat4(1.0);
@@ -72,7 +72,7 @@ void PhysicalProperties::computeRingMatrix(glm::vec3 toward_view, glm::vec3 ring
 
 #define RING_ITERATIONS 100
 
-void RingProperties::generateRings(unsigned char *buffer, int size, int seed)
+void Ring::generateRings(unsigned char *buffer, int size, int seed)
 {
   // Starting fill
   int i,j;
@@ -131,18 +131,20 @@ void RingProperties::generateRings(unsigned char *buffer, int size, int seed)
   free(ref_buffer);
 }
 
-RenderContext::RenderContext(Shader &ps, Shader &ss, Shader &rs,
-      Renderable &po, Renderable &ro) :
+RenderContext::RenderContext(Shader &ps, Shader &as, Shader &ss, Shader &rs,
+      Renderable &po, Renderable &ao, Renderable &ro) :
         planet_shader(ps),
+        atmos_shader(as),
         sun_shader(ss),
         ring_shader(rs),
         planet_obj(po),
+        atmos_obj(ao),
         ring_obj(ro)
 {
   
 }
 
-OrbitalParameters::OrbitalParameters()
+Orbit::Orbit()
 {
   this->parent =  NULL;
   this->updated = false;
@@ -150,7 +152,7 @@ OrbitalParameters::OrbitalParameters()
   this->position = glm::vec3(0,0,0);
 }
 
-void OrbitalParameters::setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0)
+void Orbit::setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0)
 {
   this->ecc = ecc;
   this->sma = sma;
@@ -161,13 +163,13 @@ void OrbitalParameters::setParameters(const std::string &parent_body, double ecc
   this->parent_body = parent_body;
 }
 
-void OrbitalParameters::computePosition(double epoch)
+void Orbit::computePosition(double epoch)
 {
   if (!updated)
   {
     if (parent)
     {
-      double meanAnomaly = sqrt(parent->getPhysicalProperties().getGM() / (sma*sma*sma))*epoch + m0;
+      double meanAnomaly = sqrt(parent->getBody().getGM() / (sma*sma*sma))*epoch + m0;
       double En = (ecc<0.8)?meanAnomaly:PI;
       const int it = 10;
       for (int i=0;i<it;++i)
@@ -178,7 +180,7 @@ void OrbitalParameters::computePosition(double epoch)
       glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg*PI/180.0,glm::dvec3(0,0,1)),inc*PI/180, glm::dvec3(1,0,0)),lan*PI/180, glm::dvec3(1,0,0));
       position = q*posInPlane;
 
-      parent->getOrbitalParameters().computePosition(epoch);
+      parent->getOrbit().computePosition(epoch);
 
       position += parent->getPosition();
     }
@@ -189,12 +191,12 @@ void OrbitalParameters::computePosition(double epoch)
   }
 }
 
-const glm::vec3 &OrbitalParameters::getPosition() const
+const glm::vec3 &Orbit::getPosition() const
 {
   return position;
 }
 
-void OrbitalParameters::setParentFromName(std::deque<Planet> &planets)
+void Orbit::setParentFromName(std::deque<Planet> &planets)
 {
   if (parent_body != "")
   {
@@ -210,17 +212,17 @@ void OrbitalParameters::setParentFromName(std::deque<Planet> &planets)
   }
 }
 
-bool OrbitalParameters::isUpdated()
+bool Orbit::isUpdated()
 {
   return updated;
 }
 
-void OrbitalParameters::reset()
+void Orbit::reset()
 {
   updated = false;
 }
 
-void OrbitalParameters::print() const
+void Orbit::print() const
 {
   std::cout << "Parent body:" << parent_body << std::endl;
   std::cout << "Ecc:" << ecc << std::endl;
@@ -231,17 +233,16 @@ void OrbitalParameters::print() const
   std::cout << "M0:" << m0 << std::endl;
 }
 
-PhysicalProperties::PhysicalProperties()
+Body::Body()
 {
 
 }
 
-void PhysicalProperties::setProperties(
+void Body::setProperties(
       float radius,
       const glm::vec3 rot_axis,
       float rotation_rate,
       glm::vec3 mean_color,
-      glm::vec3 atmosphere_color,
       double GM,
       bool is_star,
       const std::string &diffuse_filename,
@@ -253,7 +254,6 @@ void PhysicalProperties::setProperties(
   this->rotation_axis = glm::normalize(rot_axis);
   this->rotation_rate = rotation_rate;
   this->mean_color = mean_color;
-  this->atmosphere_color =  atmosphere_color;
   this->GM = GM;
   this->is_star = is_star;
   this->diffuse_filename = diffuse_filename;
@@ -266,7 +266,7 @@ void PhysicalProperties::setProperties(
   loaded = false;
 }
 
-void PhysicalProperties::load()
+void Body::load()
 {
   if (!no_tex_init)
   {
@@ -295,7 +295,7 @@ void PhysicalProperties::load()
     loaded = true;
   }
 }
-void PhysicalProperties::unload()
+void Body::unload()
 {
   if (loaded)
   {
@@ -306,13 +306,13 @@ void PhysicalProperties::unload()
   }
 }
 
-void PhysicalProperties::update(double epoch)
+void Body::update(double epoch)
 {
   rotation_angle = rotation_rate*epoch;
   cloud_disp = cloud_disp_rate*epoch;
 }
 
-void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, const RingProperties &rings)
+void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rings, const Atmosphere &atmos)
 {
   Shader &pshad = is_star?rc.sun_shader:rc.planet_shader;
 
@@ -335,6 +335,17 @@ void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, c
 
   rings.render(far_ring_mat, light_mat, rc);
 
+  if (atmos.getMaxAltitude() > 0)
+  { 
+    glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.getMaxAltitude()/radius));
+    rc.atmos_shader.use();
+    rc.atmos_shader.uniform( "projMat", glm::value_ptr(rc.proj_mat));
+    rc.atmos_shader.uniform( "viewMat", glm::value_ptr(rc.view_mat));
+    rc.atmos_shader.uniform( "modelMat", glm::value_ptr(atmos_mat));
+    rc.atmos_shader.uniform( "color", glm::value_ptr(atmos.getColor()));
+    rc.atmos_obj.render();
+  }
+
   // PLANET RENDER
   pshad.use();
   pshad.uniform( "projMat", glm::value_ptr(rc.proj_mat));
@@ -344,7 +355,7 @@ void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, c
   pshad.uniform( "light_dir", glm::value_ptr(light_dir));
   pshad.uniform( "cloud_disp", cloud_disp);
   pshad.uniform( "view_pos", glm::value_ptr(rc.view_pos));
-  pshad.uniform( "sky_color", glm::value_ptr(atmosphere_color));
+  pshad.uniform( "sky_color", glm::value_ptr(atmos.getColor()));
   pshad.uniform( "ring_inner", rings.getInner());
   pshad.uniform( "ring_outer", rings.getOuter());
   pshad.uniform( "diffuse_tex", 0);
@@ -360,23 +371,22 @@ void PhysicalProperties::render(const glm::vec3 &pos, const RenderContext &rc, c
   rings.render(near_ring_mat, light_mat, rc);
 }
 
-double PhysicalProperties::getGM() const
+double Body::getGM() const
 {
   return GM;
 }
 
-float PhysicalProperties::getRadius() const
+float Body::getRadius() const
 {
   return radius;
 }
 
-void PhysicalProperties::print() const
+void Body::print() const
 {
   std::cout << "Radius:" << radius << std::endl;
   std::cout << "Rotation axis:" << glm::to_string(rotation_axis) << std::endl;
   std::cout << "Rotation rate:" << rotation_rate << std::endl;
   std::cout << "Mean color:" << glm::to_string(mean_color) << std::endl;
-  std::cout << "Atmosphere color:" << glm::to_string(atmosphere_color) << std::endl;
   std::cout << "GM:" << GM << std::endl;
   std::cout << "Is it a star?" << (is_star?"Yes":"No") << std::endl;
   std::cout << "Diffuse map filename:" << diffuse_filename << std::endl;
@@ -389,11 +399,11 @@ void PhysicalProperties::print() const
   }
 }
 
-RingProperties::RingProperties()
+Ring::Ring()
 {
   has_rings = false;
 }
-void RingProperties::setProperties(float inner, float outer, const glm::vec3 &normal, int seed, const glm::vec4 &color)
+void Ring::setProperties(float inner, float outer, const glm::vec3 &normal, int seed, const glm::vec4 &color)
 {
   has_rings = true;
   this->inner = inner;
@@ -402,7 +412,7 @@ void RingProperties::setProperties(float inner, float outer, const glm::vec3 &no
   this->seed = seed;
   this->color = color;
 }
-void RingProperties::load()
+void Ring::load()
 {
   if (!no_rings_init)
   {
@@ -423,7 +433,7 @@ void RingProperties::load()
     loaded = true;
   }
 }
-void RingProperties::unload()
+void Ring::unload()
 {
   if (loaded)
   {
@@ -432,7 +442,7 @@ void RingProperties::unload()
   }
 }
 
-void RingProperties::render(const glm::mat4 &model_mat,  const glm::mat4 &light_mat, const RenderContext &rc) const
+void Ring::render(const glm::mat4 &model_mat,  const glm::mat4 &light_mat, const RenderContext &rc) const
 {
   if (has_rings)
   {
@@ -450,25 +460,25 @@ void RingProperties::render(const glm::mat4 &model_mat,  const glm::mat4 &light_
   }
 }
 
-void RingProperties::useTexture(int unit) const
+void Ring::useTexture(int unit) const
 {
   if (has_rings) tex.use(unit); else no_rings.use(unit);
 }
 
-float RingProperties::getInner() const
+float Ring::getInner() const
 {
   return inner;
 }
-float RingProperties::getOuter() const
+float Ring::getOuter() const
 {
   return outer;
 }
-const glm::vec3 &RingProperties::getNormal() const
+const glm::vec3 &Ring::getNormal() const
 {
   return up;
 }
 
-void RingProperties::print() const
+void Ring::print() const
 {
   if (has_rings)
   {
@@ -484,6 +494,34 @@ void RingProperties::print() const
   }
 }
 
+Atmosphere::Atmosphere()
+{
+  max_altitude = -100;
+  color = glm::vec3(1.0,1.0,1.0);
+}
+
+void Atmosphere::setProperties(const glm::vec3 &color, float max_altitude)
+{
+  this->color = color;
+  this->max_altitude = max_altitude;
+}
+
+const glm::vec3 &Atmosphere::getColor() const
+{
+  return color;
+}
+
+float Atmosphere::getMaxAltitude() const
+{
+  return max_altitude;
+}
+
+void Atmosphere::print() const
+{
+  std::cout << "Color : " << glm::to_string(color) << std::endl;
+  std::cout << "Max altitude : " << max_altitude << std::endl;
+}
+
 Planet::Planet()
 {
   name = "undefined";
@@ -494,8 +532,10 @@ void Planet::print() const
   std::cout << "Planet name:" << name << std::endl;
   std::cout << "====ORBITAL PARAMETERS===================" << std::endl;
   orbit.print();
-  std::cout << "====PHYSICAL PROPERTIES==================" << std::endl;
+  std::cout << "====BODY PROPERTIES======================" << std::endl;
   phys.print();
+  std::cout << "====ATMOSPHERE PROPERTIES================" << std::endl;
+  atmos.print();
   std::cout << "====RING PROPERTIES======================" << std::endl;
   ring.print();
 }
@@ -530,18 +570,18 @@ void Planet::setParentBody(std::deque<Planet> &planets)
 
 void Planet::render(const RenderContext &rc)
 {
-  phys.render(orbit.getPosition(), rc, ring);
+  phys.render(orbit.getPosition(), rc, ring, atmos);
 }
 
-OrbitalParameters &Planet::getOrbitalParameters()
+Orbit &Planet::getOrbit()
 {
   return orbit;
 }
-PhysicalProperties &Planet::getPhysicalProperties()
+Body &Planet::getBody()
 {
   return phys;
 }
-RingProperties &Planet::getRingProperties()
+Ring &Planet::getRing()
 {
   return ring;
 }
@@ -626,7 +666,7 @@ void Planet::createFromFile(shaun::sweeper &swp1)
     );
   }
 
-  auto phys(swp("physicalProperties"));
+  auto phys(swp("body"));
   if (!phys.is_null())
   {
     this->phys.setProperties(
@@ -634,7 +674,6 @@ void Planet::createFromFile(shaun::sweeper &swp1)
       shaun_fieldToType<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1)),
       shaun_fieldToType<float>(phys("rot_rate"), 0.0),
       shaun_fieldToType<glm::vec3>(phys("mean_color"), glm::vec3(1.0)),
-      shaun_fieldToType<glm::vec3>(phys("atmos_color"), glm::vec3(1.0)),
       shaun_fieldToType<double>(phys("GM"), 1000),
       shaun_fieldToType<bool>(phys("is_star"), false),
       shaun_fieldToType<std::string>(phys("diffuse"), ""),
@@ -644,7 +683,16 @@ void Planet::createFromFile(shaun::sweeper &swp1)
     );
   }
 
-  auto ring(swp("ringProperties"));
+  auto atmos(swp("atmosphere"));
+  if (!atmos.is_null())
+  {
+    this->atmos.setProperties(
+      shaun_fieldToType<glm::vec3>(atmos("color"), glm::vec3(1.0)),
+      shaun_fieldToType<float>(atmos("max_altitude"), -100.0)
+    );
+  }
+
+  auto ring(swp("ring"));
   if (!ring.is_null())
   {
     this->ring.setProperties(

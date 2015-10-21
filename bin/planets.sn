@@ -1,7 +1,7 @@
 planets: [
 	{
     name:"Sun"
-    physicalProperties:{
+    body:{
       radius:696000
       GM:132712440018
       diffuse:"tex/sun/diffuse.dds"
@@ -19,19 +19,22 @@ planets: [
       arg:1.029548799377086E+02deg
       m0:3.571527601141020E+02deg
     }
-    physicalProperties:{
+    body:{
       radius:6371.01
       rot_axis:[0,0,1]
       rot_rate:7.292115E-5rad
       mean_color:[0.0,0.2,1.0]
-      atmos_color:[0.6,0.8,1.0]
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
       night:"tex/earth/night.dds"
       cloud:"tex/earth/clouds.dds"
       cloud_disp_rate:3.292115E-5rad
     }
-    ringProperties:{
+    atmosphere:{
+      color: [0.6,0.8,1.0]
+      max_altitude:130
+    }
+    ring:{
       inner:10000
       outer:16000
       normal:[1,1,2]
@@ -50,12 +53,11 @@ planets: [
       arg:1.996208811827870E+02deg
       m0:2.238455175352146E+02deg
     }
-    physicalProperties:{
+    body:{
       radius:1737.53
       rot_axis:[0,0,1]
       rot_rate:2.662435E-6rad
       mean_color:[0.6,0.6,0.6]
-      atmos_color:[0.6,0.6,0.6]
       GM:4902.768
       diffuse:"tex/earth/moon/diffuse.dds"
     }
