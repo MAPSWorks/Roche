@@ -19,7 +19,8 @@ uniform float ring_outer; // Ring's outer radius
 uniform vec3 light_dir; // Towards the light source
 uniform vec3 view_pos; // Position of the camera
 uniform vec3 ring_vec; // Normal vector of the ring plane
-uniform vec3 sky_color; // dat's right
+
+uniform vec3 rel_viewpos;
 
 // GAUSS KERNEL /W LERP
 uniform float offset[3] = float[]( 0.0, 1.3846153846, 3.2307692308 );
@@ -31,6 +32,110 @@ float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 #define AMBIENT_LIGHT 0.04
 #define RING_AMBIENT 0.2
 
+uniform float planet_radius;
+uniform float atmos_height;
+
+float SCALE_H = 4.0/(atmos_height);
+float SCALE_L = 1.0/(atmos_height);
+
+#define OUT_SAMPLES 5
+#define IN_SAMPLES 5
+
+#define PI 3.14159265359
+
+uniform float K_R; // Rayleigh scattering constant
+uniform float K_M; // Mie scattering constant
+uniform float E; // Sunlight intensity
+uniform vec3 C_R; // 1 / sunlight wavelength ^4
+uniform float G_M; // Mie g constant
+
+float ray_sphere_far(vec3 ori, vec3 ray, float radius)
+{
+  float b = dot(ori, ray);
+  float c = dot(ori,ori) - radius*radius;
+  return -b+sqrt(b*b-c);
+}
+
+float ray_sphere_near(vec3 ori, vec3 ray, float radius)
+{
+  float b = dot(ori, ray);
+  float c = dot(ori,ori) - radius*radius;
+  return -b-sqrt(b*b-c);
+}
+
+float rayleigh(float cc)
+{
+  return 0.75 + (1.0 + cc);
+}
+
+float mie(float g, float c, float cc)
+{
+  float gg = g*g;
+  float a = (1.0-gg)*(1.0+cc);
+  float b = 1.0 + gg - 2.0*g*c;
+  b*= sqrt(b);
+  b*= 2.0+gg;
+
+  return 1.5*a/b;
+}
+
+float density(vec3 point)
+{
+  return exp(-max(0.0,length(point) - planet_radius)*SCALE_H);
+}
+
+float optic(vec3 a, vec3 b)
+{
+  vec3 step = (b-a)/float(OUT_SAMPLES);
+  vec3 v = a+step*0.5;
+
+  float sum = 0.0;
+  for (int i=0;i<OUT_SAMPLES;++i)
+  {
+    sum += density(v);
+    v += step;
+  }
+  return sum * length(step) * SCALE_L;
+}
+
+vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
+{
+  vec3 view_dir = frag_pos-viewer;
+  float far = length(view_dir);
+  view_dir /= far;
+
+  float near = ray_sphere_near(viewer, view_dir, planet_radius+atmos_height);
+
+  float len = (far-near)/float(IN_SAMPLES);
+  vec3 step = view_dir*len;
+
+  vec3 p = viewer+view_dir*near;
+  vec3 v = p+step*0.5;
+
+  vec3 sum = vec3(0.0);
+  float opacity = 0.0;
+  for (int i=0;i<IN_SAMPLES;++i)
+  {
+    float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
+    vec3 u = v+light_dir*t;
+    float n = (optic(p,v)+optic(v,u))*(PI * 4.0);
+    float dens = density(v);
+    sum += dens * exp(-n*(K_R*C_R+K_M));
+    opacity += dens;
+    v += step;
+  }
+
+  sum *= len * SCALE_L;
+  opacity *= len * SCALE_L;
+
+  float c = dot(view_dir,-light_dir);
+  float cc = c*c;
+
+  vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
+
+  return vec4(color, opacity);
+}
+
 void main(void)
 {
 	// TEXTURE LOOKUPS
@@ -41,11 +146,6 @@ void main(void)
 	// LIGHT CALCULATION
 	float rawlight = dot(-light_dir, pass_normal);
 	float light = clamp(rawlight,AMBIENT_LIGHT,1.0);
-	
-	// ATMOSPHERE RENDERING
-	vec3 to_viewer = normalize(view_pos-pass_position.xyz);
-	float angle = pow(1.0 - dot(pass_normal, to_viewer), 3);
-	float rim = (angle*angle*angle);
 
 	// TEXTURE COMPOSITION
 	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
@@ -66,8 +166,13 @@ void main(void)
 	shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
 	color *= mix(shadow,1.0,nightlights);
 
+	if (atmos_height >0)
+	{
+		vec4 scat = in_scattering(rel_viewpos, pass_lpos, -light_dir);
+		color = scat.xyz;//*scat.w;
+	}
+
 	// ATMOSPHERE CALCULATION
-	color = mix(color, sky_color*light, angle);
-	out_color = vec4(mix(color, sky_color*2, rim*light), 1.0-(rim*rim*rim));
+	out_color = vec4(color,1.0);
 	
 }

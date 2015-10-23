@@ -343,7 +343,6 @@ void Game::loadPlanetFiles()
     for (Planet &p : planets)
     {
       p.getOrbit().setParentFromName(planets);
-      p.print();
     }
 
     focused_planet = &planets[focused_planet_id];

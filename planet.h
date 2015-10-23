@@ -88,12 +88,13 @@ class Atmosphere
 {
 public:
   Atmosphere();
-  void setProperties(const glm::vec3 &atmosphere_color, float max_altitude);
-  const glm::vec3 &getColor() const;
+  void setProperties(float max_altitude,float K_R, float K_M, float E, glm::vec3 C_R, float G_M);
   float getMaxAltitude() const;
   void print() const;
+
+  float K_R,K_M,E,G_M;
+  glm::vec3 C_R;
 private:
-  glm::vec3 color;
   float max_altitude;
 };
 

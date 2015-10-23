@@ -335,16 +335,24 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
 
   rings.render(far_ring_mat, light_mat, rc);
 
-  if (atmos.getMaxAltitude() > 0)
+  /*if (atmos.getMaxAltitude() > 0)
   { 
     glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.getMaxAltitude()/radius));
     rc.atmos_shader.use();
     rc.atmos_shader.uniform( "projMat", glm::value_ptr(rc.proj_mat));
     rc.atmos_shader.uniform( "viewMat", glm::value_ptr(rc.view_mat));
     rc.atmos_shader.uniform( "modelMat", glm::value_ptr(atmos_mat));
-    rc.atmos_shader.uniform( "color", glm::value_ptr(atmos.getColor()));
+    rc.atmos_shader.uniform( "view_pos", glm::value_ptr(rc.view_pos - render_pos));
+    rc.atmos_shader.uniform( "light_dir", glm::value_ptr(-light_dir));
+    rc.atmos_shader.uniform( "planet_radius", radius);
+    rc.atmos_shader.uniform( "atmos_height", atmos.getMaxAltitude());
+    rc.atmos_shader.uniform( "K_R", atmos.K_R);
+    rc.atmos_shader.uniform( "K_M", atmos.K_M);
+    rc.atmos_shader.uniform( "E", atmos.E);
+    rc.atmos_shader.uniform( "C_R", glm::value_ptr(atmos.C_R));
+    rc.atmos_shader.uniform( "G_M", atmos.G_M);
     rc.atmos_obj.render();
-  }
+  }*/
 
   // PLANET RENDER
   pshad.use();
@@ -355,9 +363,18 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
   pshad.uniform( "light_dir", glm::value_ptr(light_dir));
   pshad.uniform( "cloud_disp", cloud_disp);
   pshad.uniform( "view_pos", glm::value_ptr(rc.view_pos));
-  pshad.uniform( "sky_color", glm::value_ptr(atmos.getColor()));
   pshad.uniform( "ring_inner", rings.getInner());
   pshad.uniform( "ring_outer", rings.getOuter());
+
+  pshad.uniform( "rel_viewpos", glm::value_ptr(rc.view_pos-render_pos));
+  pshad.uniform( "planet_radius", radius);
+  pshad.uniform( "atmos_height", atmos.getMaxAltitude());
+  pshad.uniform( "K_R", atmos.K_R);
+  pshad.uniform( "K_M", atmos.K_M);
+  pshad.uniform( "E", atmos.E);
+  pshad.uniform( "C_R", glm::value_ptr(atmos.C_R));
+  pshad.uniform( "G_M", atmos.G_M);
+
   pshad.uniform( "diffuse_tex", 0);
   pshad.uniform( "clouds_tex", 1);
   pshad.uniform( "night_tex", 2);
@@ -497,18 +514,16 @@ void Ring::print() const
 Atmosphere::Atmosphere()
 {
   max_altitude = -100;
-  color = glm::vec3(1.0,1.0,1.0);
 }
 
-void Atmosphere::setProperties(const glm::vec3 &color, float max_altitude)
+void Atmosphere::setProperties(float max_altitude,float K_R, float K_M, float E, glm::vec3 C_R, float G_M)
 {
-  this->color = color;
   this->max_altitude = max_altitude;
-}
-
-const glm::vec3 &Atmosphere::getColor() const
-{
-  return color;
+  this->K_R = K_R;
+  this->K_M = K_M;
+  this->E = E;
+  this->C_R = C_R;
+  this->G_M = G_M;
 }
 
 float Atmosphere::getMaxAltitude() const
@@ -518,7 +533,6 @@ float Atmosphere::getMaxAltitude() const
 
 void Atmosphere::print() const
 {
-  std::cout << "Color : " << glm::to_string(color) << std::endl;
   std::cout << "Max altitude : " << max_altitude << std::endl;
 }
 
@@ -687,8 +701,12 @@ void Planet::createFromFile(shaun::sweeper &swp1)
   if (!atmos.is_null())
   {
     this->atmos.setProperties(
-      shaun_fieldToType<glm::vec3>(atmos("color"), glm::vec3(1.0)),
-      shaun_fieldToType<float>(atmos("max_altitude"), -100.0)
+      shaun_fieldToType<float>(atmos("max_altitude"), -100.0),
+      shaun_fieldToType<float>(atmos("K_R"),0),
+      shaun_fieldToType<float>(atmos("K_M"),0),
+      shaun_fieldToType<float>(atmos("E"),0),
+      shaun_fieldToType<glm::vec3>(atmos("C_R"),glm::vec3(0,0,0)),
+      shaun_fieldToType<float>(atmos("G_M"),-0.75)
     );
   }
 

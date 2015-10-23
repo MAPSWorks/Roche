@@ -31,8 +31,12 @@ planets: [
       cloud_disp_rate:3.292115E-5rad
     }
     atmosphere:{
-      color: [0.6,0.8,1.0]
       max_altitude:130
+      K_R:0.166
+      K_M:0.0025
+      E:14.3
+      C_R:[0.3, 0.7, 1.0]
+      G_M:-0.85 
     }
     ring:{
       inner:10000

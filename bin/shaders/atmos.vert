@@ -6,10 +6,10 @@ uniform mat4 projMat;
 uniform mat4 viewMat;
 uniform mat4 modelMat;
 
-out vec4 pass_position;
+out vec3 pass_position;
 
 void main(void)
 {
-	pass_position = modelMat*in_position;
-	gl_Position = projMat*viewMat*pass_position;
+	pass_position = mat3(modelMat)*in_position.xyz;
+	gl_Position = projMat*viewMat*modelMat*in_position;
 }

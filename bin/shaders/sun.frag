@@ -17,10 +17,5 @@ void main(void)
 	// TEXTURE LOOKUPS
 	vec3 color = texture(day_tex,pass_uv).rgb;
 
-	// ATMOSPHERE RENDERING
-	vec3 to_viewer = normalize(view_pos-pass_position.xyz);
-	float angle = pow(1.0 - dot(pass_normal, to_viewer), 3);
-	float rim = angle*angle*angle;
-
-	out_color = vec4(color*(1.0+angle),1.0-rim);
+	out_color = vec4(color,1.0);
 }
