@@ -32,9 +32,10 @@ planets: [
     }
     atmosphere:{
       max_altitude:130
+      scale_height:8.5
       K_R:0.166
       K_M:0.0025
-      E:14.3
+      E:8.3
       C_R:[0.3, 0.7, 1.0]
       G_M:-0.85 
     }

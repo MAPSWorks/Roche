@@ -7,8 +7,9 @@ uniform vec3 light_dir;
 
 uniform float planet_radius;
 uniform float atmos_height;
+uniform float scale_height;
 
-float SCALE_H = 4.0/(atmos_height);
+float SCALE_H = 1.0/scale_height;
 float SCALE_L = 1.0/(atmos_height);
 
 #define OUT_SAMPLES 5
@@ -93,7 +94,6 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
   vec3 v = p+step*0.5;
 
   vec3 sum = vec3(0.0);
-  float opacity = 0.0;
   for (int i=0;i<IN_SAMPLES;++i)
   {
     float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
@@ -101,19 +101,17 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
     float n = (optic(p,v)+optic(v,u))*(PI * 4.0);
     float dens = density(v);
     sum += dens * exp(-n*(K_R*C_R+K_M));
-    opacity += dens;
     v += step;
   }
 
   sum *= len * SCALE_L;
-  opacity *= len * SCALE_L;
 
   float c = dot(view_dir,-light_dir);
   float cc = c*c;
 
   vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
 
-  return vec4(color, opacity);
+  return color.rgbb;
 }
 
 void main(void)

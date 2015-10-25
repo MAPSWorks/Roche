@@ -51,30 +51,21 @@ class Ring
 {
 public:
   Ring();
-  void setProperties(
-    float inner,
-    float outer,
-    const glm::vec3 &normal,
-    int seed,
-    const glm::vec4 &color);
   void load();
   void unload();
   void render(const glm::mat4 &model_mat, const glm::mat4 &light_mat, const RenderContext &rc) const;
   void useTexture(int unit) const;
-  float getInner() const;
-  float getOuter() const;
-  const glm::vec3 &getNormal() const;
   void print() const;
-  
-private:
-  void generateRings(unsigned char *buffer, int size, int seed);
 
   bool has_rings;
   float inner; // ring nearest distance to center of planet (km)
   float outer; // ring farthest distance to center of planet (km)
-  glm::vec3 up; // ring plane's normal vector (normalized)
+  glm::vec3 normal; // ring plane's normal vector (normalized)
   int seed; // seed for generating the rings
   glm::vec4 color;
+  
+private:
+  void generateRings(unsigned char *buffer, int size, int seed);
 
   Texture tex;
 
@@ -88,43 +79,24 @@ class Atmosphere
 {
 public:
   Atmosphere();
-  void setProperties(float max_altitude,float K_R, float K_M, float E, glm::vec3 C_R, float G_M);
-  float getMaxAltitude() const;
   void print() const;
 
   float K_R,K_M,E,G_M;
   glm::vec3 C_R;
-private:
-  float max_altitude;
+  float max_height;
+  float scale_height;
 };
 
 class Body
 {
 public:
   Body();
-  void setProperties(
-    float radius,
-    const glm::vec3 rot_axis,
-    float rotation_rate,
-    glm::vec3 mean_color,
-    double GM,
-    bool is_star,
-    const std::string &diffuse_filename,
-    const std::string &night_filename,
-    const std::string &cloud_filename,
-    float cloud_disp_rate);
   void load();
   void unload();
   void update(double epoch);
   void render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rings, const Atmosphere &atmos);
 
-  float getRadius() const;
-  double getGM() const;
   void print() const;
-
-private:
-  glm::mat4 computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer);
-  void computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat);
 
   float radius; // km 
   glm::vec3 rotation_axis;
@@ -139,6 +111,9 @@ private:
   float cloud_disp_rate;
   std::string cloud_filename;
 
+private:
+  glm::mat4 computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer);
+  void computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat);
 
   Texture cloud_tex;
   Texture diffuse_tex;    
@@ -174,12 +149,12 @@ public:
 
 private:
   template <class T>
-  T shaun_fieldToType(shaun::sweeper &swp, T def);
+  T get(shaun::sweeper &swp, T def);
 
   std::string name;
 
   Orbit orbit;
-  Body phys;
+  Body body;
   Ring ring;
   Atmosphere atmos;
 };

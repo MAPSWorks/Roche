@@ -261,7 +261,7 @@ void Game::init()
   loadPlanetFiles();
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
-  camera.getPolarPosition().z = focused_planet->getBody().getRadius()*4;
+  camera.getPolarPosition().z = focused_planet->getBody().radius*4;
 }
 
 void Game::generateModels()
@@ -448,7 +448,7 @@ void Game::update()
     camera.getPolarPosition().y = -PI/2 + 0.001;
     view_speed.y = 0;
   }
-  float radius = focused_planet->getBody().getRadius();
+  float radius = focused_planet->getBody().radius;
   if (camera.getPolarPosition().z < radius) camera.getPolarPosition().z = radius;
 
   pre_mouseposx = posX;
@@ -492,7 +492,7 @@ void Game::render()
     float t = switch_frame_current/(float)switch_frames;
     float f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
     view_center = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
-    float target_dist = focused_planet->getBody().getRadius()*4;
+    float target_dist = focused_planet->getBody().radius*4;
     camera.getPolarPosition().z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
 
     ++switch_frame_current;

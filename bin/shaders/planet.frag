@@ -29,13 +29,15 @@ uniform float weight[3] = float[]( 0.2270270270, 0.3162162162, 0.0702702703 );
 float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 
 // This should be uniform variables
-#define AMBIENT_LIGHT 0.04
-#define RING_AMBIENT 0.2
+const float AMBIENT_LIGHT = 0.04;
+const float RING_AMBIENT = 0.2;
+const float CITY_LIGHT_INTENSITY = 0.1;
 
 uniform float planet_radius;
 uniform float atmos_height;
+uniform float scale_height;
 
-float SCALE_H = 4.0/(atmos_height);
+float SCALE_H = 1.0/scale_height;
 float SCALE_L = 1.0/(atmos_height);
 
 #define OUT_SAMPLES 5
@@ -81,7 +83,7 @@ float mie(float g, float c, float cc)
 
 float density(vec3 point)
 {
-  return exp(-max(0.0,length(point) - planet_radius)*SCALE_H);
+  return exp(-(length(point) - planet_radius)*SCALE_H);
 }
 
 float optic(vec3 a, vec3 b)
@@ -113,7 +115,6 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
   vec3 v = p+step*0.5;
 
   vec3 sum = vec3(0.0);
-  float opacity = 0.0;
   for (int i=0;i<IN_SAMPLES;++i)
   {
     float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
@@ -121,19 +122,17 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
     float n = (optic(p,v)+optic(v,u))*(PI * 4.0);
     float dens = density(v);
     sum += dens * exp(-n*(K_R*C_R+K_M));
-    opacity += dens;
     v += step;
   }
 
   sum *= len * SCALE_L;
-  opacity *= len * SCALE_L;
 
   float c = dot(view_dir,-light_dir);
   float cc = c*c;
 
   vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
 
-  return vec4(color, opacity);
+  return color.rgbb;
 }
 
 void main(void)
@@ -162,14 +161,17 @@ void main(void)
 		shadow += texture(ring_tex, vec2(tex_offset + offset[i]*ringtex_size,0.0)).r * weight[i];
 		shadow += texture(ring_tex, vec2(tex_offset - offset[i]*ringtex_size,0.0)).r * weight[i];
 	}
-	//shadow = 1.0 - (1.0-shadow)*light;
-	shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
-	color *= mix(shadow,1.0,nightlights);
 
+  shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
+  color *= mix(shadow,1.0,nightlights);
+
+  // Atmospheric scattering
 	if (atmos_height >0)
 	{
-		vec4 scat = in_scattering(rel_viewpos, pass_lpos, -light_dir);
-		color = scat.xyz;//*scat.w;
+    vec3 tlpos = normalize(pass_lpos)*planet_radius;
+		vec4 scat = in_scattering(rel_viewpos, tlpos, -light_dir);
+		color *= mix(scat.w,CITY_LIGHT_INTENSITY,nightlights);
+    color += scat.xyz;
 	}
 
 	// ATMOSPHERE CALCULATION

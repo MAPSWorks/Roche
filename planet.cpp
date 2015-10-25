@@ -169,7 +169,7 @@ void Orbit::computePosition(double epoch)
   {
     if (parent)
     {
-      double meanAnomaly = sqrt(parent->getBody().getGM() / (sma*sma*sma))*epoch + m0;
+      double meanAnomaly = sqrt(parent->getBody().GM / (sma*sma*sma))*epoch + m0;
       double En = (ecc<0.8)?meanAnomaly:PI;
       const int it = 10;
       for (int i=0;i<it;++i)
@@ -238,34 +238,6 @@ Body::Body()
 
 }
 
-void Body::setProperties(
-      float radius,
-      const glm::vec3 rot_axis,
-      float rotation_rate,
-      glm::vec3 mean_color,
-      double GM,
-      bool is_star,
-      const std::string &diffuse_filename,
-      const std::string &night_filename,
-      const std::string &cloud_filename,
-      float cloud_disp_rate)
-{
-  this->radius = radius;
-  this->rotation_axis = glm::normalize(rot_axis);
-  this->rotation_rate = rotation_rate;
-  this->mean_color = mean_color;
-  this->GM = GM;
-  this->is_star = is_star;
-  this->diffuse_filename = diffuse_filename;
-  this->night_filename = night_filename;
-  this->cloud_filename = cloud_filename;
-
-  this->has_night_tex = night_filename!="";
-  this->has_cloud_tex = cloud_filename!="";
-  this->cloud_disp_rate = cloud_disp_rate;
-  loaded = false;
-}
-
 void Body::load()
 {
   if (!no_tex_init)
@@ -326,18 +298,18 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
 
   glm::vec3 light_dir = glm::normalize(pos - rc.light_pos);
 
-  glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), radius, rings.getOuter());
+  glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), radius, rings.outer);
   
   glm::mat4 far_ring_mat, near_ring_mat;
   far_ring_mat = glm::translate(far_ring_mat, render_pos);
   near_ring_mat = glm::translate(near_ring_mat, render_pos);
-  computeRingMatrix(render_pos - rc.view_pos, rings.getNormal(), rings.getOuter(), near_ring_mat, far_ring_mat);
+  computeRingMatrix(render_pos - rc.view_pos, rings.normal, rings.outer, near_ring_mat, far_ring_mat);
 
   rings.render(far_ring_mat, light_mat, rc);
 
-  /*if (atmos.getMaxAltitude() > 0)
+  if (atmos.max_height > 0)
   { 
-    glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.getMaxAltitude()/radius));
+    glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.max_height/radius));
     rc.atmos_shader.use();
     rc.atmos_shader.uniform( "projMat", glm::value_ptr(rc.proj_mat));
     rc.atmos_shader.uniform( "viewMat", glm::value_ptr(rc.view_mat));
@@ -345,30 +317,32 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
     rc.atmos_shader.uniform( "view_pos", glm::value_ptr(rc.view_pos - render_pos));
     rc.atmos_shader.uniform( "light_dir", glm::value_ptr(-light_dir));
     rc.atmos_shader.uniform( "planet_radius", radius);
-    rc.atmos_shader.uniform( "atmos_height", atmos.getMaxAltitude());
+    rc.atmos_shader.uniform( "atmos_height", atmos.max_height);
+    rc.atmos_shader.uniform( "scale_height", atmos.scale_height);
     rc.atmos_shader.uniform( "K_R", atmos.K_R);
     rc.atmos_shader.uniform( "K_M", atmos.K_M);
     rc.atmos_shader.uniform( "E", atmos.E);
     rc.atmos_shader.uniform( "C_R", glm::value_ptr(atmos.C_R));
     rc.atmos_shader.uniform( "G_M", atmos.G_M);
     rc.atmos_obj.render();
-  }*/
+  }
 
   // PLANET RENDER
   pshad.use();
   pshad.uniform( "projMat", glm::value_ptr(rc.proj_mat));
   pshad.uniform( "viewMat", glm::value_ptr(rc.view_mat));
   pshad.uniform( "modelMat", glm::value_ptr(planet_mat));
-  pshad.uniform( "ring_vec", glm::value_ptr(rings.getNormal()));
+  pshad.uniform( "ring_vec", glm::value_ptr(rings.normal));
   pshad.uniform( "light_dir", glm::value_ptr(light_dir));
   pshad.uniform( "cloud_disp", cloud_disp);
   pshad.uniform( "view_pos", glm::value_ptr(rc.view_pos));
-  pshad.uniform( "ring_inner", rings.getInner());
-  pshad.uniform( "ring_outer", rings.getOuter());
+  pshad.uniform( "ring_inner", rings.inner);
+  pshad.uniform( "ring_outer", rings.outer);
 
   pshad.uniform( "rel_viewpos", glm::value_ptr(rc.view_pos-render_pos));
   pshad.uniform( "planet_radius", radius);
-  pshad.uniform( "atmos_height", atmos.getMaxAltitude());
+  pshad.uniform( "atmos_height", atmos.max_height);
+  pshad.uniform( "scale_height", atmos.scale_height);
   pshad.uniform( "K_R", atmos.K_R);
   pshad.uniform( "K_M", atmos.K_M);
   pshad.uniform( "E", atmos.E);
@@ -386,16 +360,6 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
   rc.planet_obj.render();
 
   rings.render(near_ring_mat, light_mat, rc);
-}
-
-double Body::getGM() const
-{
-  return GM;
-}
-
-float Body::getRadius() const
-{
-  return radius;
 }
 
 void Body::print() const
@@ -420,15 +384,7 @@ Ring::Ring()
 {
   has_rings = false;
 }
-void Ring::setProperties(float inner, float outer, const glm::vec3 &normal, int seed, const glm::vec4 &color)
-{
-  has_rings = true;
-  this->inner = inner;
-  this->outer = outer;
-  this->up = normal;
-  this->seed = seed;
-  this->color = color;
-}
+
 void Ring::load()
 {
   if (!no_rings_init)
@@ -482,26 +438,13 @@ void Ring::useTexture(int unit) const
   if (has_rings) tex.use(unit); else no_rings.use(unit);
 }
 
-float Ring::getInner() const
-{
-  return inner;
-}
-float Ring::getOuter() const
-{
-  return outer;
-}
-const glm::vec3 &Ring::getNormal() const
-{
-  return up;
-}
-
 void Ring::print() const
 {
   if (has_rings)
   {
     std::cout << "Inner:" << inner << std::endl;
     std::cout << "Outer:" << outer << std::endl;
-    std::cout << "Normal:" << glm::to_string(up) << std::endl;
+    std::cout << "Normal:" << glm::to_string(normal) << std::endl;
     std::cout << "Seed:" << seed << std::endl;
     std::cout << "Color:" << glm::to_string(color) << std::endl;
   }
@@ -513,27 +456,12 @@ void Ring::print() const
 
 Atmosphere::Atmosphere()
 {
-  max_altitude = -100;
-}
-
-void Atmosphere::setProperties(float max_altitude,float K_R, float K_M, float E, glm::vec3 C_R, float G_M)
-{
-  this->max_altitude = max_altitude;
-  this->K_R = K_R;
-  this->K_M = K_M;
-  this->E = E;
-  this->C_R = C_R;
-  this->G_M = G_M;
-}
-
-float Atmosphere::getMaxAltitude() const
-{
-  return max_altitude;
+  max_height = -100;
 }
 
 void Atmosphere::print() const
 {
-  std::cout << "Max altitude : " << max_altitude << std::endl;
+  std::cout << "Max altitude : " << max_height << std::endl;
 }
 
 Planet::Planet()
@@ -547,7 +475,7 @@ void Planet::print() const
   std::cout << "====ORBITAL PARAMETERS===================" << std::endl;
   orbit.print();
   std::cout << "====BODY PROPERTIES======================" << std::endl;
-  phys.print();
+  body.print();
   std::cout << "====ATMOSPHERE PROPERTIES================" << std::endl;
   atmos.print();
   std::cout << "====RING PROPERTIES======================" << std::endl;
@@ -561,20 +489,20 @@ const std::string &Planet::getName() const
 
 void Planet::load()
 {
-  phys.load();
+  body.load();
   ring.load();
 }
 
 void Planet::unload()
 {
-  phys.unload();
+  body.unload();
   ring.unload();
 }
 
 void Planet::update(double epoch)
 {
   orbit.computePosition(epoch);
-  phys.update(epoch);
+  body.update(epoch);
 }
 
 void Planet::setParentBody(std::deque<Planet> &planets)
@@ -584,7 +512,7 @@ void Planet::setParentBody(std::deque<Planet> &planets)
 
 void Planet::render(const RenderContext &rc)
 {
-  phys.render(orbit.getPosition(), rc, ring, atmos);
+  body.render(orbit.getPosition(), rc, ring, atmos);
 }
 
 Orbit &Planet::getOrbit()
@@ -593,7 +521,7 @@ Orbit &Planet::getOrbit()
 }
 Body &Planet::getBody()
 {
-  return phys;
+  return body;
 }
 Ring &Planet::getRing()
 {
@@ -606,7 +534,7 @@ const glm::vec3 &Planet::getPosition() const
 }
 
 template <>
-glm::vec3 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec3 def)
+glm::vec3 Planet::get(shaun::sweeper &swp, glm::vec3 def)
 {
   glm::vec3 ret;
   if (swp.is_null())
@@ -619,7 +547,7 @@ glm::vec3 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec3 def)
   }
 }
 template <>
-glm::vec4 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec4 def)
+glm::vec4 Planet::get(shaun::sweeper &swp, glm::vec4 def)
 {
   glm::vec4 ret;
   if (swp.is_null())
@@ -633,31 +561,31 @@ glm::vec4 Planet::shaun_fieldToType(shaun::sweeper &swp, glm::vec4 def)
 }
 
 template <>
-float Planet::shaun_fieldToType(shaun::sweeper &swp, float def)
+float Planet::get(shaun::sweeper &swp, float def)
 {
   if (swp.is_null()) return def; else return swp.value<shaun::number>();
 }
 
 template <>
-double Planet::shaun_fieldToType(shaun::sweeper &swp, double def)
+double Planet::get(shaun::sweeper &swp, double def)
 {
   if (swp.is_null()) return def; else return swp.value<shaun::number>();
 }
 
 template <>
-int Planet::shaun_fieldToType(shaun::sweeper &swp, int def)
+int Planet::get(shaun::sweeper &swp, int def)
 {
   if (swp.is_null()) return def; else return swp.value<shaun::number>();
 }
 
 template <>
-std::string Planet::shaun_fieldToType(shaun::sweeper &swp, std::string def)
+std::string Planet::get(shaun::sweeper &swp, std::string def)
 {
   if (swp.is_null()) return def; else return std::string(swp.value<shaun::string>());
 }
 
 template <>
-bool Planet::shaun_fieldToType(shaun::sweeper &swp, bool def)
+bool Planet::get(shaun::sweeper &swp, bool def)
 {
   if (swp.is_null()) return def; else return swp.value<shaun::boolean>();
 }
@@ -665,61 +593,59 @@ bool Planet::shaun_fieldToType(shaun::sweeper &swp, bool def)
 void Planet::createFromFile(shaun::sweeper &swp1)
 {
   shaun::sweeper swp(swp1);
-  this->name = shaun_fieldToType<std::string>(swp("name"), "undefined");
+  this->name = get<std::string>(swp("name"), "undefined");
   auto orbit(swp("orbit"));
   if (!orbit.is_null())
   {
     this->orbit.setParameters(
-      shaun_fieldToType<std::string>(orbit("parent"), ""),
-      shaun_fieldToType<double>(orbit("ecc"), 0.0),
-      shaun_fieldToType<double>(orbit("sma"), 1000.0),
-      shaun_fieldToType<double>(orbit("inc"), 0.0),
-      shaun_fieldToType<double>(orbit("lan"), 0.0),
-      shaun_fieldToType<double>(orbit("arg"), 0.0),
-      shaun_fieldToType<double>(orbit("m0"), 0.0)
+      get<std::string>(orbit("parent"), ""),
+      get<double>(orbit("ecc"), 0.0),
+      get<double>(orbit("sma"), 1000.0),
+      get<double>(orbit("inc"), 0.0),
+      get<double>(orbit("lan"), 0.0),
+      get<double>(orbit("arg"), 0.0),
+      get<double>(orbit("m0"), 0.0)
     );
   }
 
   auto phys(swp("body"));
   if (!phys.is_null())
   {
-    this->phys.setProperties(
-      shaun_fieldToType<float>(phys("radius"), 1.0),
-      shaun_fieldToType<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1)),
-      shaun_fieldToType<float>(phys("rot_rate"), 0.0),
-      shaun_fieldToType<glm::vec3>(phys("mean_color"), glm::vec3(1.0)),
-      shaun_fieldToType<double>(phys("GM"), 1000),
-      shaun_fieldToType<bool>(phys("is_star"), false),
-      shaun_fieldToType<std::string>(phys("diffuse"), ""),
-      shaun_fieldToType<std::string>(phys("night"), ""),
-      shaun_fieldToType<std::string>(phys("cloud"), ""),
-      shaun_fieldToType<float>(phys("cloud_disp_rate"), 0.0)
-    );
+    this->body.radius = get<float>(phys("radius"), 1.0);
+    this->body.rotation_axis = get<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1));
+    this->body.rotation_rate = get<float>(phys("rot_rate"), 0.0);
+    this->body.mean_color = get<glm::vec3>(phys("mean_color"), glm::vec3(1.0));
+    this->body.GM = get<double>(phys("GM"), 1000);
+    this->body.is_star = get<bool>(phys("is_star"), false);
+    this->body.diffuse_filename = get<std::string>(phys("diffuse"), "");
+    this->body.night_filename = get<std::string>(phys("night"), "");
+    this->body.cloud_filename = get<std::string>(phys("cloud"), "");
+    this->body.cloud_disp_rate = get<float>(phys("cloud_disp_rate"), 0.0);
+    this->body.has_night_tex = this->body.night_filename!="";
+    this->body.has_cloud_tex = this->body.cloud_filename!="";
   }
 
   auto atmos(swp("atmosphere"));
   if (!atmos.is_null())
   {
-    this->atmos.setProperties(
-      shaun_fieldToType<float>(atmos("max_altitude"), -100.0),
-      shaun_fieldToType<float>(atmos("K_R"),0),
-      shaun_fieldToType<float>(atmos("K_M"),0),
-      shaun_fieldToType<float>(atmos("E"),0),
-      shaun_fieldToType<glm::vec3>(atmos("C_R"),glm::vec3(0,0,0)),
-      shaun_fieldToType<float>(atmos("G_M"),-0.75)
-    );
+      this->atmos.max_height = get<float>(atmos("max_altitude"), -100.0);
+      this->atmos.K_R = get<float>(atmos("K_R"),0);
+      this->atmos.K_M = get<float>(atmos("K_M"),0);
+      this->atmos.E = get<float>(atmos("E"),0);
+      this->atmos.C_R = get<glm::vec3>(atmos("C_R"),glm::vec3(0,0,0));
+      this->atmos.G_M = get<float>(atmos("G_M"),-0.75);
+      this->atmos.scale_height = get<float>(atmos("scale_height"), this->atmos.max_height/4);
   }
 
   auto ring(swp("ring"));
   if (!ring.is_null())
   {
-    this->ring.setProperties(
-      shaun_fieldToType<float>(ring("inner"), 2.0),
-      shaun_fieldToType<float>(ring("outer"), 4.0),
-      shaun_fieldToType<glm::vec3>(ring("normal"), glm::vec3(0,0,1)),
-      shaun_fieldToType<int>(ring("seed"), 2.0),
-      shaun_fieldToType<glm::vec4>(ring("color"), glm::vec4(0.6,0.6,0.6,1.0))
-    );
+    this->ring.has_rings = true;
+    this->ring.inner = get<float>(ring("inner"), 2.0),
+    this->ring.outer = get<float>(ring("outer"), 4.0),
+    this->ring.normal = get<glm::vec3>(ring("normal"), glm::vec3(0,0,1)),
+    this->ring.seed = get<int>(ring("seed"), 2.0),
+    this->ring.color = get<glm::vec4>(ring("color"), glm::vec4(0.6,0.6,0.6,1.0));
   }
 }
 
