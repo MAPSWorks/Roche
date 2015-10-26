@@ -131,8 +131,8 @@ concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
 Game::Game() : rc(planet_shader, atmos_shader, sun_shader, ring_shader, planet_obj, atmos_obj, ring_obj), input(&win)
 {
-  sensibility = 0.0004;
-  light_position = glm::vec3(0,5,0);
+  sensitivity = 0.0004;
+  light_position = glm::vec3(0,0,0);
   view_speed = glm::vec3(0,0,0);
   max_view_speed = 0.2;
   view_smoothness = 0.85;
@@ -140,7 +140,7 @@ Game::Game() : rc(planet_shader, atmos_shader, sun_shader, ring_shader, planet_o
   switch_previous_planet = NULL;
   save = false;
 
-  time_warp_values = {1,100,10000,1000000};
+  time_warp_values = {1,100,10000,86400,1000000};
   time_warp_index = 0;
 
   switch_frames = 100;
@@ -175,14 +175,14 @@ Game::~Game()
   delete screenshot_thread;
 }
 
-void tlThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd)
+void tlThread(std::atomic<bool> &quit, concurrent_queue<std::pair<std::string,Texture*>> &texs, concurrent_queue<TexMipmapData> &tmd, DDSLoader &loader)
 {
   std::pair<std::string,Texture*> st;
   while (!quit)
   {
     if (texs.try_next(st))
     {
-      load_DDS(st.first, *st.second, tmd);
+      loader.load(st.first, *st.second, tmd);
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
@@ -209,8 +209,43 @@ void ssThread(std::atomic<bool> &quit, unsigned char *buffer, std::atomic<bool> 
   }
 }
 
+void Game::loadSettingsFile()
+{
+  try 
+  {
+    shaun::parser p;
+    shaun::object obj = p.parse(read_file("settings.sn").c_str());
+    shaun::sweeper swp(&obj);
+
+    shaun::sweeper video(swp("video"));
+    auto fs = video("fullscreen");
+    fullscreen = (fs.is_null())?true:(bool)fs.value<shaun::boolean>();
+
+    if (!fullscreen)
+    {
+      win_w = video("res_x").value<shaun::number>();
+      win_h = video("res_y").value<shaun::number>();
+    }
+
+    shaun::sweeper graphics(swp("graphics"));
+    auto max_size = graphics("texture_max_size");
+    dds_loader.setMaxSize((max_size.is_null())?0:max_size.value<shaun::number>());
+
+    shaun::sweeper controls(swp("controls"));
+    sensitivity = controls("sensitivity").value<shaun::number>();
+    
+  } 
+  catch (shaun::parse_error e)
+  {
+    std::cout << e << std::endl;
+  }
+}
+
 void Game::init()
 {
+
+  loadSettingsFile();
+
   if (!glfwInit())
     exit(-1);
 
@@ -220,9 +255,12 @@ void Game::init()
   glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
   glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
   glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-  glfwWindowHint(GLFW_SAMPLES, 16);
 
-  win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+  if (fullscreen)
+    win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
+  else
+    win = glfwCreateWindow(win_w, win_h, "Roche", NULL, NULL);
+
   if (!win)
   {
     glfwTerminate();
@@ -237,7 +275,7 @@ void Game::init()
   thread_count = 1;
   for (int i=0;i<thread_count;++i)
   {
-    tl_threads.emplace_back(tlThread, std::ref(quit), std::ref(textures_to_load),std::ref(textures_to_update));
+    tl_threads.emplace_back(tlThread, std::ref(quit), std::ref(textures_to_load),std::ref(textures_to_update), std::ref(dds_loader));
   }
   screenshot_thread = new std::thread(ssThread, std::ref(quit), screenshot_buffer, std::ref(save), win);
 
@@ -266,7 +304,7 @@ void Game::init()
   ratio = width/(float)height;
   camera.getPolarPosition().z = focused_planet->getBody().radius*4;
   post_processing.create(win);
-  //post_processing.addShader(&post_default_shader);
+  post_processing.addShader(&post_default_shader);
 }
 
 void Game::generateModels()
@@ -401,7 +439,7 @@ void Game::update(double dt)
   }
   if (input.isPressed(GLFW_KEY_L))
   {
-    if (time_warp_index < time_warp_values.size()-1) time_warp_index++;
+    if (time_warp_index < (int)time_warp_values.size()-1) time_warp_index++;
   }
 
   epoch += time_warp_values[time_warp_index]*dt;
@@ -425,8 +463,8 @@ void Game::update(double dt)
 
   if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
   {
-    view_speed.x += move.x*sensibility;
-    view_speed.y += move.y*sensibility;
+    view_speed.x += move.x*sensitivity;
+    view_speed.y += move.y*sensitivity;
     for (int i=0;i<2;++i)
     {
       if (view_speed[i] > max_view_speed) view_speed[i] = max_view_speed;
@@ -435,7 +473,7 @@ void Game::update(double dt)
   }
   else if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_3))
   {
-    view_speed.z += (move.y*sensibility);
+    view_speed.z += (move.y*sensitivity);
   }
 
   camera.getPolarPosition().x += view_speed.x;
@@ -476,7 +514,7 @@ void Game::render()
     while (textures_to_load.empty())
     {
       auto st = textures_to_load.front();
-      load_DDS(st.first, *st.second, textures_to_update);
+      dds_loader.load(st.first, *st.second, textures_to_update);
       textures_to_load.pop();
     }
   }

@@ -361,10 +361,32 @@ void Renderable::render() const
   glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, NULL);
 }
 
+#define PRINT_STATUS(s) case s: return #s;
+
+std::string displayFBOStatus(GLenum s)
+{
+  switch (s)
+  {
+    PRINT_STATUS(GL_FRAMEBUFFER_COMPLETE)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER)
+    PRINT_STATUS(GL_FRAMEBUFFER_UNSUPPORTED)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE)
+    PRINT_STATUS(GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS)
+    default: return "Unknown status";
+  }
+}
+
 void PostProcessing::create(GLFWwindow *win)
 {
+  glfwGetWindowSize(win, &width, &height);
+
   glGenFramebuffers(2,fbos);
+
   glGenTextures(2,targets);
+
   for (int i=0;i<2;++i)
   {
     glBindFramebuffer(GL_FRAMEBUFFER, fbos[i]);
@@ -377,9 +399,10 @@ void PostProcessing::create(GLFWwindow *win)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, targets[i], 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
     {
-      std::cout << "Post-processing framebuffer failed!" << std::endl;
+      std::cout << "Post-processing framebuffer failed : " << displayFBOStatus(status) << std::endl;
       exit(-1);
     }
   }
@@ -400,12 +423,13 @@ void PostProcessing::destroy()
 }
 void PostProcessing::bind()
 {
-  glBindFramebuffer(GL_FRAMEBUFFER, (shaders.size()>0)?fbos[0]:0);
+  glBindFramebuffer(GL_FRAMEBUFFER, shaders.size()?fbos[0]:0);
 }
 void PostProcessing::render()
 {
-  int fbo=0;
   int passes = shaders.size();
+
+  int fbo=0;
   for (int i=0;i<passes;++i)
   {
     int fbo_id = (i<passes-1)?fbos[(fbo+1)&1]:0;

@@ -121,9 +121,11 @@ class PostProcessing
 {
 private:
   GLuint fbos[2];
+
   GLuint targets[2];
+
   GLuint quad_obj;
-  GLFWwindow *win;
+  int width,height;
   std::vector<const Shader*> shaders;
 public:
   void create(GLFWwindow *win);

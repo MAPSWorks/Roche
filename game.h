@@ -6,6 +6,7 @@
 
 #include "opengl.h"
 #include "concurrent_queue.h"
+#include "util.h"
 #include "planet.h"
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -93,6 +94,7 @@ private:
   void loadShaders();
   void loadSkybox();
   void loadPlanetFiles();
+  void loadSettingsFile();
 
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
@@ -141,13 +143,17 @@ private:
   float switch_previous_dist;
   Planet *switch_previous_planet;
 
-  float sensibility;
+  float sensitivity;
 
   PostProcessing post_processing;
+  DDSLoader dds_loader;
 
   Camera camera;
   Input input;
   GLFWwindow *win;
+  int win_w,win_h;
+  bool fullscreen;
+
   float ratio;
 
 };

@@ -19,7 +19,9 @@ std::string read_file(const std::string &filename)
     in.close();
     return(contents);
   }
-  throw(errno);
+  std::cout << "Can't open file " << filename << std::endl;
+  exit(-1);
+  return "";
 }
 
 typedef unsigned int DWORD;
@@ -52,9 +54,20 @@ typedef struct {
   DWORD           dwReserved2;
 } DDS_HEADER;
 
-void load_DDS(
+DDSLoader::DDSLoader()
+{
+  max_size = 0;
+}
+
+void DDSLoader::setMaxSize(int size)
+{
+  max_size = size;
+}
+
+void DDSLoader::load(
   const std::string &filename,
-  Texture &tex,concurrent_queue<TexMipmapData> &tmd)
+  Texture &tex,
+  concurrent_queue<TexMipmapData> &tmd)
 {
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
   if (!in)
@@ -112,6 +125,10 @@ void load_DDS(
   {
     int width = header.dwWidth>>i;
     int height = header.dwHeight>>i;
+
+    if (max_size > 0 && (width > max_size || height > max_size))
+      break;
+
     if (width <= 0) width = 1;
     if (height <= 0) height = 1;
     int imageSize = std::max(1,(width+3)/4)*std::max(1,(height+3)/4)*bytesPer16Pixels;

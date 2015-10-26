@@ -1,93 +1,56 @@
 #version 330
 
-in vec2 pass_uv;
+in vec4 pass_uv;
 
 uniform sampler2D tex;
 
-#define FXAA_EDGE_THRESHOLD (1.0/8.0)
-#define FXAA_EDGE_THRESHOLD_MIN (1.0/16.0)
-#define FXAA_SUBPIX (1)
-#define FXAA_SUBPIX_TRIM (1.0/8.0)
-#define FXAA_SUBPIX_CAP (3.0/4.0)
+const float FXAA_SPAN_MAX = 8;
+const float FXAA_REDUCE_MUL = 1.0/8.0;
+const float FXAA_REDUCE_MIN = 1.0/128.0;
 
-vec2 p = 1.0/textureSize(tex,0);
-
-vec2 nbrs[9] = vec2[](
-  vec2(0,0),
-  vec2(0,-1),
-  vec2(-1,0),
-  vec2(1,0),
-  vec2(0,1),
-  vec2(-1,-1),
-  vec2(1,-1),
-  vec2(-1,1),
-  vec2(1,1));
+vec2 off = vec2(1.0/textureSize(tex,0).x, 1.0/textureSize(tex,0).y);
 
 out vec4 out_color;
 
-float fxaa_luma(vec3 c)
-{
-  return c.g * (0.587/0.299) + c.x;
-}
-
 void main(void)
 {
-  vec3 rgb_m = texture(tex, pass_uv+nbrs[0]*p).rgb;
-  vec3 rgb_n = texture(tex, pass_uv+nbrs[1]*p).rgb;
-  vec3 rgb_w = texture(tex, pass_uv+nbrs[2]*p).rgb;
-  vec3 rgb_e = texture(tex, pass_uv+nbrs[3]*p).rgb;
-  vec3 rgb_s = texture(tex, pass_uv+nbrs[4]*p).rgb;
-
-  float luma_m = fxaa_luma(rgb_m);
-  float luma_n = fxaa_luma(rgb_n);
-  float luma_w = fxaa_luma(rgb_w);
-  float luma_e = fxaa_luma(rgb_e);
-  float luma_s = fxaa_luma(rgb_s);
-
-  float range_min = min(luma_m,min(min(luma_n,luma_w),min(luma_s,luma_e)));
-  float range_max = max(luma_m,max(max(luma_n,luma_w),max(luma_s,luma_e)));
-  float range = range_max-range_min;
-
-  if (range < max(FXAA_EDGE_THRESHOLD_MIN, range_max*FXAA_EDGE_THRESHOLD))
-  {
-    // fxaafilterreturn(rgb_m)
-  }
-  float luma_l = (luma_m+luma_w+luma_e+luma_s)*0.25;
-  float range_l = abs(luma_l - luma_m)
-  float blend_l = max(0.0, (range_l / range) - FXAA_SUBPIX_TRIM) * FXAA_SUBPIX_TRIM_SCALE;
-  blend_l = min(FXAA_SUBPIX_CAP, blend_l);
-  vec3 rgb_l = rgb_n+rgb_w+rgb_m+rgb_e+rgb_s;
-  vec3 rgb_nw = texture(tex, pass_uv+nbrs[5]*p).rgb;
-  vec3 rgb_ne = texture(tex, pass_uv+nbrs[6]*p).rgb;
-  vec3 rgb_sw = texture(tex, pass_uv+nbrs[7]*p).rgb;
-  vec3 rgb_se = texture(tex, pass_uv+nbrs[8]*p).rgb;
-  rgb_l += (rgb_nw+rgb_ne+rgb_sw+rgb_se);
-  rgb_l *= vec3(1.0/9.0);
-
-  float edge_vert =
-    abs((0.25 * luma_nw) + (-0.5 * luma_n) + (0.25 * luma_ne)) + 
-    abs((0.50 * luma_w ) + (-1.0 * luma_m) + (0.50 * luma_e )) + 
-    abs((0.25 * luma_sw) + (-0.5 * luma_s) + (0.25 * luma_se)); 
-
-  float edge_horz =
-    abs((0.25 * luma_nw) + (-0.5 * luma_w) + (0.25 * luma_sw)) + 
-    abs((0.50 * luma_n ) + (-1.0 * luma_m) + (0.50 * luma_s )) + 
-    abs((0.25 * luma_ne) + (-0.5 * luma_e) + (0.25 * luma_se));
-
-  bool horz_span = edge_horz >= edge_vert;
-
+  vec3 rgbNW = textureLod(tex, pass_uv.zw,0).xyz;
+  vec3 rgbNE = textureLodOffset(tex, pass_uv.zw, 0, ivec2(1,0)).xyz;
+  vec3 rgbSW = textureLodOffset(tex, pass_uv.zw, 0, ivec2(0,1)).xyz;
+  vec3 rgbSE = textureLodOffset(tex, pass_uv.zw, 0, ivec2(1,1)).xyz;
+  vec3 rgbM  = textureLod(tex, pass_uv.xy,0).xyz;
   
+  vec3 luma = vec3(0.299, 0.587, 0.114);
+  float lumaNW = dot(rgbNW, luma);
+  float lumaNE = dot(rgbNE, luma);
+  float lumaSW = dot(rgbSW, luma);
+  float lumaSE = dot(rgbSE, luma);
+  float lumaM  = dot( rgbM, luma);
+  
+  float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+  float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+  
+  vec2 dir;
+  dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+  dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+  
+  float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+    
+  float rcpDirMin = 1.0/(min(abs(dir.x), abs(dir.y)) + dirReduce);
+  
+  dir = min(vec2(FXAA_SPAN_MAX,  FXAA_SPAN_MAX), 
+        max(vec2(-FXAA_SPAN_MAX, -FXAA_SPAN_MAX), dir * rcpDirMin)) * off;
+    
+  vec3 rgbA = (1.0/2.0) * (
+              textureLod(tex, pass_uv.xy + dir * (1.0/3.0 - 0.5),0.0).xyz +
+              textureLod(tex, pass_uv.xy + dir * (2.0/3.0 - 0.5),0.0).xyz);
+  vec3 rgbB = rgbA * (1.0/2.0) + (1.0/4.0) * (
+              textureLod(tex, pass_uv.xy + dir * (0.0/3.0 - 0.5),0.0).xyz +
+              textureLod(tex, pass_uv.xy + dir * (3.0/3.0 - 0.5),0.0).xyz);
+  float lumaB = dot(rgbB, luma);
 
-  bool doneN = false;
-  bool doneP = false;
+  out_color.rgb = mix(rgbB,rgbA, (lumaB < lumaMin) || (lumaB > lumaMax));
+  out_color.a = 1.0;
 
-  for (int i=0;i<FXAA_SEARCH_STEPS;++i)
-  {
-    float luma_end_n;
-    float luma_end_p;
-    #if FXAA_SEARCH_ACCELERATION == 1
-      if (!doneN) luma_end_n = fxaa_luma(texture())
-  }
-
-  out_color = texture(tex, pass_uv);
+  //out_color *= texture(tex, pass_uv);
 }
