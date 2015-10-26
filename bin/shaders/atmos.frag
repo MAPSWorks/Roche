@@ -116,5 +116,5 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
 
 void main(void)
 {
-  out_color = in_scattering(view_pos,pass_position,light_dir);
+  out_color = in_scattering(view_pos,normalize(pass_position)*(planet_radius+atmos_height),light_dir);
 }

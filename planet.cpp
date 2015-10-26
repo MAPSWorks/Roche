@@ -280,7 +280,7 @@ void Body::unload()
 
 void Body::update(double epoch)
 {
-  rotation_angle = rotation_rate*epoch;
+  rotation_angle = (2.0*PI*epoch)/rotation_period;
   cloud_disp = cloud_disp_rate*epoch;
 }
 
@@ -311,42 +311,42 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
   { 
     glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.max_height/radius));
     rc.atmos_shader.use();
-    rc.atmos_shader.uniform( "projMat", glm::value_ptr(rc.proj_mat));
-    rc.atmos_shader.uniform( "viewMat", glm::value_ptr(rc.view_mat));
-    rc.atmos_shader.uniform( "modelMat", glm::value_ptr(atmos_mat));
-    rc.atmos_shader.uniform( "view_pos", glm::value_ptr(rc.view_pos - render_pos));
-    rc.atmos_shader.uniform( "light_dir", glm::value_ptr(-light_dir));
+    rc.atmos_shader.uniform( "projMat", rc.proj_mat);
+    rc.atmos_shader.uniform( "viewMat", rc.view_mat);
+    rc.atmos_shader.uniform( "modelMat", atmos_mat);
+    rc.atmos_shader.uniform( "view_pos", rc.view_pos - render_pos);
+    rc.atmos_shader.uniform( "light_dir", -light_dir);
     rc.atmos_shader.uniform( "planet_radius", radius);
     rc.atmos_shader.uniform( "atmos_height", atmos.max_height);
     rc.atmos_shader.uniform( "scale_height", atmos.scale_height);
     rc.atmos_shader.uniform( "K_R", atmos.K_R);
     rc.atmos_shader.uniform( "K_M", atmos.K_M);
     rc.atmos_shader.uniform( "E", atmos.E);
-    rc.atmos_shader.uniform( "C_R", glm::value_ptr(atmos.C_R));
+    rc.atmos_shader.uniform( "C_R", atmos.C_R);
     rc.atmos_shader.uniform( "G_M", atmos.G_M);
     rc.atmos_obj.render();
   }
 
   // PLANET RENDER
   pshad.use();
-  pshad.uniform( "projMat", glm::value_ptr(rc.proj_mat));
-  pshad.uniform( "viewMat", glm::value_ptr(rc.view_mat));
-  pshad.uniform( "modelMat", glm::value_ptr(planet_mat));
-  pshad.uniform( "ring_vec", glm::value_ptr(rings.normal));
-  pshad.uniform( "light_dir", glm::value_ptr(light_dir));
+  pshad.uniform( "projMat", rc.proj_mat);
+  pshad.uniform( "viewMat", rc.view_mat);
+  pshad.uniform( "modelMat", planet_mat);
+  pshad.uniform( "ring_vec", rings.normal);
+  pshad.uniform( "light_dir", light_dir);
   pshad.uniform( "cloud_disp", cloud_disp);
-  pshad.uniform( "view_pos", glm::value_ptr(rc.view_pos));
+  pshad.uniform( "view_pos", rc.view_pos);
   pshad.uniform( "ring_inner", rings.inner);
   pshad.uniform( "ring_outer", rings.outer);
 
-  pshad.uniform( "rel_viewpos", glm::value_ptr(rc.view_pos-render_pos));
+  pshad.uniform( "rel_viewpos", rc.view_pos-render_pos);
   pshad.uniform( "planet_radius", radius);
   pshad.uniform( "atmos_height", atmos.max_height);
   pshad.uniform( "scale_height", atmos.scale_height);
   pshad.uniform( "K_R", atmos.K_R);
   pshad.uniform( "K_M", atmos.K_M);
   pshad.uniform( "E", atmos.E);
-  pshad.uniform( "C_R", glm::value_ptr(atmos.C_R));
+  pshad.uniform( "C_R", atmos.C_R);
   pshad.uniform( "G_M", atmos.G_M);
 
   pshad.uniform( "diffuse_tex", 0);
@@ -366,7 +366,7 @@ void Body::print() const
 {
   std::cout << "Radius:" << radius << std::endl;
   std::cout << "Rotation axis:" << glm::to_string(rotation_axis) << std::endl;
-  std::cout << "Rotation rate:" << rotation_rate << std::endl;
+  std::cout << "Rotation period:" << rotation_period << std::endl;
   std::cout << "Mean color:" << glm::to_string(mean_color) << std::endl;
   std::cout << "GM:" << GM << std::endl;
   std::cout << "Is it a star?" << (is_star?"Yes":"No") << std::endl;
@@ -421,11 +421,11 @@ void Ring::render(const glm::mat4 &model_mat,  const glm::mat4 &light_mat, const
   {
     // FAR RING RENDER
     rc.ring_shader.use();
-    rc.ring_shader.uniform( "projMat", glm::value_ptr(rc.proj_mat));
-    rc.ring_shader.uniform( "viewMat", glm::value_ptr(rc.view_mat));
-    rc.ring_shader.uniform( "modelMat", glm::value_ptr(model_mat));
-    rc.ring_shader.uniform( "lightMat", glm::value_ptr(light_mat));
-    rc.ring_shader.uniform( "ring_color", glm::value_ptr(color));
+    rc.ring_shader.uniform( "projMat", rc.proj_mat);
+    rc.ring_shader.uniform( "viewMat", rc.view_mat);
+    rc.ring_shader.uniform( "modelMat", model_mat);
+    rc.ring_shader.uniform( "lightMat", light_mat);
+    rc.ring_shader.uniform( "ring_color", color);
     rc.ring_shader.uniform( "tex", 0);
     rc.ring_shader.uniform( "minDist", inner/outer);
     tex.use(0);
@@ -613,7 +613,7 @@ void Planet::createFromFile(shaun::sweeper &swp1)
   {
     this->body.radius = get<float>(phys("radius"), 1.0);
     this->body.rotation_axis = get<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1));
-    this->body.rotation_rate = get<float>(phys("rot_rate"), 0.0);
+    this->body.rotation_period = get<float>(phys("rot_period"), 10.0);
     this->body.mean_color = get<glm::vec3>(phys("mean_color"), glm::vec3(1.0));
     this->body.GM = get<double>(phys("GM"), 1000);
     this->body.is_star = get<bool>(phys("is_star"), false);
@@ -662,9 +662,9 @@ void Skybox::render(const glm::mat4 &proj_mat,const glm::mat4 &view_mat, Shader 
   
   // SKYBOX RENDER
   skybox_shader.use();
-  skybox_shader.uniform("projMat", glm::value_ptr(proj_mat));
-  skybox_shader.uniform("viewMat", glm::value_ptr(view_mat));
-  skybox_shader.uniform("modelMat", glm::value_ptr(skybox_mat));
+  skybox_shader.uniform("projMat", proj_mat);
+  skybox_shader.uniform("viewMat", view_mat);
+  skybox_shader.uniform("modelMat", skybox_mat);
   skybox_shader.uniform("tex", 0);
   tex.use(0);
   o.render(); 

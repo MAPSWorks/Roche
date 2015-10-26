@@ -31,7 +31,7 @@ float ringtex_size = 1.0/float(textureSize(ring_tex,0).x);
 // This should be uniform variables
 const float AMBIENT_LIGHT = 0.04;
 const float RING_AMBIENT = 0.2;
-const float CITY_LIGHT_INTENSITY = 0.1;
+const float CITY_LIGHT_INTENSITY = 0.6;
 
 uniform float planet_radius;
 uniform float atmos_height;
@@ -148,7 +148,7 @@ void main(void)
 
 	// TEXTURE COMPOSITION
 	float nightlights = clamp(-rawlight*12.0+1.0,0.0,1.0);
-	vec3 color = mix(day*light  + nightlights*night, light*cloud.rgb, cloud.a);
+	vec3 color = mix(day*light  + nightlights*night*CITY_LIGHT_INTENSITY, light*cloud.rgb, cloud.a);
 
 	// SHADOW CALCULATION (RAYTRACING)
 	float t = dot(pass_lpos.xyz, ring_vec)/dot(light_dir,ring_vec);
@@ -170,7 +170,7 @@ void main(void)
 	{
     vec3 tlpos = normalize(pass_lpos)*planet_radius;
 		vec4 scat = in_scattering(rel_viewpos, tlpos, -light_dir);
-		color *= mix(scat.w,CITY_LIGHT_INTENSITY,nightlights);
+    color *= 1.0-scat.w;
     color += scat.xyz;
 	}
 

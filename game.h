@@ -81,7 +81,7 @@ public:
   Game();
   ~Game();
   void init();
-  void update();
+  void update(double dt);
   void render();
   bool isRunning();
   static void loadTexture(const std::string &filename, Texture &tex);
@@ -121,7 +121,13 @@ private:
   glm::vec3 light_position;
   Renderable skybox_obj, planet_obj, atmos_obj, ring_obj, flare_obj; // meshes
   Texture flare_tex;
-  Shader skybox_shader, planet_shader, atmos_shader, ring_shader, sun_shader, flare_shader;
+  Shader skybox_shader,
+    planet_shader, 
+    atmos_shader,
+    ring_shader,
+    sun_shader,
+    flare_shader,
+    post_default_shader;
   Skybox skybox;
 
   // INTERACTION RELATED STUFF
@@ -136,6 +142,8 @@ private:
   Planet *switch_previous_planet;
 
   float sensibility;
+
+  PostProcessing post_processing;
 
   Camera camera;
   Input input;

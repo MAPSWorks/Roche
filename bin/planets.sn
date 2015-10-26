@@ -2,6 +2,7 @@ planets: [
 	{
     name:"Sun"
     body:{
+      rot_period:2192831.6
       radius:696000
       GM:132712440018
       diffuse:"tex/sun/diffuse.dds"
@@ -22,7 +23,7 @@ planets: [
     body:{
       radius:6371.01
       rot_axis:[0,0,1]
-      rot_rate:7.292115E-5rad
+      rot_period:86164.091
       mean_color:[0.0,0.2,1.0]
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
@@ -35,7 +36,7 @@ planets: [
       scale_height:8.5
       K_R:0.166
       K_M:0.0025
-      E:8.3
+      E:9.3
       C_R:[0.3, 0.7, 1.0]
       G_M:-0.85 
     }
@@ -61,7 +62,7 @@ planets: [
     body:{
       radius:1737.53
       rot_axis:[0,0,1]
-      rot_rate:2.662435E-6rad
+      rot_period:2360586
       mean_color:[0.6,0.6,0.6]
       GM:4902.768
       diffuse:"tex/earth/moon/diffuse.dds"

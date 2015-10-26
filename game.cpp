@@ -70,7 +70,7 @@ const glm::mat4 &Camera::getViewMat()
 
 void Camera::update(float ratio)
 {
-  proj_mat = glm::perspective((float)(fovy/180*PI),ratio, near, far);
+  proj_mat = glm::infinitePerspective((float)(fovy/180*PI),ratio, 0.01f);
   pos = glm::vec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]) + center;
   view_mat = glm::lookAt(pos, center, up);
 }
@@ -160,6 +160,9 @@ Game::~Game()
   planet_obj.destroy();
   skybox_obj.destroy();
   flare_obj.destroy();
+
+  post_processing.destroy();
+
   glfwTerminate();
 
   quit = true;
@@ -262,6 +265,8 @@ void Game::init()
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
   camera.getPolarPosition().z = focused_planet->getBody().radius*4;
+  post_processing.create(win);
+  //post_processing.addShader(&post_default_shader);
 }
 
 void Game::generateModels()
@@ -306,6 +311,7 @@ void Game::loadShaders()
   sun_shader.loadFromFile("shaders/planet.vert", "shaders/sun.frag");
   skybox_shader.loadFromFile("shaders/skybox.vert", "shaders/skybox.frag");
   flare_shader.loadFromFile("shaders/flare.vert", "shaders/flare.frag");
+  post_default_shader.loadFromFile("shaders/post.vert", "shaders/post_fxaa.frag");
 }
 
 void Game::loadSkybox()
@@ -378,7 +384,7 @@ private:
   glm::vec3 view_pos;
 };
 
-void Game::update()
+void Game::update(double dt)
 {
   for (Planet &p: planets)
   {
@@ -398,7 +404,7 @@ void Game::update()
     if (time_warp_index < time_warp_values.size()-1) time_warp_index++;
   }
 
-  epoch += time_warp_values[time_warp_index];
+  epoch += time_warp_values[time_warp_index]*dt;
 
   if (input.isPressed(GLFW_KEY_TAB) && !is_switching)
   {
@@ -502,6 +508,7 @@ void Game::render()
     view_center = focused_planet->getPosition();
   }
 
+  post_processing.bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
   camera.update(ratio);
@@ -515,7 +522,7 @@ void Game::render()
   for (Planet &p : planets)
   {
     glm::vec3 dist = p.getPosition() - view_center - camera.getPosition();
-    if (glm::length(dist) >= MAX_VIEW_DIST)
+    if (!p.getBody().is_star && glm::length(dist) >= MAX_VIEW_DIST)
     {
       flares.push_back(&p);
       p.unload();
@@ -526,7 +533,6 @@ void Game::render()
       p.load();
     }
   }
-
   
   skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
   flare_shader.use();
@@ -559,6 +565,7 @@ void Game::render()
     mesh->render(rc);
   }
 
+  post_processing.render();
   glfwSwapBuffers(win);
   glfwPollEvents();
 }

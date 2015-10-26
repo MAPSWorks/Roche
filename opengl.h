@@ -8,6 +8,10 @@
 #include <memory>
 #include <vector>
 
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
+
 class TexMipmapData;
 
 /// Stores information for using an opengl texture
@@ -107,7 +111,26 @@ public:
   void uniform(const std::string &name, const void *value) const; /// Sets a Uniform variable's value from a pointer
   void uniform(const std::string &name, int value) const; /// Sets a uniform variable's value from an integer
   void uniform(const std::string &name, float value) const; /// Sets a uniform variable's value from a float
+  void uniform(const std::string &name, const glm::vec3 &value) const;
+  void uniform(const std::string &name, const glm::vec4 &value) const;
+  void uniform(const std::string &name, const glm::mat4 &value) const;
   void use() const;
+};
+
+class PostProcessing
+{
+private:
+  GLuint fbos[2];
+  GLuint targets[2];
+  GLuint quad_obj;
+  GLFWwindow *win;
+  std::vector<const Shader*> shaders;
+public:
+  void create(GLFWwindow *win);
+  void destroy();
+  void bind();
+  void render();
+  void addShader(const Shader *s);
 };
 
 #endif

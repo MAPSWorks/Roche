@@ -12,6 +12,8 @@
 
 #include <thread>
 
+#include <glm/gtc/type_ptr.hpp>
+
 #define PLANET_STRIDE 24
 
 #define PI        3.14159265358979323846264338327950288 
@@ -94,6 +96,21 @@ void Shader::uniform(const std::string &name, float value) const
 {
   float a[] = {value};
   uniform(name, a);
+}
+
+void Shader::uniform(const std::string &name, const glm::vec3 &value) const
+{
+  uniform(name, glm::value_ptr(value));
+}
+
+void Shader::uniform(const std::string &name, const glm::vec4 &value) const
+{
+  uniform(name, glm::value_ptr(value));
+}
+
+void Shader::uniform(const std::string &name, const glm::mat4 &value) const
+{
+  uniform(name, glm::value_ptr(value));
 }
 
 void Shader::use() const
@@ -342,4 +359,70 @@ void Renderable::render() const
   glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,24,(GLvoid*)0);
   glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,24,(GLvoid*)16);
   glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, NULL);
+}
+
+void PostProcessing::create(GLFWwindow *win)
+{
+  glGenFramebuffers(2,fbos);
+  glGenTextures(2,targets);
+  for (int i=0;i<2;++i)
+  {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbos[i]);
+    glBindTexture(GL_TEXTURE_2D, targets[i]);
+    int width,height;
+    glfwGetWindowSize(win, &width, &height);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, targets[i], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+      std::cout << "Post-processing framebuffer failed!" << std::endl;
+      exit(-1);
+    }
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  //float quad[] = {0,0,1,0,1,1,0,0,1,1,0,1};
+  float quad[] = {0,0,0,1,1,1,0,0,1,1,1,0};
+  glGenBuffers(1,&quad_obj);
+  glBindBuffer(GL_ARRAY_BUFFER, quad_obj);
+  glBufferData(GL_ARRAY_BUFFER, 6*2*4, quad, GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+void PostProcessing::destroy()
+{
+  glDeleteFramebuffers(2,fbos);
+  glDeleteFramebuffers(2,targets);
+  glDeleteBuffers(1,&quad_obj);
+}
+void PostProcessing::bind()
+{
+  glBindFramebuffer(GL_FRAMEBUFFER, (shaders.size()>0)?fbos[0]:0);
+}
+void PostProcessing::render()
+{
+  int fbo=0;
+  int passes = shaders.size();
+  for (int i=0;i<passes;++i)
+  {
+    int fbo_id = (i<passes-1)?fbos[(fbo+1)&1]:0;
+    glBindFramebuffer(GL_FRAMEBUFFER,fbo_id);
+    glClear(GL_COLOR_BUFFER_BIT);
+    const Shader *s = shaders[i];
+    s->use();
+    s->uniform("tex", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D,targets[fbo]);
+    glBindBuffer(GL_ARRAY_BUFFER, quad_obj);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(GLvoid*)0);
+    glDrawArrays(GL_TRIANGLES, 0,6);
+    fbo = (fbo+1)&1;
+  }
+}
+void PostProcessing::addShader(const Shader *s)
+{
+  shaders.push_back(s);
 }
