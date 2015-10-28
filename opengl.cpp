@@ -440,19 +440,40 @@ void PostProcessing::render()
     int fbo_id = (i<passes-1)?fbos[(fbo+1)&1]:0;
     glBindFramebuffer(GL_FRAMEBUFFER,fbo_id);
     glClear(GL_COLOR_BUFFER_BIT);
-    (*shaders[i].second)(*shaders[i].first, targets[i], width, height);
+    shaders[i]->action(targets[i], width, height);
     glBindBuffer(GL_ARRAY_BUFFER, quad_obj);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(GLvoid*)0);
     glDrawArrays(GL_TRIANGLES, 0,6);
     fbo = (fbo+1)&1;
   }
 }
-void PostProcessing::addShader(const Shader *s, void (*action)(const Shader &, GLuint, int, int))
+void PostProcessing::addShader(PostProcessingAction *ppa)
 {
-  shaders.push_back(std::pair<const Shader *, void (*)(const Shader&, GLuint, int, int)>(s,action));
+  shaders.push_back(ppa);
 }
 
-void PostProcessing::default_action(const Shader &s, GLuint tex, int width, int height)
+PostProcessing::~PostProcessing()
+{
+  for (PostProcessingAction *ppa : shaders)
+  {
+    delete ppa;
+  }
+}
+
+PostProcessingAction::PostProcessingAction(const Shader &s1) : s(s1)
+{
+}
+
+PostProcessingAction::~PostProcessingAction()
+{
+}
+
+HDRAction::HDRAction(const Shader &s) : PostProcessingAction(s)
+{
+  exposure = 0.5;
+}
+
+void PostProcessingAction::action(GLuint tex, int width, int height)
 {
   s.use();
   s.uniform("tex", 0);
@@ -460,21 +481,26 @@ void PostProcessing::default_action(const Shader &s, GLuint tex, int width, int 
   glBindTexture(GL_TEXTURE_2D,tex);
 }
 
-void PostProcessing::hdr_action(const Shader &s, GLuint tex, int width, int height)
+void HDRAction::action(GLuint tex, int width, int height)
 {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D,tex);
   glGenerateMipmap(GL_TEXTURE_2D);
   float numLevel = floor(log2(std::max(width,height)));
-  float average_color[6];
-  glGetTexImage(GL_TEXTURE_2D, numLevel-1, GL_RGB,GL_FLOAT,average_color);
+  float average_color[3] = {1.0,1.0,1.0};
+  glGetTexImage(GL_TEXTURE_2D, numLevel, GL_RGB,GL_FLOAT,average_color);
 
   float average_brightness = 0.0;
-  for (int i=0;i<2;++i)
-  average_brightness += (average_color[i*3+0]*0.2126+average_color[i*3+1]*0.7152+average_color[i*3+2]*0.0722) *0.5;
-  float exposure = 0.5/ average_brightness;
-  if (exposure > 1.0) exposure = 1.0;
-  if (exposure < 0.01) exposure = 0.01;
+  average_brightness += (average_color[0]*0.2126+average_color[1]*0.7152+average_color[2]*0.0722) *0.5;
+  if (average_brightness != average_brightness) average_brightness = 0.5; // HORRIBLE FIX FOR NAN VALUES RETURNED BY GLGETTEXIMAGE
+  float new_exposure = 0.5/ average_brightness;
+
+  if (new_exposure > 1.0) new_exposure = 1.0;
+  if (new_exposure < 0.0001) new_exposure = 0.0001;
+
+  exposure = (new_exposure-exposure)*0.1 + exposure;
+
+  std::cout << exposure << std::endl;
 
   s.use();
   s.uniform("tex", 0);

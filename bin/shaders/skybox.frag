@@ -7,5 +7,5 @@ out vec4 out_color;
 
 void main(void)
 {
-    out_color = vec4(texture(tex, pass_uv).rgb*0.6,1.0);
+    out_color = vec4(texture(tex, pass_uv).rgb*1.0,1.0);
 }

@@ -307,8 +307,8 @@ void Game::init()
   ratio = width/(float)height;
   camera.getPolarPosition().z = focused_planet->getBody().radius*4;
   post_processing.create(win);
-  post_processing.addShader(&post_hdr,PostProcessing::hdr_action);
-  post_processing.addShader(&post_default);
+  post_processing.addShader(new HDRAction(post_hdr));
+  post_processing.addShader(new PostProcessingAction(post_default));
 }
 
 void Game::generateModels()

@@ -117,6 +117,16 @@ public:
   void use() const;
 };
 
+class PostProcessingAction
+{
+protected:
+  const Shader &s;
+public:
+  PostProcessingAction(const Shader &s);
+  virtual ~PostProcessingAction();
+  virtual void action(GLuint tex, int width, int height);
+};
+
 class PostProcessing
 {
 private:
@@ -125,17 +135,24 @@ private:
 
   GLuint quad_obj;
   int width,height;
-  std::vector<std::pair<const Shader *, void (*)(const Shader&, GLuint, int, int)> > shaders;
-
-  static void default_action(const Shader &s, GLuint tex, int width, int height);
+  std::vector<PostProcessingAction*> shaders;
 
 public:
+  ~PostProcessing();
   void create(GLFWwindow *win);
   void destroy();
   void bind();
   void render();
-  void addShader(const Shader *s, void (*action)(const Shader &, GLuint, int, int)=default_action);
-
-  static void hdr_action(const Shader &s, GLuint tex, int width, int height);
+  void addShader(PostProcessingAction *ppa);
 };
+
+class HDRAction : public PostProcessingAction
+{
+private:
+  float exposure;
+public:
+  HDRAction(const Shader &s);
+  void action(GLuint tex, int width, int height);
+};
+
 #endif
