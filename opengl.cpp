@@ -14,6 +14,8 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <glm/ext.hpp>
+
 #define PLANET_STRIDE 24
 
 #define PI        3.14159265358979323846264338327950288 
@@ -393,9 +395,11 @@ void PostProcessing::create(GLFWwindow *win)
     glBindTexture(GL_TEXTURE_2D, targets[i]);
     int width,height;
     glfwGetWindowSize(win, &width, &height);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, targets[i], 0);
@@ -425,6 +429,7 @@ void PostProcessing::bind()
 {
   glBindFramebuffer(GL_FRAMEBUFFER, shaders.size()?fbos[0]:0);
 }
+
 void PostProcessing::render()
 {
   int passes = shaders.size();
@@ -435,18 +440,43 @@ void PostProcessing::render()
     int fbo_id = (i<passes-1)?fbos[(fbo+1)&1]:0;
     glBindFramebuffer(GL_FRAMEBUFFER,fbo_id);
     glClear(GL_COLOR_BUFFER_BIT);
-    const Shader *s = shaders[i];
-    s->use();
-    s->uniform("tex", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D,targets[fbo]);
+    (*shaders[i].second)(*shaders[i].first, targets[i], width, height);
     glBindBuffer(GL_ARRAY_BUFFER, quad_obj);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(GLvoid*)0);
     glDrawArrays(GL_TRIANGLES, 0,6);
     fbo = (fbo+1)&1;
   }
 }
-void PostProcessing::addShader(const Shader *s)
+void PostProcessing::addShader(const Shader *s, void (*action)(const Shader &, GLuint, int, int))
 {
-  shaders.push_back(s);
+  shaders.push_back(std::pair<const Shader *, void (*)(const Shader&, GLuint, int, int)>(s,action));
+}
+
+void PostProcessing::default_action(const Shader &s, GLuint tex, int width, int height)
+{
+  s.use();
+  s.uniform("tex", 0);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D,tex);
+}
+
+void PostProcessing::hdr_action(const Shader &s, GLuint tex, int width, int height)
+{
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D,tex);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  float numLevel = floor(log2(std::max(width,height)));
+  float average_color[6];
+  glGetTexImage(GL_TEXTURE_2D, numLevel-1, GL_RGB,GL_FLOAT,average_color);
+
+  float average_brightness = 0.0;
+  for (int i=0;i<2;++i)
+  average_brightness += (average_color[i*3+0]*0.2126+average_color[i*3+1]*0.7152+average_color[i*3+2]*0.0722) *0.5;
+  float exposure = 0.5/ average_brightness;
+  if (exposure > 1.0) exposure = 1.0;
+  if (exposure < 0.01) exposure = 0.01;
+
+  s.use();
+  s.uniform("tex", 0);
+  s.uniform("exposure", exposure);
 }

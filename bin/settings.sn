@@ -12,7 +12,7 @@ video:{
 */
 
 graphics:{
-  texture_max_size:2048
+  texture_max_size:4096
 }
 
 controls:{

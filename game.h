@@ -129,7 +129,8 @@ private:
     ring_shader,
     sun_shader,
     flare_shader,
-    post_default_shader;
+    post_default,
+    post_hdr;
   Skybox skybox;
 
   // INTERACTION RELATED STUFF

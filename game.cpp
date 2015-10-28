@@ -295,6 +295,9 @@ void Game::init()
   glCullFace(GL_FRONT);
   glEnableVertexAttribArray(0);
   glEnableVertexAttribArray(1);
+  glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
+  glClampColor(GL_CLAMP_VERTEX_COLOR, GL_FALSE);
+  glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
 
   generateModels();
   loadShaders();
@@ -304,7 +307,8 @@ void Game::init()
   ratio = width/(float)height;
   camera.getPolarPosition().z = focused_planet->getBody().radius*4;
   post_processing.create(win);
-  post_processing.addShader(&post_default_shader);
+  post_processing.addShader(&post_hdr,PostProcessing::hdr_action);
+  post_processing.addShader(&post_default);
 }
 
 void Game::generateModels()
@@ -349,7 +353,8 @@ void Game::loadShaders()
   sun_shader.loadFromFile("shaders/planet.vert", "shaders/sun.frag");
   skybox_shader.loadFromFile("shaders/skybox.vert", "shaders/skybox.frag");
   flare_shader.loadFromFile("shaders/flare.vert", "shaders/flare.frag");
-  post_default_shader.loadFromFile("shaders/post.vert", "shaders/post_fxaa.frag");
+  post_default.loadFromFile("shaders/post_fxaa.vert", "shaders/post_fxaa.frag");
+  post_hdr.loadFromFile("shaders/post.vert", "shaders/post_hdr.frag");
 }
 
 void Game::loadSkybox()
@@ -444,13 +449,21 @@ void Game::update(double dt)
 
   epoch += time_warp_values[time_warp_index]*dt;
 
-  if (input.isPressed(GLFW_KEY_TAB) && !is_switching)
+  if (input.isPressed(GLFW_KEY_TAB))
   {
-    switch_previous_planet = focused_planet;
-    focused_planet_id = (focused_planet_id+1)%planets.size();
-    focused_planet = &planets[focused_planet_id];
-    switch_previous_dist = camera.getPolarPosition().z;
-    is_switching = true;  
+    if (is_switching)
+    {
+      is_switching = false;
+      camera.getPolarPosition().z = focused_planet->getBody().radius*4;
+    }
+    else
+    {
+      switch_previous_planet = focused_planet;
+      focused_planet_id = (focused_planet_id+1)%planets.size();
+      focused_planet = &planets[focused_planet_id];
+      switch_previous_dist = camera.getPolarPosition().z;
+      is_switching = true;
+    } 
   }
 
   double posX, posY;

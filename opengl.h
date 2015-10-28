@@ -121,18 +121,21 @@ class PostProcessing
 {
 private:
   GLuint fbos[2];
-
   GLuint targets[2];
 
   GLuint quad_obj;
   int width,height;
-  std::vector<const Shader*> shaders;
+  std::vector<std::pair<const Shader *, void (*)(const Shader&, GLuint, int, int)> > shaders;
+
+  static void default_action(const Shader &s, GLuint tex, int width, int height);
+
 public:
   void create(GLFWwindow *win);
   void destroy();
   void bind();
   void render();
-  void addShader(const Shader *s);
-};
+  void addShader(const Shader *s, void (*action)(const Shader &, GLuint, int, int)=default_action);
 
+  static void hdr_action(const Shader &s, GLuint tex, int width, int height);
+};
 #endif
