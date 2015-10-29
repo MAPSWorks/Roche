@@ -28,6 +28,7 @@ planets: [
       declination:90
       rot_period:86164.091
       mean_color:[0.3,0.7,1.0]
+      albedo:0.367
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
       night:"tex/earth/night.dds"
@@ -68,6 +69,7 @@ planets: [
       declination:67.16
       rot_period:2360586
       mean_color:[0.6,0.6,0.6]
+      albedo:0.12
       GM:4902.768
       diffuse:"tex/earth/moon/diffuse.dds"
     }

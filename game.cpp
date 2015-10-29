@@ -27,7 +27,8 @@
 
 #include <glm/ext.hpp>
 
-#define MAX_VIEW_DIST 2000000
+#define MIN_FLARE_DIST  4000000
+#define MAX_PLANET_DIST 8000000
 
 Camera::Camera()
 {
@@ -37,7 +38,7 @@ Camera::Camera()
 
   fovy = 50;
   near = 20;
-  far = MAX_VIEW_DIST;
+  far = MIN_FLARE_DIST;
 }
 
 glm::vec3 &Camera::getCenter()
@@ -575,15 +576,19 @@ void Game::render()
   for (Planet &p : planets)
   {
     glm::vec3 dist = p.getPosition() - view_center - camera.getPosition();
-    if (!p.getBody().is_star && glm::length(dist) >= MAX_VIEW_DIST)
+    float len_dist = glm::length(dist);
+    if (!p.getBody().is_star && len_dist >= MIN_FLARE_DIST)
     {
       flares.push_back(&p);
-      p.unload();
     }
-    else
+    if (p.getBody().is_star || len_dist <= MAX_PLANET_DIST)
     {
       meshes.push_back(&p);
       p.load();
+    } 
+    else
+    {
+      p.unload();
     }
   }
   
@@ -597,9 +602,14 @@ void Game::render()
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
     if (posOnScreen.z > 0)
     {
-      float size_on_screen = glm::degrees((float)atan(flare->getBody().radius/MAX_VIEW_DIST))*2/camera.getFovy();
+      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/MIN_FLARE_DIST))*4)/camera.getFovy();
+      float alpha = (glm::length(flare->getPosition() - view_center - camera.getPosition()) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
+      glm::vec3 color = (0.4+flare->getBody().albedo)*flare->getBody().mean_color * (
+        glm::dot(
+          glm::normalize(flare->getPosition() - view_center - camera.getPosition()), 
+          glm::normalize(flare->getPosition()))*0.5+0.5);
       flare_shader.uniform("size", size_on_screen);
-      flare_shader.uniform("color", glm::value_ptr(glm::vec4(flare->getBody().mean_color,1.0)));
+      flare_shader.uniform("color", glm::value_ptr(glm::vec4(color,std::min(1.0f,alpha))));
 
       glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
       flare_shader.uniform("pos", glm::value_ptr(pOS));

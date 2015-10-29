@@ -102,6 +102,7 @@ public:
   glm::vec3 rotation_axis;
   float rotation_period; // radians per second
   glm::vec3 mean_color;
+  float albedo;
   double GM; // km3 s-2
   bool is_star;
   std::string diffuse_filename;

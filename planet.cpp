@@ -624,6 +624,7 @@ void Planet::createFromFile(shaun::sweeper &swp1)
     this->body.rotation_axis = glm::vec3(-sin(r_a)*cos(dec),cos(r_a)*cos(dec), sin(dec));
     this->body.rotation_period = get<float>(phys("rot_period"), 10.0);
     this->body.mean_color = get<glm::vec3>(phys("mean_color"), glm::vec3(1.0));
+    this->body.albedo = get<float>(phys("albedo"), 0.3);
     this->body.GM = get<double>(phys("GM"), 1000);
     this->body.is_star = get<bool>(phys("is_star"), false);
     this->body.diffuse_filename = get<std::string>(phys("diffuse"), "");
