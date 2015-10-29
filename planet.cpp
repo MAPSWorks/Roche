@@ -176,10 +176,13 @@ void Orbit::computePosition(double epoch)
       const int it = 20;
       for (int i=0;i<it;++i)
         En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
-      double trueAnomaly = atan2(sqrt(1+ecc)*sin(En), sqrt(1-ecc)*cos(En));
+      double trueAnomaly = 2*atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
       double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
       glm::dvec3 posInPlane = glm::vec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-      glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg,glm::dvec3(0,0,1)),inc, glm::dvec3(1,0,0)),lan, glm::dvec3(1,0,0));
+      glm::dquat q = glm::dquat();
+      q = glm::rotate(q, lan, glm::dvec3(0,0,1));
+      q = glm::rotate(q, inc, glm::dvec3(0,1,0));
+      q = glm::rotate(q, arg, glm::dvec3(0,0,1));
       position = q*posInPlane;
 
       parent->getOrbit().computePosition(epoch);

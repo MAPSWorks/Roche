@@ -56,7 +56,7 @@ planets: [
     name:"Moon"
     orbit:{
       parent:"Earth"
-      ecc:5.298940118493898E-02
+      ecc:5.298940118493898E-02e
       sma:3.844212844766085E+05
       inc:2.836200854713088E+01deg
       lan:2.294272126732694E+00deg
