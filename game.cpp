@@ -27,7 +27,7 @@
 
 #include <glm/ext.hpp>
 
-#define MAX_VIEW_DIST 20000000
+#define MAX_VIEW_DIST 2000000
 
 Camera::Camera()
 {
@@ -597,8 +597,9 @@ void Game::render()
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
     if (posOnScreen.z > 0)
     {
-      flare_shader.uniform("size", 0.02f);
-      flare_shader.uniform("color", glm::value_ptr(glm::vec4(0.6,0.8,1.0,1.0)));
+      float size_on_screen = glm::degrees((float)atan(flare->getBody().radius/MAX_VIEW_DIST))*2/camera.getFovy();
+      flare_shader.uniform("size", size_on_screen);
+      flare_shader.uniform("color", glm::value_ptr(glm::vec4(flare->getBody().mean_color,1.0)));
 
       glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
       flare_shader.uniform("pos", glm::value_ptr(pOS));

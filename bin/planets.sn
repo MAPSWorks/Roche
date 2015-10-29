@@ -2,6 +2,8 @@ planets: [
 	{
     name:"Sun"
     body:{
+      right_ascension:286.13
+      declination:63.87
       rot_period:2192831.6
       radius:696000
       GM:132712440018
@@ -22,9 +24,10 @@ planets: [
     }
     body:{
       radius:6371.01
-      rot_axis:[0,0,1]
+      right_ascension:0
+      declination:90
       rot_period:86164.091
-      mean_color:[0.0,0.2,1.0]
+      mean_color:[0.3,0.7,1.0]
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
       night:"tex/earth/night.dds"
@@ -61,7 +64,8 @@ planets: [
     }
     body:{
       radius:1737.53
-      rot_axis:[0,0,1]
+      right_ascension:270
+      declination:67.16
       rot_period:2360586
       mean_color:[0.6,0.6,0.6]
       GM:4902.768

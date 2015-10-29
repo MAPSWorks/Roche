@@ -156,10 +156,10 @@ void Orbit::setParameters(const std::string &parent_body, double ecc, double sma
 {
   this->ecc = ecc;
   this->sma = sma;
-  this->inc = inc;
-  this->lan = lan;
-  this->arg = arg;
-  this->m0 = m0;
+  this->inc = glm::radians(inc);
+  this->lan = glm::radians(lan);
+  this->arg = glm::radians(arg);
+  this->m0 = glm::radians(m0);
   this->parent_body = parent_body;
 }
 
@@ -169,20 +169,23 @@ void Orbit::computePosition(double epoch)
   {
     if (parent)
     {
-      double meanAnomaly = sqrt(parent->getBody().GM / (sma*sma*sma))*epoch + m0;
+      double orbital_period = 2*PI*sqrt((sma*sma*sma)/parent->getBody().GM);
+      double mean_motion = 2*PI/orbital_period;
+      double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
       double En = (ecc<0.8)?meanAnomaly:PI;
-      const int it = 10;
+      const int it = 20;
       for (int i=0;i<it;++i)
         En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
-      double trueAnomaly = atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
+      double trueAnomaly = atan2(sqrt(1+ecc)*sin(En), sqrt(1-ecc)*cos(En));
       double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
       glm::dvec3 posInPlane = glm::vec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-      glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg*PI/180.0,glm::dvec3(0,0,1)),inc*PI/180, glm::dvec3(1,0,0)),lan*PI/180, glm::dvec3(1,0,0));
+      glm::dquat q = glm::rotate(glm::rotate(glm::rotate(glm::dquat(), arg,glm::dvec3(0,0,1)),inc, glm::dvec3(1,0,0)),lan, glm::dvec3(1,0,0));
       position = q*posInPlane;
 
       parent->getOrbit().computePosition(epoch);
 
       position += parent->getPosition();
+      updated = true;
     }
     else
     {
@@ -292,7 +295,11 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
 
   glm::mat4 planet_mat = glm::translate(glm::mat4(), render_pos);
 
-  glm::quat q = glm::rotate(glm::quat(), rotation_angle, rotation_axis);
+  glm::vec3 NORTH = glm::vec3(0,0,1);
+
+  
+  glm::quat q = glm::rotate(glm::quat(), (float)acos(glm::dot(NORTH,rotation_axis)), glm::cross(NORTH,rotation_axis));
+  q = glm::rotate(q, rotation_angle, NORTH);
   planet_mat *= mat4_cast(q);
   planet_mat = glm::scale(planet_mat, glm::vec3(radius));
 
@@ -612,7 +619,9 @@ void Planet::createFromFile(shaun::sweeper &swp1)
   if (!phys.is_null())
   {
     this->body.radius = get<float>(phys("radius"), 1.0);
-    this->body.rotation_axis = get<glm::vec3>(phys("rot_axis"), glm::vec3(0,0,1));
+    float r_a = glm::radians(get<float>(phys("right_ascension"), 0.0));
+    float dec = glm::radians(get<float>(phys("declination"), 90.0));
+    this->body.rotation_axis = glm::vec3(-sin(r_a)*cos(dec),cos(r_a)*cos(dec), sin(dec));
     this->body.rotation_period = get<float>(phys("rot_period"), 10.0);
     this->body.mean_color = get<glm::vec3>(phys("mean_color"), glm::vec3(1.0));
     this->body.GM = get<double>(phys("GM"), 1000);
