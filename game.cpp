@@ -231,9 +231,11 @@ void Game::loadSettingsFile()
     auto max_size = graphics("texture_max_size");
     dds_loader.setMaxSize((max_size.is_null())?0:max_size.value<shaun::number>());
 
+    auto ssaa_fact = graphics("ssaa_factor");
+    ssaa_factor = (ssaa_fact.is_null())?1.0:ssaa_fact.value<shaun::number>();
+
     shaun::sweeper controls(swp("controls"));
     sensitivity = controls("sensitivity").value<shaun::number>();
-    
   } 
   catch (shaun::parse_error e)
   {
@@ -306,7 +308,7 @@ void Game::init()
   glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
   ratio = width/(float)height;
   camera.getPolarPosition().z = focused_planet->getBody().radius*4;
-  post_processing.create(win);
+  post_processing.create(win, ssaa_factor);
   post_processing.addShader(new HDRAction(post_hdr));
   post_processing.addShader(new PostProcessingAction(post_default));
 }

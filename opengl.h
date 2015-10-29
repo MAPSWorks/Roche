@@ -124,7 +124,7 @@ protected:
 public:
   PostProcessingAction(const Shader &s);
   virtual ~PostProcessingAction();
-  virtual void action(GLuint tex, int width, int height);
+  virtual void action(GLuint tex, int width, int height, int true_width, int true_height);
 };
 
 class PostProcessing
@@ -135,11 +135,12 @@ private:
 
   GLuint quad_obj;
   int width,height;
+  int true_width, true_height;
   std::vector<PostProcessingAction*> shaders;
 
 public:
   ~PostProcessing();
-  void create(GLFWwindow *win);
+  void create(GLFWwindow *win, float ssaa_factor);
   void destroy();
   void bind();
   void render();
@@ -152,7 +153,7 @@ private:
   float exposure;
 public:
   HDRAction(const Shader &s);
-  void action(GLuint tex, int width, int height);
+  void action(GLuint tex, int width, int height, int true_width, int true_height);
 };
 
 #endif

@@ -381,7 +381,7 @@ std::string displayFBOStatus(GLenum s)
   }
 }
 
-void PostProcessing::create(GLFWwindow *win)
+void PostProcessing::create(GLFWwindow *win, float ssaa_factor)
 {
   glfwGetWindowSize(win, &width, &height);
 
@@ -393,8 +393,9 @@ void PostProcessing::create(GLFWwindow *win)
   {
     glBindFramebuffer(GL_FRAMEBUFFER, fbos[i]);
     glBindTexture(GL_TEXTURE_2D, targets[i]);
-    int width,height;
-    glfwGetWindowSize(win, &width, &height);
+    glfwGetWindowSize(win, &true_width, &true_height);
+    width = true_width * ssaa_factor;
+    height = true_height * ssaa_factor;
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -427,6 +428,8 @@ void PostProcessing::destroy()
 }
 void PostProcessing::bind()
 {
+  glViewport(0,0,width, height);
+  glScissor(0,0,width, height);
   glBindFramebuffer(GL_FRAMEBUFFER, shaders.size()?fbos[0]:0);
 }
 
@@ -438,9 +441,14 @@ void PostProcessing::render()
   for (int i=0;i<passes;++i)
   {
     int fbo_id = (i<passes-1)?fbos[(fbo+1)&1]:0;
+    if (fbo_id==0)
+    {
+      glViewport(0,0,true_width,true_height);
+      glScissor(0,0,true_width, true_height);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER,fbo_id);
     glClear(GL_COLOR_BUFFER_BIT);
-    shaders[i]->action(targets[i], width, height);
+    shaders[i]->action(targets[i], width, height, true_width, true_height);
     glBindBuffer(GL_ARRAY_BUFFER, quad_obj);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(GLvoid*)0);
     glDrawArrays(GL_TRIANGLES, 0,6);
@@ -473,15 +481,17 @@ HDRAction::HDRAction(const Shader &s) : PostProcessingAction(s)
   exposure = 0.5;
 }
 
-void PostProcessingAction::action(GLuint tex, int width, int height)
+void PostProcessingAction::action(GLuint tex, int width, int height, int true_width, int true_height)
 {
   s.use();
   s.uniform("tex", 0);
+  glm::vec2 offset = glm::vec2(1.0/(float)true_width,1.0/(float)true_height);
+  s.uniform("off",glm::value_ptr(offset));
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D,tex);
 }
 
-void HDRAction::action(GLuint tex, int width, int height)
+void HDRAction::action(GLuint tex, int width, int height, int true_width, int true_height)
 {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D,tex);
@@ -493,14 +503,12 @@ void HDRAction::action(GLuint tex, int width, int height)
   float average_brightness = 0.0;
   average_brightness += (average_color[0]*0.2126+average_color[1]*0.7152+average_color[2]*0.0722) *0.5;
   if (average_brightness != average_brightness) average_brightness = 0.5; // HORRIBLE FIX FOR NAN VALUES RETURNED BY GLGETTEXIMAGE
-  float new_exposure = 0.5/ average_brightness;
+  float new_exposure = 0.5 / average_brightness;
 
   if (new_exposure > 1.0) new_exposure = 1.0;
   if (new_exposure < 0.0001) new_exposure = 0.0001;
 
   exposure = (new_exposure-exposure)*0.1 + exposure;
-
-  std::cout << exposure << std::endl;
 
   s.use();
   s.uniform("tex", 0);

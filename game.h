@@ -147,6 +147,7 @@ private:
   float sensitivity;
 
   PostProcessing post_processing;
+  float ssaa_factor;
   DDSLoader dds_loader;
 
   Camera camera;

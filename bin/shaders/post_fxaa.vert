@@ -5,7 +5,7 @@ layout(location = 0)in vec2 in_position;
 uniform sampler2D tex;
 uniform float FXAA_SUBPIX_SHIFT = 1.0/4.0;
 
-vec2 off = vec2(1.0/textureSize(tex,0).x, 1.0/textureSize(tex,0).y);
+uniform vec2 off;
 
 out vec4 pass_uv;
 
