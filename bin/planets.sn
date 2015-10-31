@@ -12,15 +12,68 @@ planets: [
     }
 	}
   {
+    name:"Mercury"
+    orbit:{
+      parent:"Sun"
+      ecc:2.056263990541989E-01
+      sma:5.790929673375671E+07
+      inc:2.860560297885953E+01
+      lan:1.084410261039662E+01
+      arg:6.702195884630474E+01
+      m0:2.746499628827846E+02
+    }
+    body:{
+      radius:2439.7
+      right_ascension:281.01
+      declination:61.45
+      rot_period:5067000
+      mean_color:[0.5,0.5,0.5]
+      albedo:0.142
+      GM:22032.9
+      diffuse:"tex/mercury/diffuse.dds"
+    }
+  }
+  {
+    name:"Venus"
+    orbit:{
+      parent:"Sun"
+      ecc:6.750771403073557E-03
+      sma:1.082090289797319E+08
+      inc:2.447382189996360E+01
+      lan:7.970772069782099E+00
+      arg:1.232590907232442E+02
+      m0:1.880074844662774E+02
+    }
+    body:{
+      radius:6051.8
+      right_ascension:272.76
+      declination:67.16
+      rot_period:-20997360
+      mean_color:[1.0,0.9,0.7]
+      albedo:0.67
+      GM:324859.9
+      diffuse:"tex/venus/diffuse.dds"
+    }
+    atmosphere:{
+      max_altitude:250
+      scale_height:15.9
+      K_R:0.4
+      K_M:0.000
+      E:34.5
+      C_R:[1.0,0.9,0.7]
+      G_M:-0.85
+    }
+  }
+  {
     name:"Earth"
     orbit:{
       parent:"Sun"
       ecc:1.608754617940990E-02
       sma:1.494930654907732E+08
-      inc:2.344603359636712E+01deg
-      lan:3.599965626953215E+02deg
-      arg:1.029548799377086E+02deg
-      m0:3.571527601141020E+02deg
+      inc:2.344603359636712E+01
+      lan:3.599965626953215E+02
+      arg:1.029548799377086E+02
+      m0:3.571527601141020E+02
     }
     body:{
       radius:6371.01
@@ -58,10 +111,10 @@ planets: [
       parent:"Earth"
       ecc:5.298940118493898E-02e
       sma:3.844212844766085E+05
-      inc:2.836200854713088E+01deg
-      lan:2.294272126732694E+00deg
-      arg:1.996208811827870E+02deg
-      m0:2.238455175352146E+02deg
+      inc:2.836200854713088E+01
+      lan:2.294272126732694E+00
+      arg:1.996208811827870E+02
+      m0:2.238455175352146E+02
     }
     body:{
       radius:1737.53
@@ -72,6 +125,37 @@ planets: [
       albedo:0.12
       GM:4902.768
       diffuse:"tex/earth/moon/diffuse.dds"
+    }
+  }
+  {
+    name:"Mars"
+    orbit:{
+      parent:"Sun"
+      ecc:9.350760272320555E-02
+      sma:2.279407531070573E+08
+      inc:2.469347399234601E+01
+      lan:3.332505483544657E+00
+      arg:3.323226461664896E+02
+      m0:1.029688193604206E+01
+    }
+    body:{
+      radius:3389.5
+      right_ascension:317.68143
+      declination:52.88650
+      rot_period:88642
+      mean_color:[1.0,0.4,0.0]
+      albedo:0.170
+      GM:42828.9
+      diffuse:"tex/mars/diffuse.dds"
+    }
+    atmosphere:{
+      max_altitude:170
+      scale_height:11.1
+      K_R:0.030
+      K_M:0.0009
+      E:12.5
+      C_R:[1.0,0.6,0.2]
+      G_M:-0.85 
     }
   }
 ]
