@@ -18,6 +18,8 @@
 
 #define PI 3.14159265358979323846264338327950288 
 
+#define SCATTERING_SAMPLES (50)
+
 Texture Body::no_night;
 Texture Body::no_clouds;
 Texture Ring::no_rings;
@@ -256,32 +258,27 @@ void Body::load()
     TexMipmapData(false, no_clouds, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
     no_tex_init = true;
   }
-  if (!loaded)
+
+  diffuse_tex.create();
+  Game::loadTexture(diffuse_filename, diffuse_tex);
+  if (has_night_tex) 
   {
-    diffuse_tex.create();
-    Game::loadTexture(diffuse_filename, diffuse_tex);
-    if (has_night_tex) 
-    {
-      night_tex.create();
-      Game::loadTexture(night_filename, night_tex);
-    }
-    if (has_cloud_tex)
-    {
-      cloud_tex.create();
-      Game::loadTexture(cloud_filename, cloud_tex);
-    }
-    loaded = true;
+    night_tex.create();
+    Game::loadTexture(night_filename, night_tex);
+  }
+  if (has_cloud_tex)
+  {
+    cloud_tex.create();
+    Game::loadTexture(cloud_filename, cloud_tex);
   }
 }
 void Body::unload()
 {
-  if (loaded)
-  {
-    diffuse_tex.destroy();
+  diffuse_tex.destroy();
+  if (has_night_tex)
     night_tex.destroy();
+  if (has_cloud_tex)
     cloud_tex.destroy();
-    loaded = false;
-  }
 }
 
 void Body::update(double epoch)
@@ -317,7 +314,7 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
 
   rings.render(far_ring_mat, light_mat, rc);
 
-  if (atmos.max_height > 0)
+  if (atmos.max_height >= 0)
   { 
     glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.max_height/radius));
     rc.atmos_shader.use();
@@ -334,7 +331,11 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
     rc.atmos_shader.uniform( "E", atmos.E);
     rc.atmos_shader.uniform( "C_R", atmos.C_R);
     rc.atmos_shader.uniform( "G_M", atmos.G_M);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
+    rc.atmos_shader.uniform( "lookup", 4);
     rc.atmos_obj.render();
+
   }
 
   // PLANET RENDER
@@ -367,6 +368,12 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
   if (has_cloud_tex) cloud_tex.use(1); else no_clouds.use(1);
   if (has_night_tex) night_tex.use(2); else no_night.use(2);
   rings.useTexture(3);
+  if (atmos.max_height >= 0)
+  {
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
+    pshad.uniform( "lookup", 4);
+  }
   rc.planet_obj.render();
 
   rings.render(near_ring_mat, light_mat, rc);
@@ -404,7 +411,7 @@ void Ring::load()
     TexMipmapData(false, no_rings, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
     no_rings_init = true;
   }
-  if (!loaded && has_rings)
+  if (has_rings)
   {
     const int ringsize = 4096;
     unsigned char *rings = new unsigned char[ringsize];
@@ -413,16 +420,12 @@ void Ring::load()
     tex.create();
     TexMipmapData(false, tex, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings).updateTexture();
     tex.genMipmaps();
-    loaded = true;
   }
 }
 void Ring::unload()
 {
-  if (loaded)
-  {
+  if (has_rings)
     tex.destroy();
-    loaded = false;
-  }
 }
 
 void Ring::render(const glm::mat4 &model_mat,  const glm::mat4 &light_mat, const RenderContext &rc) const
@@ -474,9 +477,12 @@ void Atmosphere::print() const
   std::cout << "Max altitude : " << max_height << std::endl;
 }
 
+int Planet::SCATTERING_RES = 256;
+
 Planet::Planet()
 {
   name = "undefined";
+  loaded = false;
 }
 
 void Planet::print() const
@@ -497,16 +503,89 @@ const std::string &Planet::getName() const
   return name;
 }
 
+float Planet::scat_density(const glm::vec2 &p)
+{
+  return scat_density(glm::length(p)-body.radius);
+}
+
+float Planet::scat_density(float p)
+{
+  return glm::exp(-std::max(0.0f,p)/atmos.scale_height);
+}
+
+float Planet::scat_optic(const glm::vec2 &a, const glm::vec2 &b)
+{
+  glm::vec2 step = (b-a)/(float)SCATTERING_SAMPLES;
+  glm::vec2 v = a+step*0.5;
+
+  float sum = 0.0;
+  for (int i=0;i<SCATTERING_SAMPLES;++i)
+  {
+    sum += scat_density(v);
+    v += step;
+  }
+  return sum * glm::length(step) / atmos.max_height;
+}
+
+float Planet::ray_sphere_far(glm::vec2 ori, glm::vec2 ray, float radius)
+{
+  float b = glm::dot(ori, ray);
+  float c = glm::dot(ori,ori) - radius*radius;
+  return -b+sqrt(b*b-c);
+}
+
 void Planet::load()
 {
-  body.load();
-  ring.load();
+  if (!loaded)
+  {
+    body.load();
+    ring.load();
+    // Atmospheric scattering lookup table creation
+    if (atmos.max_height >= 0)
+    {
+      // x-axis : altitude from 0.0 (sea level) to 1.0 (max_height)
+      // y-axis : cosine of angle of ray / 2
+      float *lookup_data = new float[SCATTERING_RES*SCATTERING_RES*4];
+      float inv_scaleheight = 1.0/atmos.scale_height;
+      for (int i=0;i<SCATTERING_RES;++i)
+      {
+        float alt = (float)i / (float)SCATTERING_RES * atmos.max_height;
+        float density = glm::exp(-alt*inv_scaleheight);
+        for (int j=0;j<SCATTERING_RES;++j)
+        {
+          lookup_data[(i+j*SCATTERING_RES)*4+0] = density;
+          float angle = (float)j*PI/(float)SCATTERING_RES;
+          glm::vec2 ray_dir = glm::vec2(sin(angle),cos(angle));
+          glm::vec2 ray_ori = glm::vec2(0, body.radius + alt);
+          float t = ray_sphere_far(ray_ori, ray_dir, body.radius+atmos.max_height);
+          glm::vec2 u = ray_ori + ray_dir*t;
+          lookup_data[(i+j*SCATTERING_RES)*4+1] = scat_optic(ray_ori,u)*(4*3.14159265359);
+        }
+      }
+      glGenTextures(1,&atmos.lookup_table);
+      glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCATTERING_RES, SCATTERING_RES, 0, GL_RGBA,GL_FLOAT,lookup_data);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      delete [] lookup_data;
+    }
+    loaded = true;
+  }
 }
 
 void Planet::unload()
 {
-  body.unload();
-  ring.unload();
+  if (loaded)
+  {
+    body.unload();
+    ring.unload();
+    if (atmos.max_height >= 0)
+      glDeleteTextures(1, &atmos.lookup_table);
+    loaded = false;
+  }
 }
 
 void Planet::update(double epoch)

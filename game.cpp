@@ -156,6 +156,7 @@ Game::~Game()
 {
   ring_shader.destroy();
   planet_shader.destroy();
+  atmos_shader.destroy();
 
   ring_obj.destroy();
   planet_obj.destroy();

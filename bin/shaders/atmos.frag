@@ -23,6 +23,8 @@ uniform float E; // Sunlight intensity
 uniform vec3 C_R; // 1 / sunlight wavelength ^4
 uniform float G_M; // Mie g constant
 
+uniform sampler2D lookup;
+
 out vec4 out_color;
 
 float getNear(vec3 ray_origin, vec3 ray, float far)
@@ -46,7 +48,7 @@ float ray_sphere_near(vec3 ori, vec3 ray, float radius)
 
 float rayleigh(float cc)
 {
-  return 0.75 + (1.0 + cc);
+  return 0.75 * (1.0 + cc);
 }
 
 float mie(float g, float c, float cc)
@@ -58,25 +60,6 @@ float mie(float g, float c, float cc)
   b*= 2.0+gg;
 
   return 1.5*a/b;
-}
-
-float density(vec3 point)
-{
-  return exp(-(length(point) - planet_radius)*SCALE_H);
-}
-
-float optic(vec3 a, vec3 b)
-{
-  vec3 step = (b-a)/float(OUT_SAMPLES);
-  vec3 v = a+step*0.5;
-
-  float sum = 0.0;
-  for (int i=0;i<OUT_SAMPLES;++i)
-  {
-    sum += density(v);
-    v += step;
-  }
-  return sum * length(step) * SCALE_L;
 }
 
 vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
@@ -98,8 +81,16 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
   {
     float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
     vec3 u = v+light_dir*t;
-    float n = (optic(p,v)+optic(v,u))*(PI * 4.0);
-    float dens = density(v);
+
+    float alt = (length(v)-planet_radius)/atmos_height;
+    vec3 norm_v = normalize(v);
+
+    float angle_view = acos(dot(norm_v, -view_dir))/PI;
+    float angle_light = acos(dot(norm_v, light_dir))/PI;
+
+    float n = texture(lookup, vec2(alt,angle_view)).g +
+              texture(lookup, vec2(alt,angle_light)).g;
+    float dens = texture(lookup,vec2(alt,0.0)).r;
     sum += dens * exp(-n*(K_R*C_R+K_M));
     v += step;
   }
@@ -110,8 +101,8 @@ vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
   float cc = c*c;
 
   vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
-
-  return color.rgbb;
+  
+  return color.rgbg;
 }
 
 void main(void)

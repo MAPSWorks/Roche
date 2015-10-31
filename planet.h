@@ -69,8 +69,6 @@ private:
 
   Texture tex;
 
-  bool loaded;
-
   static Texture no_rings;
   static bool no_rings_init;
 };
@@ -85,6 +83,7 @@ public:
   glm::vec3 C_R;
   float max_height;
   float scale_height;
+  GLuint lookup_table;
 };
 
 class Body
@@ -122,8 +121,6 @@ private:
   float rotation_angle;
   float cloud_disp;
 
-  bool loaded;
-
   static Texture no_night,no_clouds;
   static bool no_tex_init;
 };
@@ -148,11 +145,20 @@ public:
   Ring &getRing();
   Atmosphere &getAtmosphere();
 
+  static int SCATTERING_RES;
+
 private:
   template <class T>
   T get(shaun::sweeper &swp, T def);
 
+  float scat_density(const glm::vec2 &p);
+  float scat_density(float p);
+  float scat_optic(const glm::vec2 &a,const glm::vec2 &b);
+  float ray_sphere_far(glm::vec2 ori, glm::vec2 ray, float radius);
+
   std::string name;
+
+  bool loaded;
 
   Orbit orbit;
   Body body;
