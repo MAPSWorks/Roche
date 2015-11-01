@@ -603,11 +603,12 @@ void Game::render()
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
     if (posOnScreen.z > 0)
     {
-      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/MIN_FLARE_DIST))*4)/camera.getFovy();
-      float alpha = (glm::length(flare->getPosition() - view_center - camera.getPosition()) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
+      glm::vec3 dist = flare->getPosition() - view_center - camera.getPosition();
+      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/glm::length(dist)))*4)/camera.getFovy();
+      float alpha = (glm::length(dist) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
       glm::vec3 color = (0.4+flare->getBody().albedo)*flare->getBody().mean_color * (
         glm::dot(
-          glm::normalize(flare->getPosition() - view_center - camera.getPosition()), 
+          glm::normalize(dist), 
           glm::normalize(flare->getPosition()))*0.5+0.5);
       flare_shader.uniform("size", size_on_screen);
       flare_shader.uniform("color", glm::value_ptr(glm::vec4(color,std::min(1.0f,alpha))));
