@@ -194,12 +194,12 @@ void Orbit::computePosition(double epoch)
     }
     else
     {
-      position = glm::vec3(0,0,0);
+      position = glm::dvec3(0,0,0);
     }
   }
 }
 
-const glm::vec3 &Orbit::getPosition() const
+const glm::dvec3 &Orbit::getPosition() const
 {
   return position;
 }
@@ -287,7 +287,7 @@ void Body::update(double epoch)
   cloud_disp = cloud_disp_rate*epoch;
 }
 
-void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rings, const Atmosphere &atmos)
+void Body::render(const glm::dvec3 &pos, const RenderContext &rc, const Ring &rings, const Atmosphere &atmos)
 {
   Shader &pshad = is_star?rc.sun_shader:rc.planet_shader;
 
@@ -297,13 +297,12 @@ void Body::render(const glm::vec3 &pos, const RenderContext &rc, const Ring &rin
 
   glm::vec3 NORTH = glm::vec3(0,0,1);
 
-  
   glm::quat q = glm::rotate(glm::quat(), (float)acos(glm::dot(NORTH,rotation_axis)), glm::cross(NORTH,rotation_axis));
   q = glm::rotate(q, rotation_angle, NORTH);
   planet_mat *= mat4_cast(q);
   planet_mat = glm::scale(planet_mat, glm::vec3(radius));
 
-  glm::vec3 light_dir = glm::normalize(pos - rc.light_pos);
+  glm::vec3 light_dir = glm::normalize(pos - glm::dvec3(rc.light_pos));
 
   glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), radius, rings.outer);
   
@@ -617,7 +616,7 @@ Ring &Planet::getRing()
   return ring;
 }
 
-const glm::vec3 &Planet::getPosition() const
+const glm::dvec3 &Planet::getPosition() const
 {
   return orbit.getPosition();
 }

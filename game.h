@@ -27,12 +27,12 @@ public:
   /// Needed before scene rendering,ratio is the screen w/h ratio
   void update(float ratio);
   /// Returns a modifiable reference to the point the view is looking at
-  glm::vec3 &getCenter();
+  glm::dvec3 &getCenter();
   /** Returns a modifiable reference to the the polar coordinates of the view
    * around the center point (theta, phi, distance), theta and phi in radians **/
   glm::vec3 &getPolarPosition();
   /// Returns the actual position of the camera in cartesian coordinates
-  const glm::vec3 &getPosition();
+  const glm::dvec3 &getPosition();
   /// Returns a modifiable reference to the up vector of the view
   glm::vec3 &getUp();
   /// Returns the generated projection matrix
@@ -54,8 +54,8 @@ public:
 
 private:
   glm::vec3 polarPos;
-  glm::vec3 pos;
-  glm::vec3 center;
+  glm::dvec3 pos;
+  glm::dvec3 center;
   glm::vec3 up;
   float fovy;
   float near;
@@ -99,7 +99,6 @@ private:
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
   int focused_planet_id;
-  glm::vec3 view_center; // The position the view is centered on
   double epoch; // Seconds since January 1st 2015 00:00
   int time_warp_index;
   std::vector<double> time_warp_values;

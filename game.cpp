@@ -33,7 +33,7 @@
 Camera::Camera()
 {
   polarPos = glm::vec3(0.0,0.0,8000);
-  center = glm::vec3(0,0,0);
+  center = glm::dvec3(0,0,0);
   up = glm::vec3(0,0,1);
 
   fovy = 50;
@@ -41,7 +41,7 @@ Camera::Camera()
   far = MIN_FLARE_DIST;
 }
 
-glm::vec3 &Camera::getCenter()
+glm::dvec3 &Camera::getCenter()
 {
   return center;
 }
@@ -50,7 +50,7 @@ glm::vec3 &Camera::getPolarPosition()
 {
   return polarPos;
 }
-const glm::vec3 &Camera::getPosition()
+const glm::dvec3 &Camera::getPosition()
 {
   return pos;
 }
@@ -72,8 +72,8 @@ const glm::mat4 &Camera::getViewMat()
 void Camera::update(float ratio)
 {
   proj_mat = glm::infinitePerspective((float)(fovy/180*PI),ratio, 0.01f);
-  pos = glm::vec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]) + center;
-  view_mat = glm::lookAt(pos, center, up);
+  pos = glm::dvec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]);
+  view_mat = glm::lookAt(glm::vec3(pos), glm::vec3(0,0,0), up);
 }
 
 float Camera::getNear()
@@ -137,7 +137,6 @@ Game::Game() : rc(planet_shader, atmos_shader, sun_shader, ring_shader, planet_o
   view_speed = glm::vec3(0,0,0);
   max_view_speed = 0.2;
   view_smoothness = 0.85;
-  view_center = glm::vec3(0,0,0);
   switch_previous_planet = NULL;
   save = false;
 
@@ -414,7 +413,7 @@ void Game::loadTexture(const std::string &filename, Texture &tex)
 class PlanetCompareByDist
 {
 public:
-  PlanetCompareByDist(const glm::vec3 &view_pos)
+  PlanetCompareByDist(const glm::dvec3 &view_pos)
   {
     this->view_pos = view_pos;
   }
@@ -424,11 +423,11 @@ public:
   }
   float getDist(Planet *p)
   {
-    glm::vec3 temp = p->getPosition() - view_pos;
+    glm::dvec3 temp = p->getPosition() - view_pos;
     return glm::dot(temp,temp);
   }
 private:
-  glm::vec3 view_pos;
+  glm::dvec3 view_pos;
 };
 
 void Game::update(double dt)
@@ -551,8 +550,8 @@ void Game::render()
   if (is_switching)
   {
     float t = switch_frame_current/(float)switch_frames;
-    float f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
-    view_center = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
+    double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
+    camera.getCenter() = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
     float target_dist = focused_planet->getBody().radius*4;
     camera.getPolarPosition().z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
 
@@ -560,7 +559,7 @@ void Game::render()
   }
   else
   {
-    view_center = focused_planet->getPosition();
+    camera.getCenter() = focused_planet->getPosition();
   }
 
   post_processing.bind();
@@ -576,7 +575,7 @@ void Game::render()
   // Planet sorting between flares and close meshes
   for (Planet &p : planets)
   {
-    glm::vec3 dist = p.getPosition() - view_center - camera.getPosition();
+    glm::vec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
     float len_dist = glm::length(dist);
     if (!p.getBody().is_star && len_dist >= MIN_FLARE_DIST)
     {
@@ -600,10 +599,10 @@ void Game::render()
   flare_tex.use(0);
   for (Planet *flare : flares)
   {
-    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - view_center, 1.0);
+    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - camera.getCenter(), 1.0);
     if (posOnScreen.z > 0)
     {
-      glm::vec3 dist = flare->getPosition() - view_center - camera.getPosition();
+      glm::dvec3 dist = flare->getPosition() - camera.getCenter() - camera.getPosition();
       float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/glm::length(dist)))*4)/camera.getFovy();
       float alpha = (glm::length(dist) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
       glm::vec3 color = (0.4+flare->getBody().albedo)*flare->getBody().mean_color * (
@@ -623,9 +622,9 @@ void Game::render()
   rc.view_mat = view_mat;
   rc.view_pos = camera.getPosition();
   rc.light_pos = light_position;
-  rc.view_center = view_center;
+  rc.view_center = camera.getCenter();
 
-  std::sort(meshes.begin(),meshes.end(), PlanetCompareByDist(camera.getPosition()+view_center));
+  std::sort(meshes.begin(),meshes.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
   for (Planet *mesh : meshes)
   {
     mesh->render(rc);
