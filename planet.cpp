@@ -732,10 +732,12 @@ void Planet::createFromFile(shaun::sweeper &swp1)
   if (!ring.is_null())
   {
     this->ring.has_rings = true;
-    this->ring.inner = get<float>(ring("inner"), 2.0),
-    this->ring.outer = get<float>(ring("outer"), 4.0),
-    this->ring.normal = get<glm::vec3>(ring("normal"), glm::vec3(0,0,1)),
-    this->ring.seed = get<int>(ring("seed"), 2.0),
+    this->ring.inner = get<float>(ring("inner"), 2.0);
+    this->ring.outer = get<float>(ring("outer"), 4.0);
+    float r_a = glm::radians(get<float>(ring("right_ascension"), 0.0));
+    float dec = glm::radians(get<float>(ring("declination"), 90.0));
+    this->ring.normal = glm::vec3(-sin(r_a)*cos(dec),cos(r_a)*cos(dec), sin(dec));
+    this->ring.seed = get<int>(ring("seed"), 2.0);
     this->ring.color = get<glm::vec4>(ring("color"), glm::vec4(0.6,0.6,0.6,1.0));
   }
 }

@@ -97,13 +97,6 @@ planets: [
       C_R:[0.3, 0.7, 1.0]
       G_M:-0.85 
     }
-    ring:{
-      inner:10000
-      outer:16000
-      normal:[1,1,2]
-      seed:1909802985
-      color:[0.6,0.6,0.6,1.0]
-    }
   }
   {
     name:"Moon"
@@ -218,6 +211,14 @@ planets: [
       E:6.5
       C_R:[1.0,0.9,0.4]
       G_M:-0.85 
+    }
+    ring:{
+      inner:66900
+      outer:139826
+      right_ascension:40.589
+      declination:83.537
+      seed:1909802985
+      color:[0.6,0.6,0.6,1.0]
     }
   }
   {

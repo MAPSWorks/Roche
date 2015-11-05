@@ -18,5 +18,5 @@ void main(void)
 	// TEXTURE LOOKUPS
 	vec3 color = texture(day_tex,pass_uv).rgb;
 
-	out_color = vec4(color*0.0005*length(rel_viewpos),1.0);
+	out_color = vec4(color,1.0);
 }
