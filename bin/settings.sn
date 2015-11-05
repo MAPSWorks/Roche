@@ -12,7 +12,7 @@ video:{
 */
 
 graphics:{
-  texture_max_size:4096
+  texture_max_size:1024
   ssaa_factor:1.0
 }
 

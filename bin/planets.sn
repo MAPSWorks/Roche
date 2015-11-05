@@ -267,7 +267,7 @@ planets: [
       right_ascension:299.3
       declination:42.950
       rot_period:57996
-      mean_color:[1.0,0.4,0.0]
+      mean_color:[0.0,0.4,1.0]
       albedo:0.41
       GM:6836529
       diffuse:"tex/neptune/diffuse.dds"
@@ -326,8 +326,8 @@ planets: [
     }
     body:{
       radius:606
-      right_ascension:317.68143
-      declination:52.88650
+      right_ascension:132.993
+      declination:-6.163
       rot_period:584020
       mean_color:[0.4,0.4,0.4]
       albedo:0.2

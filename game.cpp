@@ -258,6 +258,10 @@ void Game::init()
   glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
   glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
   glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 
   if (fullscreen)
     win = glfwCreateWindow(mode->width, mode->height, "Roche", monitor, NULL);
@@ -329,8 +333,8 @@ void Game::generateModels()
   ring_obj.updateVerts(24*4, ring_vert);
   ring_obj.updateIndices(12, ring_ind);
 
-  planet_obj.generateSphere(128,128, 1);
-  atmos_obj.generateSphere(128,128, 0);
+  planet_obj.generateSphere(32,32, 1);
+  atmos_obj.generateSphere(32,32, 0);
   skybox_obj.generateSphere(16,16,0);
 
   float flare_vert[] =
@@ -603,7 +607,7 @@ void Game::render()
     if (posOnScreen.z > 0)
     {
       glm::dvec3 dist = flare->getPosition() - camera.getCenter() - camera.getPosition();
-      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/glm::length(dist)))*4)/camera.getFovy();
+      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/MAX_PLANET_DIST))*4)/camera.getFovy();
       float alpha = (glm::length(dist) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
       glm::vec3 color = (0.4+flare->getBody().albedo)*flare->getBody().mean_color * (
         glm::dot(
