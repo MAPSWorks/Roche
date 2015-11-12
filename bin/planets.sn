@@ -9,6 +9,8 @@ planets: [
       GM:132712440018
       diffuse:"tex/sun/diffuse.dds"
       is_star:true
+      mean_color:[4.0,4.0,4.0]
+      albedo:2.5
     }
 	}
   {
@@ -80,7 +82,7 @@ planets: [
       right_ascension:0
       declination:90
       rot_period:86164.091
-      mean_color:[0.3,0.7,1.0]
+      mean_color:[0.13,0.45,0.65]
       albedo:0.367
       GM:398600.440
       diffuse:"tex/earth/diffuse.dds"
@@ -278,8 +280,8 @@ planets: [
       scale_height:19.7
       K_R:0.030
       K_M:0.0009
-      E:12.5
-      C_R:[1.0,0.6,0.2]
+      E:3
+      C_R:[0.0,0.4,1.0]
       G_M:-0.85 
     }
   }

@@ -500,13 +500,12 @@ void HDRAction::action(GLuint tex, int width, int height, int true_width, int tr
   float average_color[3] = {1.0,1.0,1.0};
   glGetTexImage(GL_TEXTURE_2D, numLevel, GL_RGB,GL_FLOAT,average_color);
 
-  float average_brightness = 0.0;
-  average_brightness += (average_color[0]*0.2126+average_color[1]*0.7152+average_color[2]*0.0722) *0.5;
+  float average_brightness = (average_color[0]*0.2126+average_color[1]*0.7152+average_color[2]*0.0722) *0.5;
   if (average_brightness != average_brightness) average_brightness = 0.5; // HORRIBLE FIX FOR NAN VALUES RETURNED BY GLGETTEXIMAGE
-  float new_exposure = 0.5 / average_brightness;
+  if (average_brightness < 0.5) average_brightness = 0.5;
+  else if (average_brightness > 2.0) average_brightness = 2.0;
 
-  if (new_exposure > 1.0) new_exposure = 1.0;
-  if (new_exposure < 0.0001) new_exposure = 0.0001;
+  float new_exposure = -log(0.5) / average_brightness;
 
   exposure = (new_exposure-exposure)*0.1 + exposure;
 

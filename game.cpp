@@ -27,8 +27,8 @@
 
 #include <glm/ext.hpp>
 
-#define MIN_FLARE_DIST  4000000
-#define MAX_PLANET_DIST 8000000
+#define MIN_FLARE_DIST  100.0
+#define MAX_PLANET_DIST 200.0
 
 Camera::Camera()
 {
@@ -333,8 +333,8 @@ void Game::generateModels()
   ring_obj.updateVerts(24*4, ring_vert);
   ring_obj.updateIndices(12, ring_ind);
 
-  planet_obj.generateSphere(32,32, 1);
-  atmos_obj.generateSphere(32,32, 0);
+  planet_obj.generateSphere(64,64, 1);
+  atmos_obj.generateSphere(64,64, 0);
   skybox_obj.generateSphere(16,16,0);
 
   float flare_vert[] =
@@ -581,11 +581,11 @@ void Game::render()
   {
     glm::vec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
     float len_dist = glm::length(dist);
-    if (!p.getBody().is_star && len_dist >= MIN_FLARE_DIST)
+    if (len_dist >= MIN_FLARE_DIST*p.getBody().radius)
     {
       flares.push_back(&p);
     }
-    if (p.getBody().is_star || len_dist <= MAX_PLANET_DIST)
+    if (len_dist <= MAX_PLANET_DIST*p.getBody().radius)
     {
       meshes.push_back(&p);
       p.load();
@@ -601,18 +601,23 @@ void Game::render()
   flare_shader.uniform("ratio", ratio);
   flare_shader.uniform("tex", 0);
   flare_tex.use(0);
+  int width,height;
+  glfwGetWindowSize(win, &width, &height);
+  float pixelsize = 1.0/(float)height;
   for (Planet *flare : flares)
   {
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - camera.getCenter(), 1.0);
     if (posOnScreen.z > 0)
     {
+      float radius = flare->getBody().radius;
+      float albedo = flare->getBody().albedo;
       glm::dvec3 dist = flare->getPosition() - camera.getCenter() - camera.getPosition();
-      float size_on_screen = (glm::degrees((float)atan(flare->getBody().radius/MAX_PLANET_DIST))*4)/camera.getFovy();
-      float alpha = (glm::length(dist) - MIN_FLARE_DIST) / (MAX_PLANET_DIST - MIN_FLARE_DIST);
-      glm::vec3 color = (0.4+flare->getBody().albedo)*flare->getBody().mean_color * (
+      float size_on_screen = std::max(pixelsize*2*(0.4f+albedo),(glm::degrees((float)atan(radius/glm::length(dist))))/camera.getFovy());
+      float alpha = (glm::length(dist) - MIN_FLARE_DIST*radius) / (MAX_PLANET_DIST*radius - MIN_FLARE_DIST*radius);
+      glm::vec3 color = (2.0+albedo)*flare->getBody().mean_color * ((flare->getBody().is_star)?1:(
         glm::dot(
           glm::normalize(dist), 
-          glm::normalize(flare->getPosition()))*0.5+0.5);
+          glm::normalize(flare->getPosition()))*0.5+0.5));
       flare_shader.uniform("size", size_on_screen);
       flare_shader.uniform("color", glm::value_ptr(glm::vec4(color,std::min(1.0f,alpha))));
 
