@@ -72,8 +72,15 @@ void DDSLoader::load(
   std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
   if (!in)
   {
-    std::cout << "Can't open file " << filename << std::endl;
-    throw(errno);
+    std::cout << "Can't open file " << filename << " : Loading a white texture instead" << std::endl;
+    unsigned char *white;
+    white = new unsigned char[4];
+    white[0] = 255;
+    white[1] = 255;
+    white[2] = 255;
+    white[3] = 255;
+    tmd.push(TexMipmapData(false, tex, 0, GL_RGBA, 1, 1, GL_UNSIGNED_BYTE, white));
+    return;
   }
 
   // Reads the first 4 bytes and checks the dds file signature

@@ -604,6 +604,7 @@ void Game::render()
   int width,height;
   glfwGetWindowSize(win, &width, &height);
   float pixelsize = 1.0/(float)height;
+  std::sort(flares.begin(),flares.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
   for (Planet *flare : flares)
   {
     glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - camera.getCenter(), 1.0);
@@ -612,7 +613,10 @@ void Game::render()
       float radius = flare->getBody().radius;
       float albedo = flare->getBody().albedo;
       glm::dvec3 dist = flare->getPosition() - camera.getCenter() - camera.getPosition();
-      float size_on_screen = std::max(pixelsize*2*(0.4f+albedo),(glm::degrees((float)atan(radius/glm::length(dist))))/camera.getFovy());
+      float fdist = glm::length(dist);
+      float visual_angle = glm::degrees((float)atan(radius/fdist));
+      float max_size = std::min(4.0,((std::max(1.0,(fdist/(MIN_FLARE_DIST*radius)))-1.0)*albedo*radius*0.0000000001)+1.0)*pixelsize*2.0;
+      float size_on_screen = std::max(max_size,(visual_angle)/camera.getFovy());
       float alpha = (glm::length(dist) - MIN_FLARE_DIST*radius) / (MAX_PLANET_DIST*radius - MIN_FLARE_DIST*radius);
       glm::vec3 color = (2.0+albedo)*flare->getBody().mean_color * ((flare->getBody().is_star)?1:(
         glm::dot(

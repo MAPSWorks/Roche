@@ -396,7 +396,7 @@ void PostProcessing::create(GLFWwindow *win, float ssaa_factor)
     glfwGetWindowSize(win, &true_width, &true_height);
     width = true_width * ssaa_factor;
     height = true_height * ssaa_factor;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_HALF_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -495,19 +495,8 @@ void HDRAction::action(GLuint tex, int width, int height, int true_width, int tr
 {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D,tex);
-  glGenerateMipmap(GL_TEXTURE_2D);
-  float numLevel = floor(log2(std::max(width,height)));
-  float average_color[3] = {1.0,1.0,1.0};
-  glGetTexImage(GL_TEXTURE_2D, numLevel, GL_RGB,GL_FLOAT,average_color);
 
-  float average_brightness = (average_color[0]*0.2126+average_color[1]*0.7152+average_color[2]*0.0722) *0.5;
-  if (average_brightness != average_brightness) average_brightness = 0.5; // HORRIBLE FIX FOR NAN VALUES RETURNED BY GLGETTEXIMAGE
-  if (average_brightness < 0.5) average_brightness = 0.5;
-  else if (average_brightness > 2.0) average_brightness = 2.0;
-
-  float new_exposure = -log(0.5) / average_brightness;
-
-  exposure = (new_exposure-exposure)*0.1 + exposure;
+  exposure = 0.8;
 
   s.use();
   s.uniform("tex", 0);

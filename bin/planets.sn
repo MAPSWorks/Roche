@@ -10,7 +10,7 @@ planets: [
       diffuse:"tex/sun/diffuse.dds"
       is_star:true
       mean_color:[4.0,4.0,4.0]
-      albedo:2.5
+      albedo:400
     }
 	}
   {
@@ -169,7 +169,7 @@ planets: [
       right_ascension:268.057
       declination:64.496
       rot_period:35730
-      mean_color:[1.0,0.7,0.2]
+      mean_color:[0.88, 0.86, 0.82]
       albedo:0.52
       GM:126686534
       diffuse:"tex/jupiter/diffuse.dds"
@@ -180,10 +180,98 @@ planets: [
       K_R:0.030
       K_M:0.0009
       E:8.5
-      C_R:[1.0,0.7,0.2]
+      C_R:[0.88, 0.86, 0.82]
       G_M:-0.85 
     }
   }
+        {
+          name:"Io"
+          orbit:{
+            parent:"Jupiter"
+            ecc:3.615698314962010E-03
+            sma:4.220186327080418E+05
+            inc:2.546409886328755E+01
+            lan:3.580466716248609E+02
+            arg:2.287718077187162E+02
+            m0:2.133936827515456E+02
+          }
+          body:{
+            radius:3660.0
+            right_ascension:268.057
+            declination:64.496
+            rot_period:1.530389098146819E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.63
+            GM:0
+            diffuse:"tex/jupiter/io/diffuse.dds"
+          }
+        }
+        {
+          name:"Europa"
+          orbit:{
+            parent:"Jupiter"
+            ecc:9.543084624597034E-03
+            sma:6.712443445944426E+05
+            inc:2.570367487535038E+01
+            lan:3.589359692127526E+02
+            arg:5.324982350747489E+01
+            m0:2.839021703648149E+02
+          }
+          body:{
+            radius:1560.8
+            right_ascension:268.057
+            declination:64.496
+            rot_period:3.069941568596450E+05
+            mean_color:[0.58,0.52,0.45]
+            albedo:0.67
+            GM:0
+            diffuse:"tex/jupiter/europa/diffuse.dds"
+          }
+        }
+        {
+          name:"Ganymede"
+          orbit:{
+            parent:"Jupiter"
+            ecc:1.618712537646723E-04
+            sma:1.070785258199689E+06
+            inc:2.527071069017788E+01
+            lan:3.580125201927148E+02
+            arg:1.441548772730600E+02
+            m0:2.316696796952682E+02
+          }
+          body:{
+            radius:2634.1
+            right_ascension:268.057
+            declination:64.496
+            rot_period:6.185164679655199E+05
+            mean_color:[0.43,0.43,0.43]
+            albedo:0.43
+            GM:0
+            diffuse:"tex/jupiter/ganymede/diffuse.dds"
+          }
+        }
+        {
+          name:"Callisto"
+          orbit:{
+            parent:"Jupiter"
+            ecc:7.915951832421818E-03
+            sma:1.883707986474027E+06
+            inc:2.544080008112594E+01
+            lan:3.585022564563481E+02
+            arg:3.207358352359100E+02
+            m0:1.746684338679254E+01
+          }
+          body:{
+            radius:2410.3
+            right_ascension:268.057
+            declination:64.496
+            rot_period:1.443187314612591E+06
+            mean_color:[0.19,0.15,0.13]
+            albedo:0.22
+            GM:0
+            diffuse:"tex/jupiter/callisto/diffuse.dds"
+          }
+        }
   {
     name:"Saturn"
     orbit:{
@@ -223,6 +311,161 @@ planets: [
       color:[0.6,0.6,0.6,1.0]
     }
   }
+        {
+          name:"Mimas"
+          orbit:{
+            parent:"Saturn"
+            ecc:1.701972396898549E-02
+            sma:1.860048638484224E+05
+            inc:7.416466561085095E+00
+            lan:1.397616069234242E+02
+            arg:2.189829713751684E+02
+            m0:1.580419674888895E+02
+          }
+          body:{
+            radius:198.2
+            right_ascension:40.589
+            declination:83.537
+            rot_period:8.184044290751277E+04
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.962
+            GM:0
+            diffuse:"tex/saturn/mimas/diffuse.dds"
+          }
+        }
+        {
+          name:"Enceladus"
+          orbit:{
+            parent:"Saturn"
+            ecc:6.284449319944454E-03
+            sma:2.384135086556571E+05
+            inc:6.681508985862626E+00
+            lan:1.284243605608760E+02
+            arg:1.206667850345486E+02
+            m0:1.624696892694979E+00
+          }
+          body:{
+            radius:252.3
+            right_ascension:40.589
+            declination:83.537
+            rot_period:1.187620763017552E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:1.04
+            GM:0
+            diffuse:"tex/saturn/enceladus/diffuse.dds"
+          }
+        }
+        {
+          name:"Tethys"
+          orbit:{
+            parent:"Saturn"
+            ecc:1.110132806220525E-03
+            sma:2.949738686565405E+05
+            inc:6.845182380086431E+00
+            lan:1.192493737822902E+02
+            arg:2.294527951721610E+02
+            m0:3.508809921332671E+02
+          }
+          body:{
+            radius:536.3
+            right_ascension:40.589
+            declination:83.537
+            rot_period:1.634393455060252E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.80
+            GM:0
+            diffuse:"tex/saturn/tethys/diffuse.dds"
+          }
+        }
+        {
+          name:"Dione"
+          orbit:{
+            parent:"Saturn"
+            ecc:1.674193006331477E-03
+            sma:3.776488638773022E+05
+            inc:6.693915042161477E+00
+            lan:1.285605581002196E+02
+            arg:1.199876315474379E+02
+            m0:1.816737195460367E+02
+          }
+          body:{
+            radius:562.5
+            right_ascension:40.589
+            declination:83.537
+            rot_period:2.367627575044749E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.6
+            GM:0
+            diffuse:"tex/saturn/dione/diffuse.dds"
+          }
+        }
+        {
+          name:"Rhea"
+          orbit:{
+            parent:"Saturn"
+            ecc:1.159918759589484E-03
+            sma:5.272135584895514E+05
+            inc:6.431733681903300E+00
+            lan:1.303670843134903E+02
+            arg:1.745198585029166E+02
+            m0:1.780276607348527E+01
+          }
+          body:{
+            radius:764.5
+            right_ascension:40.589
+            declination:83.537
+            rot_period:3.905354920207487E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.6
+            GM:0
+            diffuse:"tex/saturn/rhea/diffuse.dds"
+          }
+        }
+        {
+          name:"Titan"
+          orbit:{
+            parent:"Saturn"
+            ecc:2.891669265126748E-02
+            sma:1.221967399509460E+06
+            inc:6.460486211792352E+00
+            lan:1.264938851001483E+02
+            arg:1.820925510008058E+02
+            m0:7.688513795529327E+01
+          }
+          body:{
+            radius:2575.5
+            right_ascension:40.589
+            declination:83.537
+            rot_period:1.377905939181029E+06
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.2
+            GM:0
+            diffuse:"tex/saturn/titan/diffuse.dds"
+          }
+        }
+        {
+          name:"Iapetus"
+          orbit:{
+            parent:"Saturn"
+            ecc:2.878944802790377E-02
+            sma:3.560243963757803E+06
+            inc:1.458600616073205E+01
+            lan:5.029387515944099E+01
+            arg:3.144223439030465E+02
+            m0:1.398742970525598E+02
+          }
+          body:{
+            radius:734.5
+            right_ascension:40.589
+            declination:83.537
+            rot_period:6.853311665503774E+06
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.6
+            GM:120.51
+            diffuse:"tex/saturn/iapetus/diffuse.dds"
+          }
+        }
+
   {
     name:"Uranus"
     orbit:{
@@ -254,6 +497,117 @@ planets: [
       G_M:-0.85 
     }
   }
+        {
+          name:"Miranda"
+          orbit:{
+            parent:"Uranus"
+            ecc:1.242169026817149E-03
+            sma:1.298778453498981E+05
+            inc:7.858862653423145E+01
+            lan:1.690640495384217E+02
+            arg:3.272308140130071E+02
+            m0:2.720084704039479E+02
+          }
+          body:{
+            radius:234.2
+            right_ascension:257.311
+            declination:-15.175
+            rot_period:1.221785307098922E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.27 
+            GM:0.0
+            diffuse:"tex/uranus/miranda/diffuse.dds"
+          }
+        }
+        {
+          name:"Ariel"
+          orbit:{
+            parent:"Uranus"
+            ecc:1.892787897368917E-03
+            sma:1.909438089730098E+05
+            inc:7.489890545165777E+01
+            lan:1.665671095790165E+02
+            arg:1.702822333935800E+02
+            m0:5.710545668100816E+01
+          }
+          body:{
+            radius:577.9
+            right_ascension:257.311
+            declination:-15.175
+            rot_period:2.177948929193003E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.34 
+            GM:0.0
+            diffuse:"tex/uranus/ariel/diffuse.dds"
+          }
+        }
+        {
+          name:"Umbriel"
+          orbit:{
+            parent:"Uranus"
+            ecc:3.823550472527097E-03
+            sma:2.659947653677312E+05
+            inc:7.499399873120002E+01
+            lan:1.665601072957826E+02
+            arg:2.078013397088959E+02
+            m0:1.208952601259192E+02
+          }
+          body:{
+            radius:584.7
+            right_ascension:257.311
+            declination:-15.175
+            rot_period:3.580955244932137E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.18 
+            GM:0.0
+            diffuse:"tex/uranus/umbriel/diffuse.dds"
+          }
+        }
+        {
+          name:"Titania"
+          orbit:{
+            parent:"Uranus"
+            ecc:2.482088460872848E-03
+            sma:4.362948468107953E+05
+            inc:7.504576678651132E+01
+            lan:1.666555216392402E+02
+            arg:1.657055002799660E+02
+            m0:2.158583676140625E+02
+          }
+          body:{
+            radius:788.9
+            right_ascension:257.311
+            declination:-15.175
+            rot_period:7.522359193044165E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.27
+            GM:0.0
+            diffuse:"tex/uranus/titania/diffuse.dds"
+          }
+        }
+        {
+          name:"Oberon"
+          orbit:{
+            parent:"Uranus"
+            ecc:1.107521635376462E-03
+            sma:5.834306509097135E+05
+            inc:7.493490476336572E+01
+            lan:1.666887328819021E+02
+            arg:2.748707186181900E+02
+            m0:2.681498893387961E+02
+          }
+          body:{
+            radius:761.4
+            right_ascension:257.311
+            declination:-15.175
+            rot_period:7.522359193044165E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.24
+            GM:0.0
+            diffuse:"tex/uranus/oberon/diffuse.dds"
+          }
+        }
+
   {
     name:"Neptune"
     orbit:{
@@ -285,6 +639,72 @@ planets: [
       G_M:-0.85 
     }
   }
+        {
+          name:"Proteus"
+          orbit:{
+            parent:"Neptune"
+            ecc:3.256815101071937E-04
+            sma:1.176733340223366E+05
+            inc:4.761707661975181E+01
+            lan:2.830163790952003E+01
+            arg:7.258203506944203E+01
+            m0:1.393642467258296E+02
+          }
+          body:{
+            radius:761.4
+            right_ascension:299.3
+            declination:42.950
+            rot_period:9.701179388941791E+04
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.06
+            GM:0.0
+            diffuse:"tex/neptune/proteus/diffuse.dds"
+          }
+        }
+        {
+          name:"Triton"
+          orbit:{
+            parent:"Neptune"
+            ecc:1.657660369444283E-05
+            sma:3.547671049689570E+05
+            inc:1.123356828674764E+02
+            lan:1.971953441545549E+02
+            arg:2.273978789611177E+02
+            m0:3.563968558173460E+02
+          }
+          body:{
+            radius:1352.6
+            right_ascension:299.3
+            declination:42.950
+            rot_period:-5.077817809625707E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.7 
+            GM:0.0
+            diffuse:"tex/neptune/triton/diffuse.dds"
+          }
+        }
+        {
+          name:"Nereid"
+          orbit:{
+            parent:"Neptune"
+            ecc:7.480278477439654E-01
+            sma:5.523517034583244E+06
+            inc:2.755028546647822E+01
+            lan:3.534655322357244E+02
+            arg:2.605409220080267E+02
+            m0:3.223310725896737E+02
+          }
+          body:{
+            radius:170
+            right_ascension:299.3
+            declination:42.950
+            rot_period:5.077817809625707E+05
+            mean_color:[0.65,0.47,0.39]
+            albedo:0.2
+            GM:0.0
+            diffuse:"tex/neptune/nereid/diffuse.dds"
+          }
+        }
   {
     name:"Pluto"
     orbit:{
@@ -301,7 +721,7 @@ planets: [
       right_ascension:132.993
       declination:-6.163
       rot_period:551856
-      mean_color:[1.0,0.9,0.9]
+      mean_color:[0.4,0.3,0.3]
       albedo:0.57
       GM:871
       diffuse:"tex/pluto/diffuse.dds"
@@ -332,7 +752,7 @@ planets: [
       right_ascension:132.993
       declination:-6.163
       rot_period:584020
-      mean_color:[0.4,0.4,0.4]
+      mean_color:[0.2,0.2,0.2]
       albedo:0.2
       GM:106
       diffuse:"tex/pluto/charon/diffuse.dds"

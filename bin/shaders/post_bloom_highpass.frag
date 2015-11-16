@@ -3,15 +3,14 @@
 in vec2 pass_uv;
 
 uniform sampler2D tex;
-uniform float exposure;
+uniform float threshold;
 
 out vec4 out_color;
-
-const float gamma = 2.2;
 
 void main(void)
 {
   vec3 color = texture(tex, pass_uv).rgb;
-  color = vec3(1.0) - exp(-color*exposure);
+  vec3 brightness = dot(color, vec3(0.299, 0.587, 0.114));
+  if (brightness > threshold)
   out_color = vec4(color, 1.0);
 }
