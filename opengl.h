@@ -79,8 +79,8 @@ private:
 
 typedef union
 {
-  void (*vec)(GLint location, GLsizei count, GLvoid *value); // glUniform**v function
-  void (*mat)(GLint location, GLsizei count, GLboolean transpose, GLvoid *value); // glUniformMatrix**v function
+  void (*vec)(GLint location, GLsizei count, const GLvoid *value); // glUniform**v function
+  void (*mat)(GLint location, GLsizei count, GLboolean transpose, const GLvoid *value); // glUniformMatrix**v function
 } 
 UniformFunc;
 
