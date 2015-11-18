@@ -198,7 +198,7 @@ void Body::unload()
 
 void Body::update(double epoch)
 {
-  rotation_angle = (2.0*PI*epoch)/rotation_period;
+  rotation_angle = (2.0*PI*epoch)/rotation_period + PI;
   cloud_disp = cloud_disp_rate*epoch;
 }
 

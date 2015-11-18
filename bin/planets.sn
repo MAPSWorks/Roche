@@ -154,6 +154,50 @@ planets: [
     }
   }
   {
+    name:"Vesta"
+    orbit:{
+      parent:"Sun"
+      ecc:9.020691727905571E-02
+      sma:3.533461723904176E+08
+      inc:2.276964445832595E+01
+      lan:1.816712160033746E+01
+      arg:2.364452409126661E+02
+      m0:6.108158394851992E+01
+    }
+    body:{
+      radius:262.7
+      right_ascension:294.18
+      declination:66.764
+      rot_period:19231.2
+      mean_color:[0.5,0.5,0.5]
+      albedo:0.423
+      GM:17.8
+      diffuse:"tex/vesta/diffuse.dds"
+    }
+  }
+  {
+    name:"Ceres"
+    orbit:{
+      parent:"Sun"
+      ecc:7.936346568634500E-02
+      sma:4.137387477045226E+08
+      inc:2.712733970667490E+01
+      lan:2.345017292347652E+01
+      arg:1.291910064227597E+02
+      m0:6.017888601864237E+01
+    }
+    body:{
+      radius:473
+      right_ascension:294.18
+      declination:66.764
+      rot_period:32667.012
+      mean_color:[0.5,0.5,0.5]
+      albedo:0.090
+      GM:63.2
+      diffuse:"tex/ceres/diffuse.dds"
+    }
+  }
+  {
     name:"Jupiter"
     orbit:{
       parent:"Sun"
@@ -441,6 +485,15 @@ planets: [
             albedo:0.2
             GM:0
             diffuse:"tex/saturn/titan/diffuse.dds"
+          }
+          atmosphere:{
+            max_altitude:500
+            scale_height:40
+            K_R:0.5
+            K_M:0.000
+            E:12
+            C_R:[1.0,0.9,0.6]
+            G_M:-0.85
           }
         }
         {
