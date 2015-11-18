@@ -96,10 +96,14 @@ private:
   void loadPlanetFiles();
   void loadSettingsFile();
 
+  glm::mat4 computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer);
+  void computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat);
+  void renderPlanet(Planet &p);
+
   std::deque<Planet> planets; // Main planet collection
   Planet *focused_planet; // Planet the view follows
   int focused_planet_id;
-  double epoch; // Seconds since January 1st 2015 00:00
+  double epoch; // Seconds since January 1st 1950 00:00
   int time_warp_index;
   std::vector<double> time_warp_values;
 
@@ -117,12 +121,10 @@ private:
 
   unsigned char *screenshot_buffer;
 
-  // RENDERING RELATED STUFF
-  RenderContext rc;
   glm::vec3 light_position;
   Renderable skybox_obj, planet_obj, atmos_obj, ring_obj, flare_obj; // meshes
   Texture flare_tex;
-  Shader skybox_shader,
+  Shader skybox_shader,         
     planet_shader, 
     atmos_shader,
     ring_shader,
@@ -131,7 +133,7 @@ private:
     post_default,
     post_hdr;
   Skybox skybox;
-
+  
   // INTERACTION RELATED STUFF
   double pre_mouseposx, pre_mouseposy; // previous cursor position
   glm::vec3 view_speed;
@@ -156,6 +158,8 @@ private:
   bool fullscreen;
 
   float ratio;
+
+  Texture no_night, no_clouds;
 
 };
 

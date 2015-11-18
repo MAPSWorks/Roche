@@ -130,7 +130,7 @@ bool Input::isHeld(int key)
 
 concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
-Game::Game() : rc(planet_shader, atmos_shader, sun_shader, ring_shader, planet_obj, atmos_obj, ring_obj), input(&win)
+Game::Game() : input(&win)
 {
   sensitivity = 0.0004;
   light_position = glm::vec3(0,0,0);
@@ -305,6 +305,13 @@ void Game::init()
   glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
   glClampColor(GL_CLAMP_VERTEX_COLOR, GL_FALSE);
   glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
+
+  no_night.create();
+  no_clouds.create();
+  unsigned char *black = new unsigned char[4]{0,0,0,255};
+  unsigned char *trans = new unsigned char[4]{255,255,255,0};
+  TexMipmapData(false, no_night, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, black).updateTexture();
+  TexMipmapData(false, no_clouds, 0, GL_RGBA, 1,1,GL_UNSIGNED_BYTE, trans).updateTexture();
 
   generateModels();
   loadShaders();
@@ -573,74 +580,21 @@ void Game::render()
   glm::mat4 proj_mat = camera.getProjMat();
   glm::mat4 view_mat = camera.getViewMat();
 
-  std::vector<Planet*> flares; // Planets to be rendered as flares (too far away)
-  std::vector<Planet*> meshes; // Planets to be rendered as their whole mesh
+  std::vector<Planet*> renderablePlanets; // Planets to be rendered as flares (too far away)
 
   // Planet sorting between flares and close meshes
   for (Planet &p : planets)
   {
-    glm::vec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
-    float len_dist = glm::length(dist);
-    if (len_dist >= MIN_FLARE_DIST*p.getBody().radius)
-    {
-      flares.push_back(&p);
-    }
-    if (len_dist <= MAX_PLANET_DIST*p.getBody().radius)
-    {
-      meshes.push_back(&p);
-      p.load();
-    } 
-    else
-    {
-      p.unload();
-    }
+    if ((proj_mat*view_mat*glm::vec4(p.getPosition() - camera.getCenter(), 1.0)).z > 0)
+      renderablePlanets.push_back(&p);
   }
   
   skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
-  flare_shader.use();
-  flare_shader.uniform("ratio", ratio);
-  flare_shader.uniform("tex", 0);
-  flare_tex.use(0);
-  int width,height;
-  glfwGetWindowSize(win, &width, &height);
-  float pixelsize = 1.0/(float)height;
-  std::sort(flares.begin(),flares.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
-  for (Planet *flare : flares)
+  
+  std::sort(renderablePlanets.begin(),renderablePlanets.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
+  for (Planet *p : renderablePlanets)
   {
-    glm::vec4 posOnScreen = proj_mat*view_mat*glm::vec4(flare->getPosition() - camera.getCenter(), 1.0);
-    if (posOnScreen.z > 0)
-    {
-      float radius = flare->getBody().radius;
-      float albedo = flare->getBody().albedo;
-      glm::dvec3 dist = flare->getPosition() - camera.getCenter() - camera.getPosition();
-      float fdist = glm::length(dist);
-      float visual_angle = glm::degrees((float)atan(radius/fdist));
-      float max_size = std::min(4.0,((std::max(1.0,(fdist/(MIN_FLARE_DIST*radius)))-1.0)*albedo*radius*0.0000000001)+1.0)*pixelsize*2.0;
-      float size_on_screen = std::max(max_size,(visual_angle)/camera.getFovy());
-      float alpha = (glm::length(dist) - MIN_FLARE_DIST*radius) / (MAX_PLANET_DIST*radius - MIN_FLARE_DIST*radius);
-      glm::vec3 color = (2.0+albedo)*flare->getBody().mean_color * ((flare->getBody().is_star)?1:(
-        glm::dot(
-          glm::normalize(dist), 
-          glm::normalize(flare->getPosition()))*0.5+0.5));
-      flare_shader.uniform("size", size_on_screen);
-      flare_shader.uniform("color", glm::value_ptr(glm::vec4(color,std::min(1.0f,alpha))));
-
-      glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
-      flare_shader.uniform("pos", glm::value_ptr(pOS));
-      flare_obj.render();
-    }
-  }
-
-  rc.proj_mat = proj_mat;
-  rc.view_mat = view_mat;
-  rc.view_pos = camera.getPosition();
-  rc.light_pos = light_position;
-  rc.view_center = camera.getCenter();
-
-  std::sort(meshes.begin(),meshes.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
-  for (Planet *mesh : meshes)
-  {
-    mesh->render(rc);
+    renderPlanet(*p);
   }
 
   post_processing.render();
@@ -651,4 +605,208 @@ void Game::render()
 bool Game::isRunning()
 {
   return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
+}
+
+glm::mat4 Game::computeLightMatrix(const glm::vec3 &light_dir,const glm::vec3 &light_up, float planet_size, float ring_outer)
+{
+  glm::mat4 light_mat;
+  glm::vec3 nlight_up = glm::normalize(light_up);
+  glm::vec3 nlight_dir = - glm::normalize(light_dir);
+  glm::vec3 light_right = glm::normalize(glm::cross(nlight_dir, nlight_up));
+  nlight_dir *= ring_outer;
+  nlight_up = glm::normalize(glm::cross(nlight_dir, light_right)) * planet_size;
+  light_right *= planet_size;
+  int i;
+  for (i=0;i<3;++i)
+  {
+    light_mat[i][0] = light_right[i];
+    light_mat[i][1] = nlight_up[i];
+    light_mat[i][2] = -nlight_dir[i];
+  }
+  return light_mat;
+}
+
+void Game::computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float size, glm::mat4 &near_mat, glm::mat4 &far_mat)
+{
+  glm::mat4 near_mat_temp = glm::mat4(1.0);
+  glm::mat4 far_mat_temp = glm::mat4(1.0);
+  rings_up = glm::normalize(rings_up);
+  toward_view = glm::normalize(toward_view);
+
+  glm::vec3 rings_right = glm::normalize(glm::cross(rings_up, toward_view));
+  glm::vec3 rings_x = glm::normalize(glm::cross(rings_up, rings_right));
+  int i;
+  for (i=0;i<3;++i)
+  {
+    near_mat_temp[0][i] = rings_x[i]*size;
+    near_mat_temp[1][i] = rings_right[i]*size;
+    near_mat_temp[2][i] = rings_up[i]*size;
+    far_mat_temp[0][i] = -rings_x[i]*size;
+    far_mat_temp[1][i] = -rings_right[i]*size;
+    far_mat_temp[2][i] = -rings_up[i]*size;
+  }
+  near_mat *= near_mat_temp;
+  far_mat *= far_mat_temp;
+}
+
+void Game::renderPlanet(Planet &p)
+{
+
+  glm::vec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
+  float len_dist = glm::length(dist);
+  if (len_dist >= MIN_FLARE_DIST*p.getBody().radius)
+  {
+    flare_shader.use();
+    flare_shader.uniform("ratio", ratio);
+    flare_shader.uniform("tex", 0);
+    flare_tex.use(0);
+    int width,height;
+    glfwGetWindowSize(win, &width, &height);
+    float pixelsize = 1.0/(float)height;
+
+    glm::vec4 posOnScreen = camera.getProjMat()*camera.getViewMat()*glm::vec4(p.getPosition() - camera.getCenter(), 1.0);
+    float radius = p.getBody().radius;
+    float albedo = p.getBody().albedo;
+    glm::dvec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
+    float fdist = glm::length(dist);
+    float visual_angle = glm::degrees((float)atan(radius/fdist));
+    float max_size = std::min(4.0,((std::max(1.0,(fdist/(MIN_FLARE_DIST*radius)))-1.0)*albedo*radius*0.0000000001)+1.0)*pixelsize*2.0;
+    float size_on_screen = std::max(max_size,(visual_angle)/camera.getFovy());
+    float alpha = (glm::length(dist) - MIN_FLARE_DIST*radius) / (MAX_PLANET_DIST*radius - MIN_FLARE_DIST*radius);
+    glm::vec3 color = (2.0+albedo)*p.getBody().mean_color * ((p.getBody().is_star)?1:(
+      glm::dot(
+        glm::normalize(dist), 
+        glm::normalize(p.getPosition()))*0.5+0.5));
+    flare_shader.uniform("size", size_on_screen);
+    flare_shader.uniform("color", glm::value_ptr(glm::vec4(color,std::min(1.0f,alpha))));
+
+    glm::vec2 pOS = glm::vec2(posOnScreen/posOnScreen.w);
+    flare_shader.uniform("pos", glm::value_ptr(pOS));
+    flare_obj.render();
+  }
+  if (len_dist <= MAX_PLANET_DIST*p.getBody().radius)
+  {
+    Shader &pshad = p.getBody().is_star?sun_shader:planet_shader;
+
+    // Computing planet matrix
+    glm::vec3 render_pos = p.getPosition()-camera.getCenter();
+
+    // translation
+    glm::mat4 planet_mat = glm::translate(glm::mat4(), render_pos);
+
+    // rotation
+    glm::vec3 NORTH = glm::vec3(0,0,1);
+    glm::quat q = glm::rotate(glm::quat(), (float)acos(glm::dot(NORTH,p.getBody().rotation_axis)), glm::cross(NORTH,p.getBody().rotation_axis));
+    q = glm::rotate(q, p.getBody().rotation_angle, NORTH);
+    planet_mat *= mat4_cast(q);
+    // scale
+    planet_mat = glm::scale(planet_mat, glm::vec3(p.getBody().radius));
+
+    glm::vec3 light_dir = glm::normalize(p.getPosition() - glm::dvec3(light_position));
+    glm::mat4 light_mat = computeLightMatrix(light_dir, glm::vec3(0,0,1), p.getBody().radius, p.getRing().outer);
+
+    glm::mat4 far_ring_mat, near_ring_mat;
+    far_ring_mat = glm::translate(far_ring_mat, render_pos);
+    near_ring_mat = glm::translate(near_ring_mat, render_pos);
+    computeRingMatrix(render_pos - glm::vec3(camera.getPosition()), p.getRing().normal, p.getRing().outer, near_ring_mat, far_ring_mat);
+
+    if (p.getRing().has_rings)
+    {
+      // FAR RING RENDER
+      ring_shader.use();
+      ring_shader.uniform( "projMat", camera.getProjMat());
+      ring_shader.uniform( "viewMat", camera.getViewMat());
+      ring_shader.uniform( "modelMat", far_ring_mat);
+      ring_shader.uniform( "lightMat", light_mat);
+      ring_shader.uniform( "ring_color", p.getRing().color);
+      ring_shader.uniform( "tex", 0);
+      ring_shader.uniform( "minDist", p.getRing().inner/p.getRing().outer);
+      p.getRing().tex.use(0);
+      ring_obj.render();
+    }
+
+    const Atmosphere &atmos = p.getAtmosphere();
+
+    if (atmos.max_height >= 0)
+    { 
+      glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.max_height/p.getBody().radius));
+      atmos_shader.use();
+      atmos_shader.uniform( "projMat", camera.getProjMat());
+      atmos_shader.uniform( "viewMat", camera.getViewMat());
+      atmos_shader.uniform( "modelMat", atmos_mat);
+      atmos_shader.uniform( "view_pos", glm::vec3(camera.getPosition()) - render_pos);
+      atmos_shader.uniform( "light_dir", -light_dir);
+      atmos_shader.uniform( "planet_radius", p.getBody().radius);
+      atmos_shader.uniform( "atmos_height", atmos.max_height);
+      atmos_shader.uniform( "scale_height", atmos.scale_height);
+      atmos_shader.uniform( "K_R", atmos.K_R);
+      atmos_shader.uniform( "K_M", atmos.K_M);
+      atmos_shader.uniform( "E", atmos.E);
+      atmos_shader.uniform( "C_R", atmos.C_R);
+      atmos_shader.uniform( "G_M", atmos.G_M);
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
+      atmos_shader.uniform( "lookup", 4);
+      atmos_obj.render();
+    }
+
+    // PLANET RENDER
+    pshad.use();
+    pshad.uniform( "projMat", camera.getProjMat());
+    pshad.uniform( "viewMat", camera.getViewMat());
+    pshad.uniform( "modelMat", planet_mat);
+    pshad.uniform( "ring_vec", p.getRing().normal);
+    pshad.uniform( "light_dir", light_dir);
+    pshad.uniform( "cloud_disp", p.getBody().cloud_disp);
+    pshad.uniform( "view_pos", camera.getPosition());
+    pshad.uniform( "ring_inner", p.getRing().inner);
+    pshad.uniform( "ring_outer", p.getRing().outer);
+
+    pshad.uniform( "rel_viewpos", glm::vec3(camera.getPosition())-render_pos);
+    pshad.uniform( "planet_radius", p.getBody().radius);
+    pshad.uniform( "atmos_height", atmos.max_height);
+    pshad.uniform( "scale_height", atmos.scale_height);
+    pshad.uniform( "K_R", atmos.K_R);
+    pshad.uniform( "K_M", atmos.K_M);
+    pshad.uniform( "E", atmos.E);
+    pshad.uniform( "C_R", atmos.C_R);
+    pshad.uniform( "G_M", atmos.G_M);
+
+    pshad.uniform( "diffuse_tex", 0);
+    pshad.uniform( "clouds_tex", 1);
+    pshad.uniform( "night_tex", 2);
+    pshad.uniform( "ring_tex", 3);
+    p.getBody().diffuse_tex.use(0);
+    if (p.getBody().has_cloud_tex) p.getBody().cloud_tex.use(1); else no_clouds.use(1);
+    if (p.getBody().has_night_tex) p.getBody().night_tex.use(2); else no_night.use(2);
+    if (p.getRing().has_rings) p.getRing().tex.use(3); else no_clouds.use(3);
+    if (atmos.max_height >= 0)
+    {
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
+      pshad.uniform( "lookup", 4);
+    }
+    planet_obj.render();
+
+    if (p.getRing().has_rings)
+    {
+      // FAR RING RENDER
+      ring_shader.use();
+      ring_shader.uniform( "projMat", camera.getProjMat());
+      ring_shader.uniform( "viewMat", camera.getViewMat());
+      ring_shader.uniform( "modelMat", near_ring_mat);
+      ring_shader.uniform( "lightMat", light_mat);
+      ring_shader.uniform( "ring_color", p.getRing().color);
+      ring_shader.uniform( "tex", 0);
+      ring_shader.uniform( "minDist", p.getRing().inner/p.getRing().outer);
+      p.getRing().tex.use(0);
+      ring_obj.render();
+    }
+    p.load();
+  } 
+  else
+  {
+    p.unload();
+  }
+
 }
