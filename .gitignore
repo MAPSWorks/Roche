@@ -1,3 +1,4 @@
-obj/
 assets/
-screenshots/
+build/
+./roche
+./roche.exe
