@@ -19,63 +19,6 @@
 
 #define PI        3.14159265358979323846264338327950288 
 
-/// Manages the view of the scene
-class Camera
-{
-public:
-	Camera();
-	/// Needed before scene rendering,ratio is the screen w/h ratio
-	void update(float ratio);
-	/// Returns a modifiable reference to the point the view is looking at
-	glm::dvec3 &getCenter();
-	/** Returns a modifiable reference to the the polar coordinates of the view
-	 * around the center point (theta, phi, distance), theta and phi in radians **/
-	glm::vec3 &getPolarPosition();
-	/// Returns the actual position of the camera in cartesian coordinates
-	const glm::dvec3 &getPosition();
-	/// Returns a modifiable reference to the up vector of the view
-	glm::vec3 &getUp();
-	/// Returns the generated projection matrix
-	const glm::mat4 &getProjMat();
-	/// Returns the generated view matrix
-	const glm::mat4 &getViewMat();
-
-	/// Near frustum plane
-	float getNear();
-	void setNear(float near);
-
-	/// Far frustum plane
-	float getFar();
-	void setFar(float far);
-
-	/// Field of view on y axis
-	float getFovy();
-	void setFovy(float fovy);
-
-private:
-	glm::vec3 polarPos;
-	glm::dvec3 pos;
-	glm::dvec3 center;
-	glm::vec3 up;
-	float fovy;
-	float near;
-	float far;
-	glm::mat4 proj_mat;
-	glm::mat4 view_mat;
-
-};
-
-class Input
-{
-public:
-	Input(GLFWwindow **win);
-	bool isPressed(int key);
-	bool isHeld(int key);
-private:
-	GLFWwindow **win;
-	std::bitset<512> pressed;
-};
-
 class Game
 {
 public:
@@ -151,9 +94,15 @@ private:
 	float ssaa_factor;
 	DDSLoader dds_loader;
 
-	Camera camera;
-	Input input;
+	// camera
+	glm::vec3 cameraPolar;
+	glm::dvec3 cameraCenter;
+	glm::dvec3 cameraPos;
+	glm::mat4 projMat;
+	glm::mat4 viewMat;
+
 	GLFWwindow *win;
+	std::bitset<512> keysHeld;
 	int win_w,win_h;
 	bool fullscreen;
 

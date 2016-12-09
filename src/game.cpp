@@ -27,110 +27,14 @@
 
 #include <glm/ext.hpp>
 
-#define MIN_FLARE_DIST  100.0
-#define MAX_PLANET_DIST 200.0
+const int MIN_FLARE_DIST = 100.0;
+const int MAX_PLANET_DIST = 200.0;
 
-Camera::Camera()
-{
-	polarPos = glm::vec3(0.0,0.0,8000);
-	center = glm::dvec3(0,0,0);
-	up = glm::vec3(0,0,1);
-
-	fovy = 50;
-	near = 20;
-	far = MIN_FLARE_DIST;
-}
-
-glm::dvec3 &Camera::getCenter()
-{
-	return center;
-}
-
-glm::vec3 &Camera::getPolarPosition()
-{
-	return polarPos;
-}
-const glm::dvec3 &Camera::getPosition()
-{
-	return pos;
-}
-glm::vec3 &Camera::getUp()
-{
-	return up;
-}
-
-const glm::mat4 &Camera::getProjMat()
-{
-	return proj_mat;
-}
-
-const glm::mat4 &Camera::getViewMat()
-{
-	return view_mat;
-}
-
-void Camera::update(float ratio)
-{
-	proj_mat = glm::infinitePerspective((float)(fovy/180*PI),ratio, 0.01f);
-	pos = glm::dvec3(cos(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[0])*cos(polarPos[1])*polarPos[2], sin(polarPos[1])*polarPos[2]);
-	view_mat = glm::lookAt(glm::vec3(pos), glm::vec3(0,0,0), up);
-}
-
-float Camera::getNear()
-{
-	return near;
-}
-void Camera::setNear(float near)
-{
-	this->near = near;
-}
-
-float Camera::getFar()
-{
-	return far;
-}
-void Camera::setFar(float far)
-{
-	this->far = far;
-}
-
-float Camera::getFovy()
-{
-	return fovy;
-}
-void Camera::setFovy(float fovy)
-{
-	this->fovy = fovy;
-}
-
-Input::Input(GLFWwindow **win)
-{
-	this->win = win;
-}
-bool Input::isPressed(int key)
-{
-	bool key_pressed = glfwGetKey(*win, key);
-	if (key_pressed && !pressed[key])
-	{
-		pressed[key] = true;
-		return true;
-	} 
-	else if (!key_pressed)
-	{
-		pressed[key] = false;
-		return false;
-	}
-	return false;
-}
-
-bool Input::isHeld(int key)
-{
-	return glfwGetKey(*win,key);
-}
+const float CAMERA_FOVY = 40.0;
 
 concurrent_queue<std::pair<std::string,Texture*>> Game::textures_to_load;
 
-Game::Game() : input(&win)
+Game::Game()
 {
 	sensitivity = 0.0004;
 	light_position = glm::vec3(0,0,0);
@@ -149,6 +53,9 @@ Game::Game() : input(&win)
 	focused_planet_id = 0;
 	epoch = 0.0;
 	quit = false;
+
+	cameraPolar = glm::vec3(0.0,0.0,8000.0);
+	cameraCenter = glm::vec3(0.0,0.0,0.0);
 }
 
 Game::~Game()
@@ -319,7 +226,7 @@ void Game::init()
 	loadPlanetFiles();
 	glfwGetCursorPos(win, &pre_mouseposx, &pre_mouseposy);
 	ratio = width/(float)height;
-	camera.getPolarPosition().z = focused_planet->getBody().radius*4;
+	cameraPolar.z = focused_planet->getBody().radius*4;
 	post_processing.create(win, ssaa_factor);
 	post_processing.addShader(new HDRAction(post_hdr));
 	post_processing.addShader(new PostProcessingAction(post_default));
@@ -441,6 +348,19 @@ private:
 	glm::dvec3 view_pos;
 };
 
+bool Game::isPressedOnce(int key)
+{
+	if (glfwGetKey(win, key))
+	{
+		if (keysHeld[key]) return false;
+		else return (keysHeld[key] = true);
+	}
+	else
+	{
+		return (keysHeld[key] = false);
+	}
+}
+
 void Game::update(double dt)
 {
 	for (Planet &p: planets)
@@ -452,30 +372,30 @@ void Game::update(double dt)
 		p.update(epoch);
 	}
 
-	if (input.isPressed(GLFW_KEY_K))
+	if (isPressedOnce(GLFW_KEY_K))
 	{
 		if (time_warp_index > 0) time_warp_index--;
 	}
-	if (input.isPressed(GLFW_KEY_L))
+	if (isPressedOnce(GLFW_KEY_L))
 	{
 		if (time_warp_index < (int)time_warp_values.size()-1) time_warp_index++;
 	}
 
 	epoch += time_warp_values[time_warp_index]*dt;
 
-	if (input.isPressed(GLFW_KEY_TAB))
+	if (isPressedOnce(GLFW_KEY_TAB))
 	{
 		if (is_switching)
 		{
 			is_switching = false;
-			camera.getPolarPosition().z = focused_planet->getBody().radius*4;
+			cameraPolar.z = focused_planet->getBody().radius*4;
 		}
 		else
 		{
 			switch_previous_planet = focused_planet;
 			focused_planet_id = (focused_planet_id+1)%planets.size();
 			focused_planet = &planets[focused_planet_id];
-			switch_previous_dist = camera.getPolarPosition().z;
+			switch_previous_dist = cameraPolar.z;
 			is_switching = true;
 		} 
 	}
@@ -486,7 +406,7 @@ void Game::update(double dt)
 	move.x = -posX+pre_mouseposx;
 	move.y = posY-pre_mouseposy;
 
-	camera.getCenter() = glm::vec3(0,0,0);
+	cameraCenter = glm::vec3(0,0,0);
 
 	if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
 	{
@@ -503,29 +423,29 @@ void Game::update(double dt)
 		view_speed.z += (move.y*sensitivity);
 	}
 
-	camera.getPolarPosition().x += view_speed.x;
-	camera.getPolarPosition().y += view_speed.y;
-	camera.getPolarPosition().z *= 1.0+view_speed.z;
+	cameraPolar.x += view_speed.x;
+	cameraPolar.y += view_speed.y;
+	cameraPolar.z *= 1.0+view_speed.z;
 
 	view_speed *= view_smoothness;
 
-	if (camera.getPolarPosition().y > PI/2 - 0.001)
+	if (cameraPolar.y > PI/2 - 0.001)
 	{
-		camera.getPolarPosition().y = PI/2 - 0.001;
+		cameraPolar.y = PI/2 - 0.001;
 		view_speed.y = 0;
 	}
-	if (camera.getPolarPosition().y < -PI/2 + 0.001)
+	if (cameraPolar.y < -PI/2 + 0.001)
 	{
-		camera.getPolarPosition().y = -PI/2 + 0.001;
+		cameraPolar.y = -PI/2 + 0.001;
 		view_speed.y = 0;
 	}
 	float radius = focused_planet->getBody().radius;
-	if (camera.getPolarPosition().z < radius) camera.getPolarPosition().z = radius;
+	if (cameraPolar.z < radius) cameraPolar.z = radius;
 
 	pre_mouseposx = posX;
 	pre_mouseposy = posY;
 
-	if (input.isPressed(GLFW_KEY_F12) && !save)
+	if (isPressedOnce(GLFW_KEY_F12) && !save)
 	{
 		int width,height;
 		glfwGetWindowSize(win, &width, &height);
@@ -562,36 +482,36 @@ void Game::render()
 	{
 		float t = switch_frame_current/(float)switch_frames;
 		double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
-		camera.getCenter() = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
+		cameraCenter = (focused_planet->getPosition() - switch_previous_planet->getPosition())*f + switch_previous_planet->getPosition();
 		float target_dist = focused_planet->getBody().radius*4;
-		camera.getPolarPosition().z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
+		cameraPolar.z = (target_dist - switch_previous_dist)*f + switch_previous_dist;
 
 		++switch_frame_current;
 	}
 	else
 	{
-		camera.getCenter() = focused_planet->getPosition();
+		cameraCenter = focused_planet->getPosition();
 	}
 
 	post_processing.bind();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
-	camera.update(ratio);
-	glm::mat4 proj_mat = camera.getProjMat();
-	glm::mat4 view_mat = camera.getViewMat();
+	cameraPos = glm::dvec3(cos(cameraPolar[0])*cos(cameraPolar[1])*cameraPolar[2], sin(cameraPolar[0])*cos(cameraPolar[1])*cameraPolar[2], sin(cameraPolar[1])*cameraPolar[2]);
+	projMat = glm::infinitePerspective((float)(CAMERA_FOVY/180*PI),ratio, 0.01f);
+	viewMat = glm::lookAt(glm::vec3(cameraPos), glm::vec3(0,0,0), glm::vec3(0,0,1));
 
 	std::vector<Planet*> renderablePlanets; // Planets to be rendered as flares (too far away)
 
 	// Planet sorting between flares and close meshes
 	for (Planet &p : planets)
 	{
-		if ((proj_mat*view_mat*glm::vec4(p.getPosition() - camera.getCenter(), 1.0)).z > 0)
+		if ((projMat*viewMat*glm::vec4(p.getPosition() - cameraCenter, 1.0)).z > 0)
 			renderablePlanets.push_back(&p);
 	}
 	
-	skybox.render(proj_mat, view_mat, skybox_shader, skybox_obj);
+	skybox.render(projMat, viewMat, skybox_shader, skybox_obj);
 	
-	std::sort(renderablePlanets.begin(),renderablePlanets.end(), PlanetCompareByDist(camera.getPosition()+camera.getCenter()));
+	std::sort(renderablePlanets.begin(),renderablePlanets.end(), PlanetCompareByDist(cameraPos+cameraCenter));
 	for (Planet *p : renderablePlanets)
 	{
 		renderPlanet(*p);
@@ -651,8 +571,7 @@ void Game::computeRingMatrix(glm::vec3 toward_view, glm::vec3 rings_up, float si
 
 void Game::renderPlanet(Planet &p)
 {
-
-	glm::vec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
+	glm::vec3 dist = p.getPosition() - cameraCenter - cameraPos;
 	float len_dist = glm::length(dist);
 	if (len_dist >= MIN_FLARE_DIST*p.getBody().radius)
 	{
@@ -664,14 +583,14 @@ void Game::renderPlanet(Planet &p)
 		glfwGetWindowSize(win, &width, &height);
 		float pixelsize = 1.0/(float)height;
 
-		glm::vec4 posOnScreen = camera.getProjMat()*camera.getViewMat()*glm::vec4(p.getPosition() - camera.getCenter(), 1.0);
+		glm::vec4 posOnScreen = projMat*viewMat*glm::vec4(p.getPosition() - cameraCenter, 1.0);
 		float radius = p.getBody().radius;
 		float albedo = p.getBody().albedo;
-		glm::dvec3 dist = p.getPosition() - camera.getCenter() - camera.getPosition();
+		glm::dvec3 dist = p.getPosition() - cameraCenter - cameraPos;
 		float fdist = glm::length(dist);
 		float visual_angle = glm::degrees((float)atan(radius/fdist));
-		float max_size = std::min(4.0,((std::max(1.0,(fdist/(MIN_FLARE_DIST*radius)))-1.0)*albedo*radius*0.0000000001)+1.0)*pixelsize*2.0;
-		float size_on_screen = std::max(max_size,(visual_angle)/camera.getFovy());
+		float max_size = std::min(4.0,((std::max(1.f,(fdist/(MIN_FLARE_DIST*radius)))-1.0)*albedo*radius*0.0000000001)+1.0)*pixelsize*2.0;
+		float size_on_screen = std::max(max_size,(visual_angle)/CAMERA_FOVY);
 		float alpha = (glm::length(dist) - MIN_FLARE_DIST*radius) / (MAX_PLANET_DIST*radius - MIN_FLARE_DIST*radius);
 		glm::vec3 color = (2.0+albedo)*p.getBody().mean_color * ((p.getBody().is_star)?1:(
 			glm::dot(
@@ -689,7 +608,7 @@ void Game::renderPlanet(Planet &p)
 		Shader &pshad = p.getBody().is_star?sun_shader:planet_shader;
 
 		// Computing planet matrix
-		glm::vec3 render_pos = p.getPosition()-camera.getCenter();
+		glm::vec3 render_pos = p.getPosition()-cameraCenter;
 
 		// translation
 		glm::mat4 planet_mat = glm::translate(glm::mat4(), render_pos);
@@ -708,14 +627,14 @@ void Game::renderPlanet(Planet &p)
 		glm::mat4 far_ring_mat, near_ring_mat;
 		far_ring_mat = glm::translate(far_ring_mat, render_pos);
 		near_ring_mat = glm::translate(near_ring_mat, render_pos);
-		computeRingMatrix(render_pos - glm::vec3(camera.getPosition()), p.getRing().normal, p.getRing().outer, near_ring_mat, far_ring_mat);
+		computeRingMatrix(render_pos - glm::vec3(cameraPos), p.getRing().normal, p.getRing().outer, near_ring_mat, far_ring_mat);
 
 		if (p.getRing().has_rings)
 		{
 			// FAR RING RENDER
 			ring_shader.use();
-			ring_shader.uniform( "projMat", camera.getProjMat());
-			ring_shader.uniform( "viewMat", camera.getViewMat());
+			ring_shader.uniform( "projMat", projMat);
+			ring_shader.uniform( "viewMat", viewMat);
 			ring_shader.uniform( "modelMat", far_ring_mat);
 			ring_shader.uniform( "lightMat", light_mat);
 			ring_shader.uniform( "ring_color", p.getRing().color);
@@ -731,10 +650,10 @@ void Game::renderPlanet(Planet &p)
 		{ 
 			glm::mat4 atmos_mat = glm::scale(planet_mat, glm::vec3(1.0+atmos.max_height/p.getBody().radius));
 			atmos_shader.use();
-			atmos_shader.uniform( "projMat", camera.getProjMat());
-			atmos_shader.uniform( "viewMat", camera.getViewMat());
+			atmos_shader.uniform( "projMat", projMat);
+			atmos_shader.uniform( "viewMat", viewMat);
 			atmos_shader.uniform( "modelMat", atmos_mat);
-			atmos_shader.uniform( "view_pos", glm::vec3(camera.getPosition()) - render_pos);
+			atmos_shader.uniform( "view_pos", glm::vec3(cameraPos) - render_pos);
 			atmos_shader.uniform( "light_dir", -light_dir);
 			atmos_shader.uniform( "planet_radius", p.getBody().radius);
 			atmos_shader.uniform( "atmos_height", atmos.max_height);
@@ -752,17 +671,17 @@ void Game::renderPlanet(Planet &p)
 
 		// PLANET RENDER
 		pshad.use();
-		pshad.uniform( "projMat", camera.getProjMat());
-		pshad.uniform( "viewMat", camera.getViewMat());
+		pshad.uniform( "projMat", projMat);
+		pshad.uniform( "viewMat", viewMat);
 		pshad.uniform( "modelMat", planet_mat);
 		pshad.uniform( "ring_vec", p.getRing().normal);
 		pshad.uniform( "light_dir", light_dir);
 		pshad.uniform( "cloud_disp", p.getBody().cloud_disp);
-		pshad.uniform( "view_pos", camera.getPosition());
+		pshad.uniform( "view_pos", cameraPos);
 		pshad.uniform( "ring_inner", p.getRing().inner);
 		pshad.uniform( "ring_outer", p.getRing().outer);
 
-		pshad.uniform( "rel_viewpos", glm::vec3(camera.getPosition())-render_pos);
+		pshad.uniform( "rel_viewpos", glm::vec3(cameraPos)-render_pos);
 		pshad.uniform( "planet_radius", p.getBody().radius);
 		pshad.uniform( "atmos_height", atmos.max_height);
 		pshad.uniform( "scale_height", atmos.scale_height);
@@ -792,8 +711,8 @@ void Game::renderPlanet(Planet &p)
 		{
 			// FAR RING RENDER
 			ring_shader.use();
-			ring_shader.uniform( "projMat", camera.getProjMat());
-			ring_shader.uniform( "viewMat", camera.getViewMat());
+			ring_shader.uniform( "projMat", projMat);
+			ring_shader.uniform( "viewMat", viewMat);
 			ring_shader.uniform( "modelMat", near_ring_mat);
 			ring_shader.uniform( "lightMat", light_mat);
 			ring_shader.uniform( "ring_color", p.getRing().color);
