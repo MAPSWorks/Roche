@@ -17,6 +17,6 @@ void main(void)
 	vec3 normal = normalize(in_position.xyz);
 	pass_normal = normalize(mat3(modelMat)*normal);
 	pass_position = modelMat*in_position;
-    pass_lpos = mat3(modelMat)*in_position.xyz;
+	pass_lpos = mat3(modelMat)*in_position.xyz;
 	gl_Position = projMat*viewMat*pass_position;
 }

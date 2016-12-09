@@ -11,7 +11,7 @@ const float gamma = 2.2;
 
 void main(void)
 {
-  vec3 color = texture(tex, pass_uv).rgb;
-  color = vec3(1.0) - exp(-color*exposure);
-  out_color = vec4(color, 1.0);
+	vec3 color = texture(tex, pass_uv).rgb;
+	color = vec3(1.0) - exp(-color*exposure);
+	out_color = vec4(color, 1.0);
 }

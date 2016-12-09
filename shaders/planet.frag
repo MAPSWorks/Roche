@@ -55,75 +55,75 @@ uniform float G_M; // Mie g constant
 
 float ray_sphere_far(vec3 ori, vec3 ray, float radius)
 {
-  float b = dot(ori, ray);
-  float c = dot(ori,ori) - radius*radius;
-  return -b+sqrt(b*b-c);
+	float b = dot(ori, ray);
+	float c = dot(ori,ori) - radius*radius;
+	return -b+sqrt(b*b-c);
 }
 
 float ray_sphere_near(vec3 ori, vec3 ray, float radius)
 {
-  float b = dot(ori, ray);
-  float c = dot(ori,ori) - radius*radius;
-  return -b-sqrt(b*b-c);
+	float b = dot(ori, ray);
+	float c = dot(ori,ori) - radius*radius;
+	return -b-sqrt(b*b-c);
 }
 
 float rayleigh(float cc)
 {
-  return 0.75 * (1.0 + cc);
+	return 0.75 * (1.0 + cc);
 }
 
 float mie(float g, float c, float cc)
 {
-  float gg = g*g;
-  float a = (1.0-gg)*(1.0+cc);
-  float b = 1.0 + gg - 2.0*g*c;
-  b*= sqrt(b);
-  b*= 2.0+gg;
+	float gg = g*g;
+	float a = (1.0-gg)*(1.0+cc);
+	float b = 1.0 + gg - 2.0*g*c;
+	b*= sqrt(b);
+	b*= 2.0+gg;
 
-  return 1.5*a/b;
+	return 1.5*a/b;
 }
 
 vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
 {
-  vec3 view_dir = frag_pos-viewer;
-  float far = length(view_dir);
-  view_dir /= far;
+	vec3 view_dir = frag_pos-viewer;
+	float far = length(view_dir);
+	view_dir /= far;
 
-  float near = ray_sphere_near(viewer, view_dir, planet_radius+atmos_height);
+	float near = ray_sphere_near(viewer, view_dir, planet_radius+atmos_height);
 
-  float len = (far-near)/float(IN_SAMPLES);
-  vec3 step = view_dir*len;
+	float len = (far-near)/float(IN_SAMPLES);
+	vec3 step = view_dir*len;
 
-  vec3 p = viewer+view_dir*near;
-  vec3 v = p+step*0.5;
+	vec3 p = viewer+view_dir*near;
+	vec3 v = p+step*0.5;
 
-  vec3 sum = vec3(0.0);
-  for (int i=0;i<IN_SAMPLES;++i)
-  {
-    float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
-    vec3 u = v+light_dir*t;
+	vec3 sum = vec3(0.0);
+	for (int i=0;i<IN_SAMPLES;++i)
+	{
+		float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
+		vec3 u = v+light_dir*t;
 
-    float alt = (length(v)-planet_radius)/atmos_height;
-    vec3 norm_v = normalize(v);
+		float alt = (length(v)-planet_radius)/atmos_height;
+		vec3 norm_v = normalize(v);
 
-    float angle_view = acos(dot(norm_v, -view_dir))/PI;
-    float angle_light = acos(dot(norm_v, light_dir))/PI;
+		float angle_view = acos(dot(norm_v, -view_dir))/PI;
+		float angle_light = acos(dot(norm_v, light_dir))/PI;
 
-    float n = texture(lookup, vec2(alt,angle_view)).g +
-              texture(lookup, vec2(alt,angle_light)).g;
-    float dens = texture(lookup,vec2(alt,0.0)).r;
-    sum += dens * exp(-n*(K_R*C_R+K_M));
-    v += step;
-  }
+		float n = texture(lookup, vec2(alt,angle_view)).g +
+							texture(lookup, vec2(alt,angle_light)).g;
+		float dens = texture(lookup,vec2(alt,0.0)).r;
+		sum += dens * exp(-n*(K_R*C_R+K_M));
+		v += step;
+	}
 
-  sum *= len * SCALE_L;
+	sum *= len * SCALE_L;
 
-  float c = dot(view_dir,-light_dir);
-  float cc = c*c;
+	float c = dot(view_dir,-light_dir);
+	float cc = c*c;
 
-  vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
+	vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
 
-  return color.rgbb;
+	return color.rgbb;
 }
 
 void main(void)
@@ -153,16 +153,16 @@ void main(void)
 		shadow += texture(ring_tex, vec2(tex_offset - offset[i]*ringtex_size,0.0)).r * weight[i];
 	}
 
-  shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
-  color *= mix(shadow,1.0,nightlights);
+	shadow = mix(1.0,shadow*(1-RING_AMBIENT) + RING_AMBIENT,dist > ring_inner && dist < ring_outer && t>=0);
+	color *= mix(shadow,1.0,nightlights);
 
-  // Atmospheric scattering
+	// Atmospheric scattering
 	if (atmos_height >0)
 	{
-    vec3 tlpos = normalize(pass_lpos)*planet_radius;
+		vec3 tlpos = normalize(pass_lpos)*planet_radius;
 		vec4 scat = in_scattering(rel_viewpos, tlpos, -light_dir);
-    color *= 1.0-scat.w;
-    color += scat.xyz;
+		color *= 1.0-scat.w;
+		color += scat.xyz;
 	}
 	out_color = vec4(color,1.0);
 }

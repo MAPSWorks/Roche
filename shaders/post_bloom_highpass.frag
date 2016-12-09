@@ -9,8 +9,8 @@ out vec4 out_color;
 
 void main(void)
 {
-  vec3 color = texture(tex, pass_uv).rgb;
-  vec3 brightness = dot(color, vec3(0.299, 0.587, 0.114));
-  if (brightness > threshold)
-  out_color = vec4(color, 1.0);
+	vec3 color = texture(tex, pass_uv).rgb;
+	vec3 brightness = dot(color, vec3(0.299, 0.587, 0.114));
+	if (brightness > threshold)
+	out_color = vec4(color, 1.0);
 }
