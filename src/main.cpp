@@ -5,13 +5,15 @@
 
 int main(int argc, char **argv)
 {
-
+	// Time
 	const int FRAMERATE_LIMIT = 60;
 	const long FRAMETIME = (long)(1000000000.0/(double)FRAMERATE_LIMIT);
 	std::chrono::nanoseconds FRAMETIME_DUR(FRAMETIME);
 
+	// Game init
 	Game game;
 	game.init();
+
 
 	std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 	std::chrono::duration<double, std::nano> elapsed;
@@ -22,7 +24,6 @@ int main(int argc, char **argv)
 	{
 		start = std::chrono::high_resolution_clock::now();
 		game.update(dt);
-		game.render();
 		end = std::chrono::high_resolution_clock::now();
 		elapsed = end-start;
 		if (elapsed < FRAMETIME_DUR)

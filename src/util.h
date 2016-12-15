@@ -1,25 +1,28 @@
-#ifndef UTIL_H
-#define UTIL_H
+#pragma once
 
 #include <string>
-#include "opengl.h"
-#include "concurrent_queue.h"
+#include <fstream>
+#include <vector>
 
-std::string read_file(const std::string &filename);
+std::string read_file(std::string filename);
 
 class DDSLoader
 {
-private:
-	int max_size;
-
 public:
-	DDSLoader();
-	void setMaxSize(int size);
-	void load(
-		const std::string &filename,
-		Texture &tex,
-		concurrent_queue<TexMipmapData> &tmd);
+	DDSLoader(std::string filename);
+	int getMipmapCount();
+	int getWidth(int mipmapLevel);
+	int getHeight(int mipmapLevel);
+	void getImageData(uint32_t mipmapLevel, 
+		std::vector<uint8_t> &data);
+
+	static void setSkipMipmap(int skipMipmap);
+
+private:
+	std::ifstream in;
+	int mipmapCount;
+	int width;
+	int height;
+
+	static int skipMipmap;
 };
-
-
-#endif

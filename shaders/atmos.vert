@@ -1,15 +1,20 @@
-#version 330
+#version 450
 
-layout(location = 0)in vec4 in_position;
+layout (location = 0) in vec4 inPosition;
 
-uniform mat4 projMat;
-uniform mat4 viewMat;
-uniform mat4 modelMat;
+layout (binding = 0, std140) uniform dynamicUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	mat4 modelMat;
+	vec4 viewPos;
+	vec4 lightDir;
+};
 
-out vec3 pass_position;
+layout (location = 0) out vec4 passNormal;
 
 void main(void)
 {
-	pass_position = mat3(modelMat)*in_position.xyz;
-	gl_Position = projMat*viewMat*modelMat*in_position;
+	passNormal = modelMat*vec4(inPosition.xyz, 0.0);
+	gl_Position = projMat*viewMat*modelMat*inPosition;
 }

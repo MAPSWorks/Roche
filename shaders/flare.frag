@@ -1,12 +1,20 @@
-#version 330
-in vec2 pass_uv;
+#version 450
 
-uniform sampler2D tex;
-uniform vec4 color;
+layout(location = 0) in vec2 passUv;
 
-out vec4 out_color;
+layout(binding = 0, std140) uniform ubo
+{
+	vec4 color;
+	vec2 pos;
+	float size;
+	float ratio;
+};
+
+layout(binding = 1) uniform sampler2D tex;
+
+layout(location = 0) out vec4 outColor;
 
 void main(void)
 {
-	out_color = texture(tex, pass_uv)*color;
+	outColor = texture(tex, passUv)*color;
 }

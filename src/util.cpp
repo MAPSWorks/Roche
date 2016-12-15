@@ -2,11 +2,9 @@
 
 #include <string>
 #include <fstream>
-#include "opengl.h"
-#include <iostream>
 #include <cstring>
 
-std::string read_file(const std::string &filename)
+std::string read_file(std::string filename)
 {
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
 	if (in)
@@ -19,12 +17,11 @@ std::string read_file(const std::string &filename)
 		in.close();
 		return(contents);
 	}
-	std::cout << "Can't open file " << filename << std::endl;
-	exit(-1);
+	throw std::runtime_error("Can't open" + filename);
 	return "";
 }
 
-typedef unsigned int DWORD;
+typedef uint32_t DWORD;
 
 struct DDS_PIXELFORMAT {
 	DWORD dwSize;
@@ -37,7 +34,7 @@ struct DDS_PIXELFORMAT {
 	DWORD dwABitMask;
 };
 
-typedef struct {
+struct DDS_HEADER {
 	DWORD           dwSize;
 	DWORD           dwFlags;
 	DWORD           dwHeight;
@@ -52,103 +49,83 @@ typedef struct {
 	DWORD           dwCaps3;
 	DWORD           dwCaps4;
 	DWORD           dwReserved2;
-} DDS_HEADER;
+};
 
-DDSLoader::DDSLoader()
+int DDSLoader::skipMipmap = 0;
+
+void DDSLoader::setSkipMipmap(int skipMipmap)
 {
-	max_size = 0;
+	DDSLoader::skipMipmap = std::max(0, skipMipmap);
 }
 
-void DDSLoader::setMaxSize(int size)
+DDSLoader::DDSLoader(std::string filename)
 {
-	max_size = size;
-}
-
-void DDSLoader::load(
-	const std::string &filename,
-	Texture &tex,
-	concurrent_queue<TexMipmapData> &tmd)
-{
-	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+	in.open(filename.c_str(), std::ios::in | std::ios::binary);
 	if (!in)
 	{
-		std::cout << "Can't open file " << filename << " : Loading a white texture instead" << std::endl;
-		unsigned char *white;
-		white = new unsigned char[4];
-		white[0] = 255;
-		white[1] = 255;
-		white[2] = 255;
-		white[3] = 255;
-		tmd.push(TexMipmapData(false, tex, 0, GL_RGBA, 1, 1, GL_UNSIGNED_BYTE, white));
-		return;
+		throw std::runtime_error("Can't open file" + filename);
 	}
 
-	// Reads the first 4 bytes and checks the dds file signature
+	// Magic number
 	char buf[4];
-	in.seekg(0,std::ios::beg);
+	in.seekg(0, std::ios::beg);
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
 	{
-		std::cout << filename << " isn't a DDS file" << std::endl;
-		return;
-	} 
+		throw std::runtime_error("Not a DDS file");
+	}
 
-	// Loads the DDS header
+	// DDS header
 	DDS_HEADER header;
-	in.read((char*)&header, 124);
-	// Extracts the DXT format
+	in.read((char*)&header, sizeof(DDS_HEADER));
 	char *fourCC;
 	fourCC = (char*)&(header.ddspf.dwFourCC);
 
-	GLenum pixelFormat; // format used in the glteximage call
-	int bytesPer16Pixels = 16; // number of bytes for each block of pixels (4x4)
-	int mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1; // number of images in the file
-
-	// Selects the proper pixel format and block size
-	if (!strncmp(fourCC, "DXT5", 4))
+	if (strncmp(fourCC, "DXT5", 4))
 	{
-		bytesPer16Pixels = 16;
-		pixelFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+		throw std::runtime_error("Format not supported");
 	}
-	else // only dxt5 is supported yet
-	{
-		std::cout << "DDS format not supported for " << filename << std::endl;
-		return;
-	}
-	// mipmapOffsets[i] is the offset from the beginning of the file where the data of level i is
-	int *mipmapOffsets = new int[mipmapCount];
-	mipmapOffsets[0] = 128; // first level is just after header
-	for (int i=1;i<mipmapCount;++i)
-	{
-		int width = header.dwWidth>>(i-1); // level is half the width & height of the previous one
-		int height = header.dwHeight>>(i-1);
-		if (width <= 0) width = 1;
-		if (height <= 0) height = 1;
-		// offset = previous offset + previous size
-		mipmapOffsets[i] = mipmapOffsets[i-1] + std::max(1,(width+3)/4)*std::max(1,(height+3)/4)*bytesPer16Pixels;
-	}
-	// Iterates through the mipmap levels from the smallest to the largest
-	for (int i=mipmapCount-1;i>=0;--i)
-	{
-		int width = header.dwWidth>>i;
-		int height = header.dwHeight>>i;
 
-		if (max_size > 0 && (width > max_size || height > max_size))
-			break;
-
-		if (width <= 0) width = 1;
-		if (height <= 0) height = 1;
-		int imageSize = std::max(1,(width+3)/4)*std::max(1,(height+3)/4)*bytesPer16Pixels;
-
-		// Reads data from file to buffer
-		char *buffer = new char[imageSize];
-		in.seekg(mipmapOffsets[i], std::ios::beg);
-		in.read(buffer, imageSize);
-
-		// Updates texture
-		tmd.push(TexMipmapData(true, tex, i, pixelFormat, width, height, imageSize, buffer));
-	}
-	delete [] mipmapOffsets;
-	in.close();
+	// Mipmap count check
+	mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
+	width = header.dwWidth;
+	height = header.dwHeight;
 }
 
+int DDSLoader::getMipmapCount()
+{
+	return std::max(1, mipmapCount-skipMipmap);
+}
+
+int DDSLoader::getWidth(int mipmapLevel)
+{
+	return std::max(1, width>>(mipmapLevel+skipMipmap));
+}
+
+int DDSLoader::getHeight(int mipmapLevel)
+{
+	return std::max(1, height>>(mipmapLevel+skipMipmap));
+}
+
+void DDSLoader::getImageData(uint32_t mipmapLevel, std::vector<uint8_t> &data)
+{
+	if (mipmapLevel >= getMipmapCount()) return;
+	else if (mipmapLevel < 0) mipmapLevel = 0;
+
+	// Offset into file to get pixel data
+	size_t offset = 128;
+	for (int i=0;i<mipmapLevel+skipMipmap;++i)
+	{
+		int mipmapWidth  = std::max(1, (int)(width  >>i));
+		int mipmapHeight = std::max(1, (int)(height >>i));
+		offset += std::max(1, (mipmapWidth+3)/4)*std::max(1, (mipmapHeight+3)/4)*16;
+	}
+
+	int mipmapWidth  = getWidth(mipmapLevel);
+	int mipmapHeight = getHeight(mipmapLevel);
+	size_t imageSize = std::max(1, (mipmapWidth+3)/4)*std::max(1, (mipmapHeight+3)/4)*16;
+
+	data.resize(imageSize);
+	in.seekg(offset, std::ios::beg);
+	in.read((char*)data.data(), imageSize);
+}

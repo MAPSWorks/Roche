@@ -1,15 +1,20 @@
 #version 330
-layout(location = 0)in vec4 in_position;
-layout(location = 1)in vec2 in_uv;
 
-uniform vec2 pos;
-uniform float size;
-uniform float ratio;
+layout(location = 0) in vec4 inPosition;
+layout(location = 1) in vec2 inUv;
 
-out vec2 pass_uv;
+layout(binding = 0, std140) uniform ubo
+{
+	vec4 color;
+	vec2 pos;
+	float size;
+	float ratio;
+};
+
+layout(location = 0) out vec2 passUv;
 
 void main(void)
 {
-	pass_uv = in_uv;
-	gl_Position = vec4(pos+in_position.xy*size*vec2(1.0,ratio),0.0,1.0);
+	passUv = inUv;
+	gl_Position = vec4(pos+inPosition.xy*size*vec2(1.0,ratio),0.0,1.0);
 }

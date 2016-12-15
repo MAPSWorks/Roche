@@ -1,10 +1,26 @@
-#version 330
+#version 450
 // PIXEL ATTRIBUTES
-in vec2 pass_uv;
-in vec3 pass_normal;
-in vec4 pass_position;
-in vec3 pass_lpos;
-out vec4 out_color;
+layout (location = 0) in vec2 pass_uv;
+layout (location = 1) in vec3 pass_normal;
+layout (location = 2) in vec4 pass_position;
+layout (location = 3) in vec3 pass_lpos;
+layout (location = 0) out vec4 out_color;
+
+layout (binding = 0, std140) uniform dynamicUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	mat4 modelMat;
+	vec4 viewPos;
+	vec4 lightDir;
+};
+
+layout (binding = 1, std140) uniform staticUBO
+{
+	float cloud_disp;
+	float ring_inner;
+	float ring_outer;
+};
 
 // TEXTURES
 uniform sampler2D diffuse_tex;
@@ -58,13 +74,6 @@ float ray_sphere_far(vec3 ori, vec3 ray, float radius)
 	float b = dot(ori, ray);
 	float c = dot(ori,ori) - radius*radius;
 	return -b+sqrt(b*b-c);
-}
-
-float ray_sphere_near(vec3 ori, vec3 ray, float radius)
-{
-	float b = dot(ori, ray);
-	float c = dot(ori,ori) - radius*radius;
-	return -b-sqrt(b*b-c);
 }
 
 float rayleigh(float cc)

@@ -6,9 +6,12 @@ find_package(OpenGL REQUIRED)
 set(SOURCE
 	game.cpp
 	main.cpp
-	opengl.cpp
+	shader.cpp
 	planet.cpp
 	util.cpp
+	renderer_gl.cpp
+	shader.cpp
+	fence.cpp
 	thirdparty/lodepng.cpp
 	thirdparty/shaun/shaun.cpp
 	thirdparty/shaun/sweeper.cpp)

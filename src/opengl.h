@@ -1,5 +1,4 @@
-#ifndef OPENGL_H
-#define OPENGL_H
+#pragma once
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -161,5 +160,3 @@ public:
 	HDRAction(const Shader &s);
 	void action(GLuint tex, int width, int height, int true_width, int true_height);
 };
-
-#endif

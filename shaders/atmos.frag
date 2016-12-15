@@ -1,49 +1,48 @@
-#version 330
+#version 450
 
-in vec3 pass_position;
+layout (location = 0) in vec4 passNormal;
 
-uniform vec3 view_pos;
-uniform vec3 light_dir;
+layout (binding = 0, std140) uniform dynamicUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	mat4 modelMat;
+	vec4 viewPos;
+	vec4 lightDir;
+};
 
-uniform float planet_radius;
-uniform float atmos_height;
-uniform float scale_height;
+layout (binding = 1, std140) uniform staticUBO
+{
+	vec4 C_R;
+	float E;
+	float K_R;
+	float K_M;
+	float G_M;
+	float planetRadius;
+	float atmosHeight;
+	float scaleHeight;
+};
 
-float SCALE_H = 1.0/scale_height;
-float SCALE_L = 1.0/(atmos_height);
+
+layout (binding = 3) uniform sampler2D lookupTable;
 
 #define OUT_SAMPLES 5
 #define IN_SAMPLES 5
 
 #define PI 3.14159265359
 
-uniform float K_R; // Rayleigh scattering constant
-uniform float K_M; // Mie scattering constant
-uniform float E; // Sunlight intensity
-uniform vec3 C_R; // 1 / sunlight wavelength ^4
-uniform float G_M; // Mie g constant
-
-uniform sampler2D lookup;
-
-out vec4 out_color;
+layout (location = 0) out vec4 outColor;
 
 float getNear(vec3 ray_origin, vec3 ray, float far)
 {
-	return 2*dot(ray,-view_pos) - far;
+	return 2*dot(ray,-viewPos.xyz) - far;
 }
 
-float ray_sphere_far(vec3 ori, vec3 ray, float radius)
+float raySphereFar(vec3 ori, vec3 ray, float radius)
 {
 	float b = dot(ori, ray);
 	float c = dot(ori,ori) - radius*radius;
 	return -b+sqrt(b*b-c);
-}
-
-float ray_sphere_near(vec3 ori, vec3 ray, float radius)
-{
-	float b = dot(ori, ray);
-	float c = dot(ori,ori) - radius*radius;
-	return -b-sqrt(b*b-c);
 }
 
 float rayleigh(float cc)
@@ -62,50 +61,50 @@ float mie(float g, float c, float cc)
 	return 1.5*a/b;
 }
 
-vec4 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir)
+vec4 inScattering(vec3 viewer, vec3 fragPos, vec3 lightDir)
 {
-	vec3 view_dir = frag_pos-viewer;
-	float far = length(view_dir);
-	view_dir /= far;
+	vec3 viewDir = fragPos-viewer;
+	float far = length(viewDir);
+	viewDir /= far;
 
-	float near = getNear(viewer, view_dir, far);
+	float near = getNear(viewer, viewDir, far);
 
 	float len = (far-near)/float(IN_SAMPLES);
-	vec3 step = view_dir*len;
+	vec3 step = viewDir*len;
 
-	vec3 p = viewer+view_dir*near;
+	vec3 p = viewer+viewDir*near;
 	vec3 v = p+step*0.5;
 
-	vec3 sum = vec3(0.0);
+	vec4 sum = vec4(0.0);
 	for (int i=0;i<IN_SAMPLES;++i)
 	{
-		float t = ray_sphere_far(v,light_dir,planet_radius+atmos_height);
-		vec3 u = v+light_dir*t;
+		float t = raySphereFar(v,lightDir.xyz,planetRadius+atmosHeight);
+		vec3 u = v+lightDir.xyz*t;
 
-		float alt = (length(v)-planet_radius)/atmos_height;
+		float alt = (length(v)-planetRadius)/atmosHeight;
 		vec3 norm_v = normalize(v);
 
-		float angle_view = acos(dot(norm_v, -view_dir))/PI;
-		float angle_light = acos(dot(norm_v, light_dir))/PI;
+		float angleView = acos(dot(norm_v, -viewDir))/PI;
+		float angleLight = acos(dot(norm_v, lightDir))/PI;
 
-		float n = texture(lookup, vec2(alt,angle_view)).g +
-							texture(lookup, vec2(alt,angle_light)).g;
-		float dens = texture(lookup,vec2(alt,0.0)).r;
+		float n = texture(lookupTable, vec2(alt,angleView)).g +
+							texture(lookupTable, vec2(alt,angleLight)).g;
+		float dens = texture(lookupTable,vec2(alt,0.0)).r;
 		sum += dens * exp(-n*(K_R*C_R+K_M));
 		v += step;
 	}
 
-	sum *= len * SCALE_L;
+	sum *= len / scaleHeight;
 
-	float c = dot(view_dir,-light_dir);
+	float c = dot(viewDir,-lightDir);
 	float cc = c*c;
 
-	vec3 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
+	vec4 color = sum * (K_R*C_R*rayleigh(cc) + K_M*mie(G_M, c,cc))*E;
 	
-	return color.rgbg;
+	return color;
 }
 
 void main(void)
 {
-	out_color = in_scattering(view_pos,normalize(pass_position)*(planet_radius+atmos_height),light_dir);
+	outColor = inScattering(viewPos.xyz,normalize(passNormal.xyz)*(planetRadius+atmosHeight),lightDir.xyz);
 }

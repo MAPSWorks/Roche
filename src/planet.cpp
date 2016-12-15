@@ -1,13 +1,12 @@
 #include "planet.h"
-#include "game.h"
-#include "opengl.h"
 #include "util.h"
 
 #include <stdlib.h>
 
+#include <random>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <glm/vec3.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -18,487 +17,144 @@
 
 #define PI 3.14159265358979323846264338327950288 
 
-#define SCATTERING_SAMPLES (50)
-
-/// RING GENERATION HELPER FUNCTION
-
-#define RING_ITERATIONS 100
-
-void Ring::generateRings(unsigned char *buffer, int size, int seed)
+void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, int seed)
 {
-	// Starting fill
-	int i,j;
-	const int ref_size = 4096;
-	float *ref_buffer = new float[ref_size];
-	for (i=0;i<ref_size;++i)
-	{
-		ref_buffer[i] = 1.0;
-	}
-	srand(seed);
+	// Create larger buffer for better anti-aliasing
+	const int upscale = 4;
+	std::vector<float> refBuffer(pixelBuffer.size()*upscale, 1.0);
 
-	// gap generation
-	const int max_gapsize = ref_size/20;
-	for (i=0;i<RING_ITERATIONS;++i)
+	// Random init
+	std::mt19937 rng(seed);
+	std::uniform_real_distribution<> dis(0, 1);
+
+	// Populate gaps
+	const int maxGapsize = refBuffer.size()/20;
+	for (int i=0;i<100;++i)
 	{
-		int gapsize = rand()%(max_gapsize);
-		int gap = rand()%(ref_size-gapsize+1);
-		float gap_opacity = rand()%RAND_MAX/(float)RAND_MAX;
-		if (gap_opacity < 0.4) gap_opacity = 0.4;
-		for (j=gap;j<gap+gapsize;++j)
-		{
-			ref_buffer[j] *= gap_opacity;
-		}
+		// multiply generated range by opacity
+		int gapSize = dis(rng)*maxGapsize;
+		int gapOffset = dis(rng)*(refBuffer.size()-gapSize+1);
+		float gapOpacity = std::max((float)dis(rng),0.4f);
+		for (int j=gapOffset;j<gapOffset+gapSize;++j)
+			refBuffer[j] *= gapOpacity;
 	}
+
 	// brightness equalization
-	float mean = 0;
-	for (i=0;i<ref_size;++i)
-	{
-		mean += ref_buffer[i];
-	}
-	mean /= ref_size;
+	float mean = 0.f;
+	for (float v : refBuffer)
+		mean += v;
+	mean /= refBuffer.size();
 	float mul = 1.0/mean;
-	for (i=0;i<ref_size;++i)
+	for (auto &v : refBuffer)
+		v *= mul;
+
+	// fading on edges
+	const int fade = refBuffer.size()/10;
+	for (int i=0;i<fade;++i)
 	{
-		ref_buffer[i] *= mul;
+		refBuffer[refBuffer.size()-i-1] *= i/(float)fade;
+		refBuffer[i] *= i/(float)fade;
 	}
 
-	// fading
-	const int fade = ref_size/10;
-	for (i=0;i<fade;++i)
+	// Downscaling
+	for (int i=0;i<pixelBuffer.size();++i)
 	{
-		ref_buffer[ref_size-i-1] *= i/(float)fade; 
-		ref_buffer[i] *= i/(float)fade;
+		float mean = 0.f;
+		for (int j=i*upscale;j<(i+1)*upscale;++j)
+			mean += refBuffer[j];
+		mean /= upscale;
+		pixelBuffer[i] = (unsigned char)(mean*255);
 	}
-	float scale = ref_size/(float)size;
-	for (i=0;i<size;++i)
+
+}
+
+glm::dvec3 OrbitalParameters::computePosition(double epoch, double parentGM)
+{
+	if (parentGM <= 0)
 	{
-		float mean = 0.0;
-		for (j=i*scale;j<(i+1)*scale;++j)
-		{
-			mean += ref_buffer[j];
-		}
-		mean /= scale;
-		buffer[i] = (unsigned char)(mean*255);
+		return glm::dvec3(0,0,0); // No parent body
 	}
-	free(ref_buffer);
-}
-
-Orbit::Orbit()
-{
-	this->parent =  NULL;
-	this->updated = false;
-	this->parent_body = "";
-	this->position = glm::vec3(0,0,0);
-}
-
-void Orbit::setParameters(const std::string &parent_body, double ecc, double sma, double inc, double lan, double arg, double m0)
-{
-	this->ecc = ecc;
-	this->sma = sma;
-	this->inc = glm::radians(inc);
-	this->lan = glm::radians(lan);
-	this->arg = glm::radians(arg);
-	this->m0 = glm::radians(m0);
-	this->parent_body = parent_body;
-}
-
-void Orbit::computePosition(double epoch)
-{
-	if (!updated)
+	else
 	{
-		if (parent)
-		{
-			double orbital_period = 2*PI*sqrt((sma*sma*sma)/parent->getBody().GM);
-			double mean_motion = 2*PI/orbital_period;
-			double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
-			double En = (ecc<0.8)?meanAnomaly:PI;
-			const int it = 20;
-			for (int i=0;i<it;++i)
-				En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
-			double trueAnomaly = 2*atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
-			double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
-			glm::dvec3 posInPlane = glm::vec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-			glm::dquat q = glm::dquat();
-			q = glm::rotate(q, lan, glm::dvec3(0,0,1));
-			q = glm::rotate(q, inc, glm::dvec3(0,1,0));
-			q = glm::rotate(q, arg, glm::dvec3(0,0,1));
-			position = q*posInPlane;
-
-			parent->getOrbit().computePosition(epoch);
-
-			position += parent->getPosition();
-			updated = true;
-		}
-		else
-		{
-			position = glm::dvec3(0,0,0);
-		}
+		// Mean Anomaly compute
+		double orbital_period = 2*PI*sqrt((sma*sma*sma)/parentGM);
+		double mean_motion = 2*PI/orbital_period;
+		double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
+		// Newton to find eccentric anomaly (En)
+		double En = (ecc<0.8)?meanAnomaly:PI;
+		const int it = 20;
+		for (int i=0;i<it;++i)
+			En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
+		// Eccentric anomaly to True anomaly
+		double trueAnomaly = 2*atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
+		// Distance from parent body
+		double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
+		// Plane changes
+		glm::dvec3 posInPlane = glm::dvec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
+		glm::dquat q = glm::dquat();
+		q = glm::rotate(q, lan, glm::dvec3(0,0,1));
+		q = glm::rotate(q, inc, glm::dvec3(0,1,0));
+		q = glm::rotate(q, arg, glm::dvec3(0,0,1));
+		return q*posInPlane;
 	}
 }
 
-const glm::dvec3 &Orbit::getPosition() const
+float scatDensity(float p, float scaleHeight)
 {
-	return position;
+	return glm::exp(-std::max(0.f, p)/scaleHeight);
 }
 
-void Orbit::setParentFromName(std::deque<Planet> &planets)
+float scatDensity(glm::vec2 p, float radius, float scaleHeight)
 {
-	if (parent_body != "")
-	{
-		for (Planet &it: planets)
-		{
-			if (it.getName() == parent_body)
-			{
-				parent = &it;
-				return;
-			}
-		}
-		std::cout << "Can't find parent body " << parent_body << std::endl;
-	}
+	return scatDensity(glm::length(p) - radius, scaleHeight);
 }
 
-bool Orbit::isUpdated()
+float scatOptic(glm::vec2 a, glm::vec2 b, 
+	float radius, float scaleHeight, float maxHeight, const int samples)
 {
-	return updated;
-}
-
-void Orbit::reset()
-{
-	updated = false;
-}
-
-Body::Body()
-{
-
-}
-
-void Body::load()
-{
-	diffuse_tex.create();
-	Game::loadTexture(diffuse_filename, diffuse_tex);
-	if (has_night_tex) 
-	{
-		night_tex.create();
-		Game::loadTexture(night_filename, night_tex);
-	}
-	if (has_cloud_tex)
-	{
-		cloud_tex.create();
-		Game::loadTexture(cloud_filename, cloud_tex);
-	}
-}
-void Body::unload()
-{
-	diffuse_tex.destroy();
-	if (has_night_tex)
-		night_tex.destroy();
-	if (has_cloud_tex)
-		cloud_tex.destroy();
-}
-
-void Body::update(double epoch)
-{
-	rotation_angle = (2.0*PI*epoch)/rotation_period + PI;
-	cloud_disp = cloud_disp_rate*epoch;
-}
-
-Ring::Ring()
-{
-	has_rings = false;
-}
-
-void Ring::load()
-{
-	if (has_rings)
-	{
-		const int ringsize = 4096;
-		unsigned char *rings = new unsigned char[ringsize];
-		generateRings(rings, ringsize, seed);
-
-		tex.create();
-		TexMipmapData(false, tex, 0, GL_DEPTH_COMPONENT, ringsize, 1, GL_UNSIGNED_BYTE, rings).updateTexture();
-		tex.genMipmaps();
-	}
-}
-void Ring::unload()
-{
-	if (has_rings)
-		tex.destroy();
-}
-
-Atmosphere::Atmosphere()
-{
-	max_height = -100;
-}
-int Planet::SCATTERING_RES = 256;
-
-Planet::Planet()
-{
-	name = "undefined";
-	loaded = false;
-}
-
-const std::string &Planet::getName() const
-{
-	return name;
-}
-
-float Planet::scat_density(const glm::vec2 &p)
-{
-	return scat_density(glm::length(p)-body.radius);
-}
-
-float Planet::scat_density(float p)
-{
-	return glm::exp(-std::max(0.0f,p)/atmos.scale_height);
-}
-
-float Planet::scat_optic(const glm::vec2 &a, const glm::vec2 &b)
-{
-	glm::vec2 step = (b-a)/(float)SCATTERING_SAMPLES;
+	glm::vec2 step = (b-a)/(float)samples;
 	glm::vec2 v = a+step*0.5;
 
-	float sum = 0.0;
-	for (int i=0;i<SCATTERING_SAMPLES;++i)
+	float sum = 0.f;
+	for (int i=0;i<samples;++i)
 	{
-		sum += scat_density(v);
+		sum += scatDensity(v, radius, scaleHeight);
 		v += step;
 	}
-	return sum * glm::length(step) / atmos.max_height;
+	return sum * glm::length(step) / maxHeight;
 }
 
-float Planet::ray_sphere_far(glm::vec2 ori, glm::vec2 ray, float radius)
+float raySphereFar(glm::vec2 origin, glm::vec2 ray, float radius)
 {
-	float b = glm::dot(ori, ray);
-	float c = glm::dot(ori,ori) - radius*radius;
+	float b = glm::dot(origin, ray);
+	float c = glm::dot(origin, origin) - radius*radius;
 	return -b+sqrt(b*b-c);
 }
 
-void Planet::load()
+void AtmosphericParameters::generateLookupTable(std::vector<float> &table, size_t size, float radius)
 {
-	if (!loaded)
+	/*  2 channel lookup table :
+	 *  x-axis for altitude (0.0 for sl, 1.0 for maxHeight)
+	 *  y-axis for cosine of angle of ray /2
+	 *  First channel for air density
+	 *  Second channel for out scattering factor
+	 */
+	table.resize(size*size*2);
+
+	for (int i=0;i<size;++i)
 	{
-		body.load();
-		ring.load();
-		// Atmospheric scattering lookup table creation
-		if (atmos.max_height >= 0)
+		float altitude = (float)i/(float)size * maxHeight;
+		float density = glm::exp(-altitude/scaleHeight);
+		for (int j=0;j<size;++j)
 		{
-			// x-axis : altitude from 0.0 (sea level) to 1.0 (max_height)
-			// y-axis : cosine of angle of ray / 2
-			float *lookup_data = new float[SCATTERING_RES*SCATTERING_RES*4];
-			float inv_scaleheight = 1.0/atmos.scale_height;
-			for (int i=0;i<SCATTERING_RES;++i)
-			{
-				float alt = (float)i / (float)SCATTERING_RES * atmos.max_height;
-				float density = glm::exp(-alt*inv_scaleheight);
-				for (int j=0;j<SCATTERING_RES;++j)
-				{
-					lookup_data[(i+j*SCATTERING_RES)*4+0] = density;
-					float angle = (float)j*PI/(float)SCATTERING_RES;
-					glm::vec2 ray_dir = glm::vec2(sin(angle),cos(angle));
-					glm::vec2 ray_ori = glm::vec2(0, body.radius + alt);
-					float t = ray_sphere_far(ray_ori, ray_dir, body.radius+atmos.max_height);
-					glm::vec2 u = ray_ori + ray_dir*t;
-					lookup_data[(i+j*SCATTERING_RES)*4+1] = scat_optic(ray_ori,u)*(4*3.14159265359);
-				}
-			}
-			glGenTextures(1,&atmos.lookup_table);
-			glBindTexture(GL_TEXTURE_2D, atmos.lookup_table);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCATTERING_RES, SCATTERING_RES, 0, GL_RGBA,GL_FLOAT,lookup_data);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			delete [] lookup_data;
+			const size_t index = (i+j*size)*2;
+			float angle = (float)j*PI/(float)size;
+			glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
+			glm::vec2 rayOri = glm::vec2(0, radius + altitude);
+			float t = raySphereFar(rayOri, rayDir, radius+maxHeight);
+			glm::vec2 u = rayOri + rayDir*t;
+			table[index+0] = density;
+			table[index+1] = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 50)*(4*PI);
 		}
-		loaded = true;
 	}
-}
-
-void Planet::unload()
-{
-	if (loaded)
-	{
-		body.unload();
-		ring.unload();
-		if (atmos.max_height >= 0)
-			glDeleteTextures(1, &atmos.lookup_table);
-		loaded = false;
-	}
-}
-
-void Planet::update(double epoch)
-{
-	orbit.computePosition(epoch);
-	body.update(epoch);
-}
-
-void Planet::setParentBody(std::deque<Planet> &planets)
-{
-	orbit.setParentFromName(planets);
-}
-
-Orbit &Planet::getOrbit()
-{
-	return orbit;
-}
-Body &Planet::getBody()
-{
-	return body;
-}
-Ring &Planet::getRing()
-{
-	return ring;
-}
-Atmosphere &Planet ::getAtmosphere()
-{
-	return atmos;
-}
-
-const glm::dvec3 &Planet::getPosition() const
-{
-	return orbit.getPosition();
-}
-
-template <>
-glm::vec3 Planet::get(shaun::sweeper &swp, glm::vec3 def)
-{
-	glm::vec3 ret;
-	if (swp.is_null())
-		return def;
-	else
-	{
-		for (int i=0;i<3;++i)
-			ret[i] = swp[i].value<shaun::number>();
-		return ret;
-	}
-}
-template <>
-glm::vec4 Planet::get(shaun::sweeper &swp, glm::vec4 def)
-{
-	glm::vec4 ret;
-	if (swp.is_null())
-		return def;
-	else
-	{
-		for (int i=0;i<4;++i)
-			ret[i] = swp[i].value<shaun::number>();
-		return ret;
-	}
-}
-
-template <>
-float Planet::get(shaun::sweeper &swp, float def)
-{
-	if (swp.is_null()) return def; else return swp.value<shaun::number>();
-}
-
-template <>
-double Planet::get(shaun::sweeper &swp, double def)
-{
-	if (swp.is_null()) return def; else return swp.value<shaun::number>();
-}
-
-template <>
-int Planet::get(shaun::sweeper &swp, int def)
-{
-	if (swp.is_null()) return def; else return swp.value<shaun::number>();
-}
-
-template <>
-std::string Planet::get(shaun::sweeper &swp, std::string def)
-{
-	if (swp.is_null()) return def; else return std::string(swp.value<shaun::string>());
-}
-
-template <>
-bool Planet::get(shaun::sweeper &swp, bool def)
-{
-	if (swp.is_null()) return def; else return swp.value<shaun::boolean>();
-}
-
-void Planet::createFromFile(shaun::sweeper &swp1)
-{
-	shaun::sweeper swp(swp1);
-	this->name = get<std::string>(swp("name"), "undefined");
-	auto orbit(swp("orbit"));
-	if (!orbit.is_null())
-	{
-		this->orbit.setParameters(
-			get<std::string>(orbit("parent"), ""),
-			get<double>(orbit("ecc"), 0.0),
-			get<double>(orbit("sma"), 1000.0),
-			get<double>(orbit("inc"), 0.0),
-			get<double>(orbit("lan"), 0.0),
-			get<double>(orbit("arg"), 0.0),
-			get<double>(orbit("m0"), 0.0)
-		);
-	}
-
-	auto phys(swp("body"));
-	if (!phys.is_null())
-	{
-		this->body.radius = get<float>(phys("radius"), 1.0);
-		float r_a = glm::radians(get<float>(phys("right_ascension"), 0.0));
-		float dec = glm::radians(get<float>(phys("declination"), 90.0));
-		this->body.rotation_axis = glm::vec3(-sin(r_a)*cos(dec),cos(r_a)*cos(dec), sin(dec));
-		this->body.rotation_period = get<float>(phys("rot_period"), 10.0);
-		this->body.mean_color = get<glm::vec3>(phys("mean_color"), glm::vec3(1.0));
-		this->body.albedo = get<float>(phys("albedo"), 0.3);
-		this->body.GM = get<double>(phys("GM"), 1000);
-		this->body.is_star = get<bool>(phys("is_star"), false);
-		this->body.diffuse_filename = get<std::string>(phys("diffuse"), "");
-		this->body.night_filename = get<std::string>(phys("night"), "");
-		this->body.cloud_filename = get<std::string>(phys("cloud"), "");
-		this->body.cloud_disp_rate = get<float>(phys("cloud_disp_rate"), 0.0);
-		this->body.has_night_tex = this->body.night_filename!="";
-		this->body.has_cloud_tex = this->body.cloud_filename!="";
-	}
-
-	auto atmos(swp("atmosphere"));
-	if (!atmos.is_null())
-	{
-			this->atmos.max_height = get<float>(atmos("max_altitude"), -100.0);
-			this->atmos.K_R = get<float>(atmos("K_R"),0);
-			this->atmos.K_M = get<float>(atmos("K_M"),0);
-			this->atmos.E = get<float>(atmos("E"),0);
-			this->atmos.C_R = get<glm::vec3>(atmos("C_R"),glm::vec3(0,0,0));
-			this->atmos.G_M = get<float>(atmos("G_M"),-0.75);
-			this->atmos.scale_height = get<float>(atmos("scale_height"), this->atmos.max_height/4);
-	}
-
-	auto ring(swp("ring"));
-	if (!ring.is_null())
-	{
-		this->ring.has_rings = true;
-		this->ring.inner = get<float>(ring("inner"), 2.0);
-		this->ring.outer = get<float>(ring("outer"), 4.0);
-		float r_a = glm::radians(get<float>(ring("right_ascension"), 0.0));
-		float dec = glm::radians(get<float>(ring("declination"), 90.0));
-		this->ring.normal = glm::vec3(-sin(r_a)*cos(dec),cos(r_a)*cos(dec), sin(dec));
-		this->ring.seed = get<int>(ring("seed"), 2.0);
-		this->ring.color = get<glm::vec4>(ring("color"), glm::vec4(0.6,0.6,0.6,1.0));
-	}
-}
-
-void Skybox::load()
-{
-
-}
-
-void Skybox::render(const glm::mat4 &proj_mat,const glm::mat4 &view_mat, Shader &skybox_shader, Renderable &o)
-{
-	glm::quat q = glm::rotate(glm::quat(), rot_angle, rot_axis);
-	glm::mat4 skybox_mat = glm::mat4_cast(q);
-	skybox_mat = glm::scale(skybox_mat, glm::vec3(size));
-	
-	// SKYBOX RENDER
-	skybox_shader.use();
-	skybox_shader.uniform("projMat", proj_mat);
-	skybox_shader.uniform("viewMat", view_mat);
-	skybox_shader.uniform("modelMat", skybox_mat);
-	skybox_shader.uniform("tex", 0);
-	tex.use(0);
-	o.render(); 
 }

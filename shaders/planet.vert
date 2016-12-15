@@ -1,22 +1,35 @@
-#version 330
-layout(location = 0)in vec4 in_position;
-layout(location = 1)in vec2 in_uv;
+#version 450
 
-uniform mat4 projMat;
-uniform mat4 viewMat;
-uniform mat4 modelMat;
+layout(location = 0) in vec4 inPosition;
+layout(location = 1) in vec4 inUv;
 
-out vec2 pass_uv;
-out vec4 pass_position;
-out vec3 pass_normal;
-out vec3 pass_lpos;
+layout (binding = 0, std140) uniform sceneDynamicUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	vec4 viewPos;
+	float invGamma;
+};
+
+layout (binding = 1, std140) uniform planetDynamicUBO
+{
+	mat4 modelMat;
+	vec4 lightDir;
+};
+
+layout (location = 0) out vec4 passUv;
+layout (location = 1) out vec4 passNormal;
+layout (location = 2) out vec4 passPosition;
+layout (location = 3) out vec4 passLpos;
 
 void main(void)
 {
-	pass_uv = in_uv;
-	vec3 normal = normalize(in_position.xyz);
-	pass_normal = normalize(mat3(modelMat)*normal);
-	pass_position = modelMat*in_position;
-	pass_lpos = mat3(modelMat)*in_position.xyz;
-	gl_Position = projMat*viewMat*pass_position;
+	passUv = inUv;
+	passLpos = modelMat*vec4(inPosition.xyz, 0.0);
+	passNormal = normalize(passLpos);
+	passPosition = modelMat*inPosition;
+	gl_Position = projMat*viewMat*passPosition;
+	// Logarithmic depth buffer
+	gl_Position.z = log2(max(1e-6, 1.0+gl_Position.w)) * (2.0/log2(5e8 + 1.0)) - 1.0;
+	gl_Position.z *= gl_Position.w;
 }
