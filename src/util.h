@@ -19,10 +19,12 @@ public:
 	static void setSkipMipmap(int skipMipmap);
 
 private:
-	std::ifstream in;
+	std::string filename;
 	int mipmapCount;
 	int width;
 	int height;
+	std::vector<int> offsets; // Offsets for mipmaps in the file
+	std::vector<int> sizes; // Image sizes
 
 	static int skipMipmap;
 };

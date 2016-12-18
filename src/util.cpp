@@ -58,9 +58,15 @@ void DDSLoader::setSkipMipmap(int skipMipmap)
 	DDSLoader::skipMipmap = std::max(0, skipMipmap);
 }
 
+int getImageSize(int width, int height)
+{
+	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*16;
+}
+
 DDSLoader::DDSLoader(std::string filename)
 {
-	in.open(filename.c_str(), std::ios::in | std::ios::binary);
+	this->filename = filename;
+	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
 	if (!in)
 	{
 		throw std::runtime_error("Can't open file" + filename);
@@ -88,23 +94,41 @@ DDSLoader::DDSLoader(std::string filename)
 
 	// Mipmap count check
 	mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
+
 	width = header.dwWidth;
 	height = header.dwHeight;
+
+	size_t offset = 128;
+	for (int i=0;i<skipMipmap;++i)
+	{
+		offset += getImageSize(getWidth(i), getHeight(i));
+	}
+	for (int i=skipMipmap;i<mipmapCount;++i)
+	{
+		int size = getImageSize(getWidth(i), getHeight(i));
+		offsets.push_back(offset);
+		sizes.push_back(size);
+		offset += size;
+	}
+
+	width = width >> skipMipmap;
+	height = height >> skipMipmap;
+	mipmapCount -= skipMipmap;
 }
 
 int DDSLoader::getMipmapCount()
 {
-	return std::max(1, mipmapCount-skipMipmap);
+	return mipmapCount;
 }
 
 int DDSLoader::getWidth(int mipmapLevel)
 {
-	return std::max(1, width>>(mipmapLevel+skipMipmap));
+	return std::max(1, width>>mipmapLevel);
 }
 
 int DDSLoader::getHeight(int mipmapLevel)
 {
-	return std::max(1, height>>(mipmapLevel+skipMipmap));
+	return std::max(1, height>>mipmapLevel);
 }
 
 void DDSLoader::getImageData(uint32_t mipmapLevel, std::vector<uint8_t> &data)
@@ -112,18 +136,15 @@ void DDSLoader::getImageData(uint32_t mipmapLevel, std::vector<uint8_t> &data)
 	if (mipmapLevel >= getMipmapCount()) return;
 	else if (mipmapLevel < 0) mipmapLevel = 0;
 
-	// Offset into file to get pixel data
-	size_t offset = 128;
-	for (int i=0;i<mipmapLevel+skipMipmap;++i)
+	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+	if (!in)
 	{
-		int mipmapWidth  = std::max(1, (int)(width  >>i));
-		int mipmapHeight = std::max(1, (int)(height >>i));
-		offset += std::max(1, (mipmapWidth+3)/4)*std::max(1, (mipmapHeight+3)/4)*16;
+		throw std::runtime_error("Can't open file" + filename);
 	}
 
-	int mipmapWidth  = getWidth(mipmapLevel);
-	int mipmapHeight = getHeight(mipmapLevel);
-	size_t imageSize = std::max(1, (mipmapWidth+3)/4)*std::max(1, (mipmapHeight+3)/4)*16;
+	// Offset into file to get pixel data
+	int imageSize = sizes[mipmapLevel];
+	int offset = offsets[mipmapLevel];
 
 	data.resize(imageSize);
 	in.seekg(offset, std::ios::beg);
