@@ -338,9 +338,10 @@ void RendererGL::render(
 		glm::vec3 viewUp,
 		std::vector<PlanetState> planetStates)
 {
-	const float closePlanetMaxDistance = 500;
-	const float texLoadDistance = 800;
-	const float texUnloadDistance = 1000;
+	const float closePlanetMinSizePixels = 1;
+	const float closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
+	const float texLoadDistance = closePlanetMaxDistance*1.4;
+	const float texUnloadDistance = closePlanetMaxDistance*1.6;
 
 	// Triple buffer of dynamic UBO
 	uint32_t nextFrameId = (frameId+1)%3;
