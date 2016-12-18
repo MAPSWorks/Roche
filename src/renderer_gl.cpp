@@ -404,12 +404,16 @@ void RendererGL::render(
 		// Planet rotation
 		const glm::vec3 north = glm::vec3(0,0,1);
 		const glm::vec3 rotAxis = planetParams[i].bodyParam.rotationAxis;
-		const glm::quat q =glm::rotate(glm::rotate(glm::quat(), 
-			(float)acos(glm::dot(north, rotAxis)), glm::cross(north, rotAxis)), 
-			planetStates[i].rotationAngle, north);
+		const glm::quat q = glm::rotate(glm::quat(), 
+			(float)acos(glm::dot(north, rotAxis)), 
+			glm::cross(north, rotAxis))*
+			glm::rotate(glm::quat(), planetStates[i].rotationAngle, north);
 
 		// Model matrix
-		const glm::mat4 modelMat = glm::scale(glm::translate(glm::mat4(), planetPos)*glm::mat4_cast(q), glm::vec3(planetParams[i].bodyParam.radius));
+		const glm::mat4 modelMat = 
+			glm::translate(glm::mat4(), planetPos)*
+			glm::mat4_cast(q)*
+			glm::scale(glm::mat4(), glm::vec3(planetParams[i].bodyParam.radius));
 
 		// Light direction
 		const glm::vec3 lightDir = 
