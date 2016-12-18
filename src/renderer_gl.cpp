@@ -330,9 +330,12 @@ void RendererGL::destroy()
 }
 
 void RendererGL::render(
+		int windowWidth,
+		int windowHeight,
 		glm::dvec3 viewPos, 
-		glm::mat4 projMat, 
-		glm::mat4 viewMat,
+		float fovy,
+		glm::dvec3 viewCenter,
+		glm::vec3 viewUp,
 		std::vector<PlanetState> planetStates)
 {
 	const float closePlanetMaxDistance = 500;
@@ -371,6 +374,9 @@ void RendererGL::render(
 		else
 			farPlanets.push_back(i);
 	}
+
+	glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e6);
+	glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
 
 	// Scene uniform update
 	SceneDynamicUBO sceneUBO;

@@ -484,11 +484,11 @@ void Game::update(double dt)
 		sin(cameraPolar.x)*cos(cameraPolar.y), 
 		sin(cameraPolar.y))*(double)cameraPolar.z +
 		cameraCenter;
-
-	glm::mat4 projMat = glm::perspective(glm::radians(CAMERA_FOVY), width/(float)height, 50.f, (float)5e6);
-	glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(cameraCenter-cameraPos), glm::vec3(0.f,0.f,1.f));
-
-	renderer->render(cameraPos, projMat, viewMat, planetStates);
+		
+	renderer->render(
+		width, height, 
+		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), 
+		planetStates);
 
 	glfwSwapBuffers(win);
 	glfwPollEvents();
