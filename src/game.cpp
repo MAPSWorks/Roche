@@ -66,8 +66,8 @@ Game::~Game()
 }
 
 void ssThread(
-	std::atomic<bool> &quit, std::vector<uint8_t> &buffer,
-	std::atomic<bool> &save, int width, int height)
+	const std::atomic<bool> &quit, std::vector<uint8_t> &buffer,
+	std::atomic<bool> &save, const int width, const int height)
 {
 	while (!quit)
 	{
@@ -164,7 +164,7 @@ void Game::init()
 	}
 	glfwMakeContextCurrent(win);
 
-	GLenum err = glewInit();
+	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
 		std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
@@ -307,7 +307,7 @@ void Game::loadPlanetFiles()
 		// Assign planet parents
 		for (uint32_t i=0;i<planetCount;++i)
 		{
-			std::string parent = planetParams[i].parentName;
+			const std::string parent = planetParams[i].parentName;
 			if (parent != "")
 			{
 				for (uint32_t j=0;j<planetCount;++j)
@@ -328,7 +328,7 @@ void Game::loadPlanetFiles()
 	}
 }
 
-bool Game::isPressedOnce(int key)
+bool Game::isPressedOnce(const int key)
 {
 	if (glfwGetKey(win, key))
 	{
@@ -341,7 +341,7 @@ bool Game::isPressedOnce(int key)
 	}
 }
 
-void Game::update(double dt)
+void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
 
@@ -405,11 +405,11 @@ void Game::update(double dt)
 
 	if (isSwitching)
 	{
-		float t = switchFrameCurrent/(float)switchFrames;
-		double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
-		glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].position;
+		const float t = switchFrameCurrent/(float)switchFrames;
+		const double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
+		const glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].position;
 		cameraCenter = (planetStates[focusedPlanetId].position - previousPlanetPos)*f + previousPlanetPos;
-		float targetDist = planetParams[focusedPlanetId].bodyParam.radius*4;
+		const float targetDist = planetParams[focusedPlanetId].bodyParam.radius*4;
 		cameraPolar.z = (targetDist - switchPreviousDist)*f + switchPreviousDist;
 
 		++switchFrameCurrent;
@@ -427,10 +427,8 @@ void Game::update(double dt)
 
 	// Mouse move
 	double posX, posY;
-	glm::vec2 move;
 	glfwGetCursorPos(win, &posX, &posY);
-	move.x = -posX+preMousePosX;
-	move.y = posY-preMousePosY;
+	const glm::vec2 move = {-posX+preMousePosX, posY-preMousePosY};
 
 	if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1))
 	{
@@ -463,7 +461,7 @@ void Game::update(double dt)
 		cameraPolar.y = -PI/2 + 0.001;
 		viewSpeed.y = 0;
 	}
-	float radius = planetParams[focusedPlanetId].bodyParam.radius;
+	const float radius = planetParams[focusedPlanetId].bodyParam.radius;
 	if (cameraPolar.z < radius) cameraPolar.z = radius;
 
 	// Mouse reset

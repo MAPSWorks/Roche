@@ -4,7 +4,7 @@
 #include <fstream>
 #include <cstring>
 
-std::string read_file(std::string filename)
+std::string read_file(const std::string filename)
 {
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
 	if (in)
@@ -53,17 +53,17 @@ struct DDS_HEADER {
 
 int DDSLoader::skipMipmap = 0;
 
-void DDSLoader::setSkipMipmap(int skipMipmap)
+void DDSLoader::setSkipMipmap(const int skipMipmap)
 {
 	DDSLoader::skipMipmap = std::max(0, skipMipmap);
 }
 
-int getImageSize(int width, int height)
+int getImageSize(const int width, const int height)
 {
 	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*16;
 }
 
-DDSLoader::DDSLoader(std::string filename)
+DDSLoader::DDSLoader(const std::string filename)
 {
 	this->filename = filename;
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
@@ -73,8 +73,8 @@ DDSLoader::DDSLoader(std::string filename)
 	}
 
 	// Magic number
-	char buf[4];
 	in.seekg(0, std::ios::beg);
+	char buf[4];
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
 	{
@@ -121,12 +121,12 @@ int DDSLoader::getMipmapCount()
 	return mipmapCount;
 }
 
-int DDSLoader::getWidth(int mipmapLevel)
+int DDSLoader::getWidth(const int mipmapLevel)
 {
 	return std::max(1, width>>mipmapLevel);
 }
 
-int DDSLoader::getHeight(int mipmapLevel)
+int DDSLoader::getHeight(const int mipmapLevel)
 {
 	return std::max(1, height>>mipmapLevel);
 }
@@ -143,8 +143,8 @@ void DDSLoader::getImageData(uint32_t mipmapLevel, std::vector<uint8_t> &data)
 	}
 
 	// Offset into file to get pixel data
-	int imageSize = sizes[mipmapLevel];
-	int offset = offsets[mipmapLevel];
+	const int imageSize = sizes[mipmapLevel];
+	const int offset = offsets[mipmapLevel];
 
 	data.resize(imageSize);
 	in.seekg(offset, std::ios::beg);

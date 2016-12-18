@@ -33,9 +33,9 @@ struct PlanetDynamicUBO
 };
 
 void generateSphere(
-	int meridians, 
-	int rings, 
-	bool exterior, 
+	const int meridians, 
+	const int rings, 
+	const bool exterior, 
 	std::vector<Vertex> &vertices, 
 	std::vector<uint32_t> &indices)
 {
@@ -44,14 +44,14 @@ void generateSphere(
 	size_t offset = 0;
 	for (int i=0;i<=rings;++i)
 	{
-		float phi = PI*((float)i/(float)rings-0.5);
-		float cp = cos(phi);
-		float sp = sin(phi);
+		const float phi = PI*((float)i/(float)rings-0.5);
+		const float cp = cos(phi);
+		const float sp = sin(phi);
 		for (int j=0;j<=meridians;++j)
 		{
-			float theta = 2*PI*((float)j/(float)meridians);
-			float ct = cos(theta);
-			float st = sin(theta);
+			const float theta = 2*PI*((float)j/(float)meridians);
+			const float ct = cos(theta);
+			const float st = sin(theta);
 			vertices[offset] = {
 				glm::vec4(cp*ct,cp*st,sp,1), 
 				glm::vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0)};
@@ -66,8 +66,8 @@ void generateSphere(
 	{
 		for (int j=0;j<meridians;++j)
 		{
-			uint32_t i1 = i+1;
-			uint32_t j1 = j+1;
+			const uint32_t i1 = i+1;
+			const uint32_t j1 = j+1;
 			std::vector<uint32_t> ind = {
 				(uint32_t)(i *(rings+1)+j),
 				(uint32_t)(i1*(rings+1)+j),
@@ -87,14 +87,16 @@ void generateSphere(
 	}
 };
 
-uint32_t align(uint32_t offset, uint32_t minAlign)
+uint32_t align(const uint32_t offset, const uint32_t minAlign)
 {
-	uint32_t remainder = offset%minAlign;
+	const uint32_t remainder = offset%minAlign;
 	if (remainder) return offset + (minAlign-remainder);
 	return offset;
 }
 
-void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParameters skyboxParam)
+void RendererGL::init(
+	const std::vector<PlanetParameters> planetParams, 
+	const SkyboxParameters skyboxParam)
 {
 	this->planetParams = planetParams;
 
@@ -103,7 +105,7 @@ void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParamete
 	// Various alignments
 	uint32_t uboMinAlign;
 	uint32_t ssboMinAlign;
-	uint32_t minAlign = 16;
+	const uint32_t minAlign = 16;
 
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, (int*)&uboMinAlign);
 	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, (int*)&ssboMinAlign);
@@ -224,15 +226,15 @@ void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParamete
 
 	// Create dynamic Buffer
 	glCreateBuffers(1, &dynamicBuffer);
-	GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
-	if (USE_COHERENT_MEMORY) flags += GL_MAP_COHERENT_BIT;
+	const GLbitfield storageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | 
+		((USE_COHERENT_MEMORY)?GL_MAP_COHERENT_BIT:0);
+	const GLbitfield mapFlags = storageFlags | ((USE_COHERENT_MEMORY)?0:GL_MAP_FLUSH_EXPLICIT_BIT);
 
-	glNamedBufferStorage(dynamicBuffer, dynamicBufferSize, nullptr, flags);
-
-	if (!USE_COHERENT_MEMORY) flags += GL_MAP_FLUSH_EXPLICIT_BIT;
-
+	glNamedBufferStorage(dynamicBuffer, dynamicBufferSize, nullptr, storageFlags);
 	dynamicBufferPtr = glMapNamedBufferRange(
-		dynamicBuffer, 0, dynamicBufferSize, flags);
+		dynamicBuffer, 0, dynamicBufferSize, mapFlags);
+
+	if (!dynamicBufferPtr) throw std::runtime_error("Can't map dynamic buffer");
 
 	// Dynamic buffer fences
 	fences.resize(dynamicOffsets.size());
@@ -261,10 +263,12 @@ void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParamete
 	programPlanetBare.source(GL_FRAGMENT_SHADER, "shaders/planet_bare.frag");
 	programPlanetBare.link();
 
-	float anisotropy = 16.f;
+	// Anisotropy
 	float maxAnisotropy;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
-	if (anisotropy > maxAnisotropy) anisotropy = maxAnisotropy;
+
+	const float requestedAnisotropy = 16.f;
+	const float anisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
 
 	// Sampler init
 	glCreateSamplers(1, &diffuseSampler);
@@ -275,7 +279,7 @@ void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParamete
 	planetTexLoaded.resize(planetCount);
 
 	// Default diffuse tex
-	uint8_t data[] = {0, 0, 0};
+	const uint8_t data[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
 	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &data);
@@ -286,13 +290,13 @@ void RendererGL::init(std::vector<PlanetParameters> planetParams, SkyboxParamete
 	glEnable(GL_MULTISAMPLE);
 
 	// Skybox model matrix
-	glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
+	const glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
 	skyboxModelMat = glm::scale(glm::mat4_cast(q), glm::vec3(-5e9));
 	// Skybox texture
 	try
 	{
 		DDSLoader loader(skyboxParam.textureFilename);
-		int mipmapCount = loader.getMipmapCount();
+		const int mipmapCount = loader.getMipmapCount();
 
 		glCreateTextures(GL_TEXTURE_2D, 1, &skyboxTex);
 		glTextureStorage2D(skyboxTex, 
@@ -344,9 +348,9 @@ void RendererGL::render(
 	const float texUnloadDistance = closePlanetMaxDistance*1.6;
 
 	// Triple buffer of dynamic UBO
-	uint32_t nextFrameId = (frameId+1)%3;
-	auto &currentDynamicOffsets = dynamicOffsets[frameId];
-	auto &nextDynamicOffsets = dynamicOffsets[nextFrameId]; 
+	const uint32_t nextFrameId = (frameId+1)%3;
+	const auto &currentDynamicOffsets = dynamicOffsets[frameId];
+	const auto &nextDynamicOffsets = dynamicOffsets[nextFrameId]; 
 
 	// Planet classification
 	std::vector<uint32_t> closePlanets;
@@ -357,8 +361,8 @@ void RendererGL::render(
 
 	for (uint32_t i=0;i<planetStates.size();++i)
 	{
-		float radius = planetParams[i].bodyParam.radius;
-		double dist = glm::distance(viewPos, planetStates[i].position)/radius;
+		const float radius = planetParams[i].bodyParam.radius;
+		const double dist = glm::distance(viewPos, planetStates[i].position)/radius;
 		if (dist < texLoadDistance && !planetTexLoaded[i])
 		{
 			// Textures need to be loaded
@@ -376,8 +380,8 @@ void RendererGL::render(
 			farPlanets.push_back(i);
 	}
 
-	glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e6);
-	glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
+	const glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e6);
+	const glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
 
 	// Scene uniform update
 	SceneDynamicUBO sceneUBO;
@@ -395,24 +399,23 @@ void RendererGL::render(
 	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
 	{
-		glm::vec3 planetPos = planetStates[i].position - viewPos;
+		const glm::vec3 planetPos = planetStates[i].position - viewPos;
 
 		// Planet rotation
-		glm::vec3 north = glm::vec3(0,0,1);
-		glm::vec3 rotAxis = planetParams[i].bodyParam.rotationAxis;
-		glm::quat q = glm::rotate(glm::quat(), 
-			(float)acos(glm::dot(north, rotAxis)), glm::cross(north, rotAxis));
-		q = glm::rotate(q, planetStates[i].rotationAngle, north);
+		const glm::vec3 north = glm::vec3(0,0,1);
+		const glm::vec3 rotAxis = planetParams[i].bodyParam.rotationAxis;
+		const glm::quat q =glm::rotate(glm::rotate(glm::quat(), 
+			(float)acos(glm::dot(north, rotAxis)), glm::cross(north, rotAxis)), 
+			planetStates[i].rotationAngle, north);
 
 		// Model matrix
-		glm::mat4 modelMat = glm::translate(glm::mat4(), planetPos);
-		modelMat *= glm::mat4_cast(q);
-		modelMat = glm::scale(modelMat, glm::vec3(planetParams[i].bodyParam.radius));
+		const glm::mat4 modelMat = glm::scale(glm::translate(glm::mat4(), planetPos)*glm::mat4_cast(q), glm::vec3(planetParams[i].bodyParam.radius));
 
 		// Light direction
-		glm::vec3 lightDir = glm::vec3(0.f);
-		if (glm::length(planetStates[i].position) > 0.1) 
-			lightDir = glm::normalize(-planetStates[i].position);
+		const glm::vec3 lightDir = 
+			(glm::length(planetStates[i].position) > 0.1)?
+				glm::vec3(glm::normalize(-planetStates[i].position)):
+				glm::vec3(0.f);
 
 		planetUBOs[i].modelMat = modelMat;
 		planetUBOs[i].lightDir = glm::vec4(lightDir,0.0);
@@ -441,7 +444,7 @@ void RendererGL::render(
 		try
 		{
 			DDSLoader loader(planetParams[i].assetPaths.diffuseFilename);
-			int mipmapCount = loader.getMipmapCount();
+			const int mipmapCount = loader.getMipmapCount();
 
 			glCreateTextures(GL_TEXTURE_2D, 1, &planetDiffuseTextures[i]);
 			glTextureStorage2D(planetDiffuseTextures[i], 
@@ -478,8 +481,8 @@ void RendererGL::render(
 	// Planet sorting from front to back
 	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
 	{
-		float distI = glm::distance(planetStates[i].position, viewPos);
-		float distJ = glm::distance(planetStates[j].position, viewPos);
+		const float distI = glm::distance(planetStates[i].position, viewPos);
+		const float distJ = glm::distance(planetStates[j].position, viewPos);
 		return distI < distJ;
 	});
 

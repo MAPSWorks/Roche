@@ -17,7 +17,7 @@
 
 #define PI 3.14159265358979323846264338327950288 
 
-void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, int seed)
+void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, const int seed)
 {
 	// Create larger buffer for better anti-aliasing
 	const int upscale = 4;
@@ -32,9 +32,9 @@ void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, int seed)
 	for (int i=0;i<100;++i)
 	{
 		// multiply generated range by opacity
-		int gapSize = dis(rng)*maxGapsize;
-		int gapOffset = dis(rng)*(refBuffer.size()-gapSize+1);
-		float gapOpacity = std::max((float)dis(rng),0.4f);
+		const int gapSize = dis(rng)*maxGapsize;
+		const int gapOffset = dis(rng)*(refBuffer.size()-gapSize+1);
+		const float gapOpacity = std::max((float)dis(rng),0.4f);
 		for (int j=gapOffset;j<gapOffset+gapSize;++j)
 			refBuffer[j] *= gapOpacity;
 	}
@@ -44,7 +44,7 @@ void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, int seed)
 	for (float v : refBuffer)
 		mean += v;
 	mean /= refBuffer.size();
-	float mul = 1.0/mean;
+	const float mul = 1.0/mean;
 	for (auto &v : refBuffer)
 		v *= mul;
 
@@ -68,7 +68,7 @@ void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, int seed)
 
 }
 
-glm::dvec3 OrbitalParameters::computePosition(double epoch, double parentGM)
+glm::dvec3 OrbitalParameters::computePosition(const double epoch, const double parentGM)
 {
 	if (parentGM <= 0)
 	{
@@ -77,42 +77,41 @@ glm::dvec3 OrbitalParameters::computePosition(double epoch, double parentGM)
 	else
 	{
 		// Mean Anomaly compute
-		double orbital_period = 2*PI*sqrt((sma*sma*sma)/parentGM);
-		double mean_motion = 2*PI/orbital_period;
-		double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
+		const double orbital_period = 2*PI*sqrt((sma*sma*sma)/parentGM);
+		const double mean_motion = 2*PI/orbital_period;
+		const double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
 		// Newton to find eccentric anomaly (En)
-		double En = (ecc<0.8)?meanAnomaly:PI;
-		const int it = 20;
+		const int it = 20; // Number of iterations
+		double En = (ecc<0.8)?meanAnomaly:PI; // Starting value of En
 		for (int i=0;i<it;++i)
 			En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
 		// Eccentric anomaly to True anomaly
-		double trueAnomaly = 2*atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
+		const double trueAnomaly = 2*atan2(sqrt(1+ecc)*sin(En/2), sqrt(1-ecc)*cos(En/2));
 		// Distance from parent body
-		double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
+		const double dist = sma*((1-ecc*ecc)/(1+ecc*cos(trueAnomaly)));
 		// Plane changes
-		glm::dvec3 posInPlane = glm::dvec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
-		glm::dquat q = glm::dquat();
-		q = glm::rotate(q, lan, glm::dvec3(0,0,1));
-		q = glm::rotate(q, inc, glm::dvec3(0,1,0));
-		q = glm::rotate(q, arg, glm::dvec3(0,0,1));
+		const glm::dvec3 posInPlane = glm::dvec3(-sin(trueAnomaly)*dist,cos(trueAnomaly)*dist,0.0);
+		const glm::dquat q =  glm::rotate(glm::dquat(), lan, glm::dvec3(0,0,1))
+												* glm::rotate(glm::dquat(), inc, glm::dvec3(0,1,0))
+												* glm::rotate(glm::dquat(), arg, glm::dvec3(0,0,1));
 		return q*posInPlane;
 	}
 }
 
-float scatDensity(float p, float scaleHeight)
+float scatDensity(const float p, const float scaleHeight)
 {
 	return glm::exp(-std::max(0.f, p)/scaleHeight);
 }
 
-float scatDensity(glm::vec2 p, float radius, float scaleHeight)
+float scatDensity(const glm::vec2 p, const float radius, const float scaleHeight)
 {
 	return scatDensity(glm::length(p) - radius, scaleHeight);
 }
 
-float scatOptic(glm::vec2 a, glm::vec2 b, 
-	float radius, float scaleHeight, float maxHeight, const int samples)
+float scatOptic(const glm::vec2 a, const glm::vec2 b, 
+	const float radius, const float scaleHeight, const float maxHeight, const int samples)
 {
-	glm::vec2 step = (b-a)/(float)samples;
+	const glm::vec2 step = (b-a)/(float)samples;
 	glm::vec2 v = a+step*0.5;
 
 	float sum = 0.f;
@@ -124,14 +123,14 @@ float scatOptic(glm::vec2 a, glm::vec2 b,
 	return sum * glm::length(step) / maxHeight;
 }
 
-float raySphereFar(glm::vec2 origin, glm::vec2 ray, float radius)
+float raySphereFar(const glm::vec2 origin, const glm::vec2 ray, const float radius)
 {
-	float b = glm::dot(origin, ray);
-	float c = glm::dot(origin, origin) - radius*radius;
+	const float b = glm::dot(origin, ray);
+	const float c = glm::dot(origin, origin) - radius*radius;
 	return -b+sqrt(b*b-c);
 }
 
-void AtmosphericParameters::generateLookupTable(std::vector<float> &table, size_t size, float radius)
+void AtmosphericParameters::generateLookupTable(std::vector<float> &table, const size_t size, const float radius)
 {
 	/*  2 channel lookup table :
 	 *  x-axis for altitude (0.0 for sl, 1.0 for maxHeight)
@@ -143,16 +142,16 @@ void AtmosphericParameters::generateLookupTable(std::vector<float> &table, size_
 
 	for (int i=0;i<size;++i)
 	{
-		float altitude = (float)i/(float)size * maxHeight;
-		float density = glm::exp(-altitude/scaleHeight);
+		const float altitude = (float)i/(float)size * maxHeight;
+		const float density = glm::exp(-altitude/scaleHeight);
 		for (int j=0;j<size;++j)
 		{
 			const size_t index = (i+j*size)*2;
-			float angle = (float)j*PI/(float)size;
-			glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
-			glm::vec2 rayOri = glm::vec2(0, radius + altitude);
-			float t = raySphereFar(rayOri, rayDir, radius+maxHeight);
-			glm::vec2 u = rayOri + rayDir*t;
+			const float angle = (float)j*PI/(float)size;
+			const glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
+			const glm::vec2 rayOri = glm::vec2(0, radius + altitude);
+			const float t = raySphereFar(rayOri, rayDir, radius+maxHeight);
+			const glm::vec2 u = rayOri + rayDir*t;
 			table[index+0] = density;
 			table[index+1] = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 50)*(4*PI);
 		}
