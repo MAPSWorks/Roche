@@ -477,10 +477,6 @@ void RendererGL::render(
 	// Planet sorting from front to back
 	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
 	{
-		/*
-		float distI = (viewMat*planetStates[i].position).z;
-		float distJ = (viewMat*planetStates[j].position).z;
-		*/
 		float distI = glm::distance(planetStates[i].position, viewPos);
 		float distJ = glm::distance(planetStates[j].position, viewPos);
 		return distI < distJ;
