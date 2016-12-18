@@ -1,7 +1,9 @@
 #include "renderer_gl.hpp"
 #include "util.h"
+
 #include <stdexcept>
 #include <cstring>
+#include <algorithm>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -465,6 +467,18 @@ void RendererGL::render(
 		planetDiffuseTextures[i] = diffuseTexDefault;
 		planetTexLoaded[i] = false;
 	}
+
+	// Planet sorting from front to back
+	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
+	{
+		/*
+		float distI = (viewMat*planetStates[i].position).z;
+		float distJ = (viewMat*planetStates[j].position).z;
+		*/
+		float distI = glm::distance(planetStates[i].position, viewPos);
+		float distJ = glm::distance(planetStates[j].position, viewPos);
+		return distI < distJ;
+	});
 
 	// Clearing
 	float clearColor[] = {0.f,0.f,0.f,1.0f};
