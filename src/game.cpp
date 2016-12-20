@@ -145,7 +145,8 @@ void Game::init()
 	glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-	glfwWindowHint(GLFW_SAMPLES, msaaSamples);
+	glfwWindowHint(GLFW_DEPTH_BITS, 0);
+	glfwWindowHint(GLFW_STENCIL_BITS, 0);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); 
@@ -175,7 +176,7 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, skybox);
+	renderer->init(planetParams, skybox, msaaSamples, width, height);
 	renderer->setGamma(gamma);
 }
 
@@ -273,7 +274,7 @@ void Game::loadPlanetFiles()
 				planet.assetPaths.nightFilename = get<std::string>(body("night"));
 				planet.assetPaths.cloudFilename = get<std::string>(body("cloud"));
 				planet.assetPaths.modelFilename = get<std::string>(body("model"));
-				planet.bodyParam.cloudDispRate = get<double>(body("cloudDispRate"));
+				planet.bodyParam.cloudDispPeriod = get<double>(body("cloudDispPeriod"));
 			}
 			shaun::sweeper atmo(pl("atmosphere"));
 			if (!atmo.is_null())
@@ -361,7 +362,10 @@ void Game::update(const double dt)
 		// Rotation
 		planetStates[i].rotationAngle = (2.0*PI*epoch)/planetParams[i].bodyParam.rotationPeriod + PI;
 		// Cloud rotation
-		planetStates[i].cloudDisp = planetParams[i].bodyParam.cloudDispRate*epoch;
+		const float period = planetParams[i].bodyParam.cloudDispPeriod;
+		planetStates[i].cloudDisp = (period)?
+			std::fmod(-epoch/period, 1.f):
+			0.f;
 	}
 
 	// Planet absolute position update
@@ -484,7 +488,6 @@ void Game::update(const double dt)
 		cameraCenter;
 		
 	renderer->render(
-		width, height, 
 		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), 
 		planetStates);
 

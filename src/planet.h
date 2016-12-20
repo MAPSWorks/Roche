@@ -47,7 +47,7 @@ struct BodyParameters
 	double GM; // gravitational parameter
 	bool isStar; // for lighting computation
 	float albedo; // light intensity from far away
-	float cloudDispRate;
+	float cloudDispPeriod;
 };
 
 struct AssetPaths

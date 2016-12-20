@@ -9,10 +9,11 @@ public:
 	void setGamma(float gamma) { this->gamma = gamma; }
 	virtual void init(
 		std::vector<PlanetParameters> planetParams, 
-		SkyboxParameters skyboxParam) = 0;
-	virtual void render(
+		SkyboxParameters skyboxParam,
+		int msaa,
 		int windowWidth,
-		int windowHeight,
+		int windowHeight) = 0;
+	virtual void render(
 		glm::dvec3 viewPos, 
 		float fovy,
 		glm::dvec3 viewCenter,

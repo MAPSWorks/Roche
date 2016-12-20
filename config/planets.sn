@@ -93,7 +93,7 @@ planets: [
 			diffuse:"tex/earth/diffuse.dds"
 			night:"tex/earth/night.dds"
 			cloud:"tex/earth/clouds.dds"
-			cloud_dispRate:3.292115E-5
+			cloudDispPeriod:0
 		}
 		atmosphere:{
 			maxAltitude:130

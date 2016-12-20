@@ -30,6 +30,7 @@ struct PlanetDynamicUBO
 {
 	glm::mat4 modelMat;
 	glm::vec4 lightDir;
+	float cloudDisp;
 };
 
 void generateSphere(
@@ -85,7 +86,17 @@ void generateSphere(
 			offset++;
 		}
 	}
-};
+}
+
+void generateFullscreenTri(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices)
+{
+	vertices.resize(3);
+	vertices[0].position = glm::vec4(-2,-1,0,1);
+	vertices[1].position = glm::vec4( 2,-1,0,1);
+	vertices[2].position = glm::vec4( 0, 4,0,1);
+
+	indices = {0,1,2};
+}
 
 uint32_t align(const uint32_t offset, const uint32_t minAlign)
 {
@@ -96,31 +107,45 @@ uint32_t align(const uint32_t offset, const uint32_t minAlign)
 
 void RendererGL::init(
 	const std::vector<PlanetParameters> planetParams, 
-	const SkyboxParameters skyboxParam)
+	const SkyboxParameters skyboxParam,
+	const int msaa,
+	const int windowWidth,
+	const int windowHeight)
 {
 	this->planetParams = planetParams;
-
-	planetCount = planetParams.size();
+	this->planetCount = planetParams.size();
+	this->msaaSamples = msaa;
+	this->windowWidth = windowWidth;
+	this->windowHeight = windowHeight;
 
 	// Various alignments
 	uint32_t uboMinAlign;
 	uint32_t ssboMinAlign;
-	const uint32_t minAlign = 16;
+	const uint32_t minAlign = 32;
 
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, (int*)&uboMinAlign);
 	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, (int*)&ssboMinAlign);
 
-	// Generate models
-	const int planetMeridians = 64;
-	const int planetRings = 64;
-
 	std::vector<std::vector<Vertex>> modelsVertices;
 	std::vector<std::vector<uint32_t>> modelsIndices;
 
-	modelsVertices.resize(1);
-	modelsIndices.resize(1);
+	modelsVertices.resize(2);
+	modelsIndices.resize(2);
 
-	generateSphere(planetMeridians, planetRings, false, modelsVertices[0], modelsIndices[0]);
+	const size_t FULLSCREEN_TRI_INDEX = 0;
+	const size_t SPHERE_INDEX = 1;
+
+	// Fullscreen tri
+	generateFullscreenTri(
+		modelsVertices[FULLSCREEN_TRI_INDEX],
+		modelsIndices[FULLSCREEN_TRI_INDEX]);
+
+	// Generate models
+	const int planetMeridians = 64;
+	const int planetRings = 64;
+	generateSphere(planetMeridians, planetRings, false, 
+		modelsVertices[SPHERE_INDEX], 
+		modelsIndices[SPHERE_INDEX]);
 
 	// Keep track of model number for each planet
 	std::vector<uint32_t> modelNumber(planetCount);
@@ -133,7 +158,7 @@ void RendererGL::init(
 		}
 		else
 		{
-			modelNumber[i] = 0;
+			modelNumber[i] = SPHERE_INDEX;
 		}
 	}
 
@@ -143,26 +168,23 @@ void RendererGL::init(
 	// Offsets in static buffer
 	std::vector<Model> models(modelsVertices.size());
 	// Vertex buffer offsets
-	currentOffset = align(currentOffset, minAlign);
 	vertexOffset = currentOffset;
 	for (uint32_t i=0;i<models.size();++i)
 	{
 		models[i].vertexOffset = currentOffset;
 		models[i].count = modelsIndices[i].size();
 		currentOffset += modelsVertices[i].size()*sizeof(Vertex);
-		currentOffset = align(currentOffset, minAlign);
 	}	
 	// Index buffer offsets
-	currentOffset = align(currentOffset, minAlign);
 	indexOffset = currentOffset;
 	for (uint32_t i=0;i<models.size();++i)
 	{
 		models[i].indexOffset = currentOffset;
 		currentOffset += modelsIndices[i].size()*sizeof(uint32_t);
-		currentOffset = align(currentOffset, minAlign);
 	}
 
-	sphere = models[0];
+	fullscreenTri = models[FULLSCREEN_TRI_INDEX];
+	sphere = models[SPHERE_INDEX];
 
 	staticBufferSize = currentOffset;
 
@@ -191,6 +213,8 @@ void RendererGL::init(
 		dynamicOffsets[i].size = currentOffset - dynamicOffsets[i].offset;
 	}
 
+	dynamicBufferSize = currentOffset;
+
 	// Assign models to planets
 	planetModels.resize(planetCount);
 	for (uint32_t i=0;i<modelNumber.size();++i)
@@ -198,13 +222,8 @@ void RendererGL::init(
 		planetModels[i] = models[modelNumber[i]];
 	}
 
-	dynamicBufferSize = currentOffset;
-
-	// Create static buffer
-	glCreateBuffers(1, &staticBuffer);
-	glNamedBufferStorage(
-		staticBuffer, staticBufferSize, nullptr,
-		GL_DYNAMIC_STORAGE_BIT);
+	// Create static & dynamic buffers
+	createBuffers();
 
 	// Fill static buffer
 	for (uint32_t i=0;i<models.size();++i) // Vertices
@@ -224,21 +243,91 @@ void RendererGL::init(
 			modelsIndices[i].data());
 	}
 
+	// Dynamic buffer fences
+	fences.resize(dynamicOffsets.size());
+
+	// Vertex array creation
+	createVertexArray();
+
+	// Shader loading
+	createShaders();
+
+	createRenderTargets();
+
+	createTextures();
+
+	createSkybox(skyboxParam);
+}
+
+void RendererGL::createTextures()
+{
+	// Anisotropy
+	float maxAnisotropy;
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+
+	const float requestedAnisotropy = 16.f;
+	const float anisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
+
+	// Sampler init
+	glCreateSamplers(1, &diffuseSampler);
+	glSamplerParameterf(diffuseSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
+	glSamplerParameteri(diffuseSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(diffuseSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+	// Texture init
+	planetTexLoaded.resize(planetCount);
+
+	// Default diffuse tex
+	const uint8_t diffuseData[] = {0, 0, 0};
+	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
+	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
+	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &diffuseData);
+
+	planetDiffuseTextures.resize(planetCount, diffuseTexDefault);
+
+	// Default cloud tex
+	const uint8_t cloudData[] = {255, 255, 255, 0};
+	glCreateTextures(GL_TEXTURE_2D, 1, &cloudTexDefault);
+	glTextureStorage2D(cloudTexDefault, 1, GL_RGBA8, 1, 1);
+	glTextureSubImage2D(cloudTexDefault, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, cloudData);
+
+	planetCloudTextures.resize(planetCount, cloudTexDefault);
+
+	// Default night tex
+	const uint8_t nightData[] = {0, 0, 0};
+	glCreateTextures(GL_TEXTURE_2D, 1, &nightTexDefault);
+	glTextureStorage2D(nightTexDefault, 1, GL_RGB8, 1, 1);
+	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &nightData);
+
+	planetNightTextures.resize(planetCount, nightTexDefault);
+}
+
+void RendererGL::createBuffers()
+{
+	// Create static buffer
+	glCreateBuffers(1, &staticBuffer);
+	glNamedBufferStorage(
+		staticBuffer, staticBufferSize, nullptr,
+		GL_DYNAMIC_STORAGE_BIT);
+
 	// Create dynamic Buffer
 	glCreateBuffers(1, &dynamicBuffer);
+
+	// Storage & map dynamic buffer
 	const GLbitfield storageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | 
 		((USE_COHERENT_MEMORY)?GL_MAP_COHERENT_BIT:0);
-	const GLbitfield mapFlags = storageFlags | ((USE_COHERENT_MEMORY)?0:GL_MAP_FLUSH_EXPLICIT_BIT);
+	const GLbitfield mapFlags = storageFlags | 
+	((USE_COHERENT_MEMORY)?0:GL_MAP_FLUSH_EXPLICIT_BIT);
 
 	glNamedBufferStorage(dynamicBuffer, dynamicBufferSize, nullptr, storageFlags);
 	dynamicBufferPtr = glMapNamedBufferRange(
 		dynamicBuffer, 0, dynamicBufferSize, mapFlags);
 
 	if (!dynamicBufferPtr) throw std::runtime_error("Can't map dynamic buffer");
+}
 
-	// Dynamic buffer fences
-	fences.resize(dynamicOffsets.size());
-
+void RendererGL::createVertexArray()
+{
 	// Vertex Array Object creation
 	const int VERTEX_BINDING = 0;
 	glCreateVertexArrays(1, &vertexArray);
@@ -257,38 +346,87 @@ void RendererGL::init(
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_UV);
 	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_UV, VERTEX_BINDING);
 	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_UV, 4, GL_FLOAT, false, offsetof(Vertex, uv));
+}
 
-	// Shader loading
-	programPlanetBare.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programPlanetBare.source(GL_FRAGMENT_SHADER, "shaders/planet_bare.frag");
-	programPlanetBare.link();
+void RendererGL::createRenderTargets()
+{
+	// Sampler
+	glCreateSamplers(1, &attachmentSampler);
+	glSamplerParameteri(attachmentSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glSamplerParameteri(attachmentSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	// Anisotropy
-	float maxAnisotropy;
-	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+	// Depth stencil texture
+	glCreateTextures(GL_TEXTURE_2D, 1, &depthStencilTex);
+	glTextureStorage2D(depthStencilTex, 1, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
 
-	const float requestedAnisotropy = 16.f;
-	const float anisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
+	// Gbuffer
+	std::vector<GLenum> formats = {
+		GL_R32F,             // Linear depth
+		GL_RG16,             // UVs
+		GL_RGBA16F,          // UV derivatives
+		GL_RG16F,            // Normals (Spheremap transform)
+	};
 
-	// Sampler init
-	glCreateSamplers(1, &diffuseSampler);
-	glSamplerParameterf(diffuseSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
-	glSamplerParameteri(diffuseSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	std::vector<GLenum> attachments = {
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		GL_COLOR_ATTACHMENT2,
+		GL_COLOR_ATTACHMENT3,
+	};
 
-	// Texture init
-	planetTexLoaded.resize(planetCount);
+// Textures
+	gbufferTex.resize(formats.size());
+	glCreateTextures(GL_TEXTURE_2D, gbufferTex.size(), gbufferTex.data());
+	for (uint32_t i=0;i<gbufferTex.size();++i)
+	{
+		glTextureStorage2D(gbufferTex[i], 1, formats[i], 
+			windowWidth, windowHeight);
+	}
 
-	// Default diffuse tex
-	const uint8_t data[] = {0, 0, 0};
-	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
-	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &data);
+	// Framebuffer
+	glCreateFramebuffers(1, &gbufferFbo);
+	glNamedFramebufferDrawBuffers(gbufferFbo, attachments.size(), attachments.data());
+	glNamedFramebufferTexture(gbufferFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+	for (uint32_t i=0;i<gbufferTex.size();++i)
+		glNamedFramebufferTexture(gbufferFbo, attachments[i], gbufferTex[i], 0);
 
-	planetDiffuseTextures.resize(planetCount, diffuseTexDefault);
+	// HDR
+	// Texture
+	glCreateTextures(GL_TEXTURE_2D, 1, &hdrTex);
+	glTextureStorage2D(hdrTex, 1, GL_RGB16F, 
+		windowWidth, windowHeight);
 
-	// Misc.
-	glEnable(GL_MULTISAMPLE);
+	// Framebuffer
+	glCreateFramebuffers(1, &hdrFbo);
+	glNamedFramebufferTexture(hdrFbo, GL_COLOR_ATTACHMENT0, hdrTex, 0);
+	glNamedFramebufferTexture(hdrFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+}
 
+void RendererGL::createShaders()
+{
+	programPlanetGbuffer.source(GL_VERTEX_SHADER, "shaders/planet.vert");
+	programPlanetGbuffer.source(GL_FRAGMENT_SHADER, "shaders/planet_gbuffer.frag");
+	programPlanetGbuffer.link();
+
+	programSkyboxGbuffer.source(GL_VERTEX_SHADER, "shaders/planet.vert");
+	programSkyboxGbuffer.source(GL_FRAGMENT_SHADER, "shaders/skybox_gbuffer.frag");
+	programSkyboxGbuffer.link();
+
+	programSkyboxDeferred.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
+	programSkyboxDeferred.source(GL_FRAGMENT_SHADER, "shaders/skybox_deferred.frag");
+	programSkyboxDeferred.link();
+
+	programPlanetDeferred.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
+	programPlanetDeferred.source(GL_FRAGMENT_SHADER, "shaders/planet_deferred.frag");
+	programPlanetDeferred.link();
+
+	programResolve.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
+	programResolve.source(GL_FRAGMENT_SHADER, "shaders/resolve.frag");
+	programResolve.link();
+}
+
+void RendererGL::createSkybox(SkyboxParameters skyboxParam)
+{
 	// Skybox model matrix
 	const glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
 	skyboxModelMat = glm::scale(glm::mat4_cast(q), glm::vec3(-5e9));
@@ -333,14 +471,49 @@ void RendererGL::destroy()
 	glDeleteBuffers(1, &dynamicBuffer);
 }
 
+void RendererGL::loadDDSTexture(GLuint &id, const std::string filename)
+{
+	try
+	{
+		DDSLoader loader(filename);
+		const int mipmapCount = loader.getMipmapCount();
+
+		glCreateTextures(GL_TEXTURE_2D, 1, &id);
+		glTextureStorage2D(id, 
+			mipmapCount, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, 
+			loader.getWidth(0), loader.getHeight(0));
+		for (int j=0;j<mipmapCount;++j)
+		{
+			std::vector<uint8_t> imageData;
+			loader.getImageData(j, imageData);
+			glCompressedTextureSubImage2D(
+				id,
+				j, 
+				0, 0, 
+				loader.getWidth(j), loader.getHeight(j), 
+				GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+				imageData.size(), imageData.data());
+		}
+	}
+	catch (...)
+	{
+
+	}
+}
+
+void RendererGL::unloadDDSTexture(GLuint &id, const GLuint defaultId)
+{
+	if (id != defaultId)
+		glDeleteTextures(1, &id);
+	id = defaultId;
+}
+
 void RendererGL::render(
-		int windowWidth,
-		int windowHeight,
-		glm::dvec3 viewPos, 
-		float fovy,
-		glm::dvec3 viewCenter,
-		glm::vec3 viewUp,
-		std::vector<PlanetState> planetStates)
+		const glm::dvec3 viewPos, 
+		const float fovy,
+		const glm::dvec3 viewCenter,
+		const glm::vec3 viewUp,
+		const std::vector<PlanetState> planetStates)
 {
 	const float closePlanetMinSizePixels = 1;
 	const float closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
@@ -422,7 +595,8 @@ void RendererGL::render(
 				glm::vec3(0.f);
 
 		planetUBOs[i].modelMat = modelMat;
-		planetUBOs[i].lightDir = glm::vec4(lightDir,0.0);
+		planetUBOs[i].lightDir = viewMat*glm::vec4(lightDir,0.0);
+		planetUBOs[i].cloudDisp = planetStates[i].cloudDisp;
 	}
 
 	// Dynamic data upload
@@ -445,40 +619,20 @@ void RendererGL::render(
 	for (uint32_t i : texLoadPlanets)
 	{
 		// Diffuse texture
-		try
-		{
-			DDSLoader loader(planetParams[i].assetPaths.diffuseFilename);
-			const int mipmapCount = loader.getMipmapCount();
+		loadDDSTexture(planetDiffuseTextures[i], planetParams[i].assetPaths.diffuseFilename);
+		loadDDSTexture(planetCloudTextures[i]  , planetParams[i].assetPaths.cloudFilename);
+		loadDDSTexture(planetNightTextures[i]  , planetParams[i].assetPaths.nightFilename);
 
-			glCreateTextures(GL_TEXTURE_2D, 1, &planetDiffuseTextures[i]);
-			glTextureStorage2D(planetDiffuseTextures[i], 
-				mipmapCount, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, loader.getWidth(0), loader.getHeight(0));
-			for (int j=0;j<mipmapCount;++j)
-			{
-				std::vector<uint8_t> imageData;
-				loader.getImageData(j, imageData);
-				glCompressedTextureSubImage2D(
-					planetDiffuseTextures[i],
-					j, 
-					0, 0, 
-					loader.getWidth(j), loader.getHeight(j), 
-					GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
-					imageData.size(), imageData.data());
-			}
-		}
-		catch (...)
-		{
-
-		}
 		planetTexLoaded[i] = true;
 	}
 
 	// Texture unloading
 	for (uint32_t i : texUnloadPlanets)
 	{
-		if (planetDiffuseTextures[i] != diffuseTexDefault)
-			glDeleteTextures(1, &planetDiffuseTextures[i]);
-		planetDiffuseTextures[i] = diffuseTexDefault;
+		unloadDDSTexture(planetDiffuseTextures[i], diffuseTexDefault);
+		unloadDDSTexture(planetCloudTextures[i]  , cloudTexDefault);
+		unloadDDSTexture(planetNightTextures[i]  , nightTexDefault);
+
 		planetTexLoaded[i] = false;
 	}
 
@@ -490,53 +644,144 @@ void RendererGL::render(
 		return distI < distJ;
 	});
 
+	renderGBuffer(closePlanets, currentDynamicOffsets);
+	renderHdr(closePlanets, currentDynamicOffsets);
+	renderResolve();
+
+	frameId = (frameId+1)%3;
+}
+
+void RendererGL::renderGBuffer(
+	const std::vector<uint32_t> closePlanets, 
+	const DynamicOffsets currentDynamicOffsets)
+{
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_STENCIL_TEST);
+	glEnable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_CLAMP);
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+
 	// Clearing
-	float clearColor[] = {0.f,0.f,0.f,1.0f};
-	glClearNamedFramebufferfv(0, GL_COLOR, 0, clearColor);
-	glClearNamedFramebufferfi(0, GL_DEPTH_STENCIL, 0, 1.f, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, gbufferFbo);
+	glClearNamedFramebufferfi(gbufferFbo, GL_DEPTH_STENCIL, 0, 1.f, 0);
 
 	// Planet rendering
-	glUseProgram(programPlanetBare.getId());
+	glUseProgram(programPlanetGbuffer.getId());
 
 	// Bind Scene UBO 
 	glBindBufferRange(
 		GL_UNIFORM_BUFFER, 0, dynamicBuffer,
 		currentDynamicOffsets.sceneUBO, sizeof(SceneDynamicUBO));
 
-	// Diffuse sampler
-	glBindSampler(2, diffuseSampler);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glDisable(GL_DEPTH_CLAMP);
-	glDepthFunc(GL_LESS);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
 	for (uint32_t i : closePlanets)
 	{
+		// Stencil value for planet
+		const uint8_t stencilValue = ((i+1)&0xFF);
+
+		glStencilFunc(GL_ALWAYS, stencilValue, 0xFF);
+
 		// Bind planet UBO
 		glBindBufferRange(
 			GL_UNIFORM_BUFFER, 1, dynamicBuffer,
 			currentDynamicOffsets.planetUBOs[i],
 			sizeof(PlanetDynamicUBO));
-		// Bind Textures
-		glBindTextureUnit(2, planetDiffuseTextures[i]);
 		// Draw
-		glBindVertexArray(vertexArray);
-		glDrawElements(GL_TRIANGLES, planetModels[i].count, GL_UNSIGNED_INT, 
-			(void*)(intptr_t)planetModels[i].indexOffset);
+		render(vertexArray, planetModels[i]);
 	}
 
 	// Skybox rendering
+	glUseProgram(programSkyboxGbuffer.getId());
+	
 	glEnable(GL_DEPTH_CLAMP);
 	glDepthFunc(GL_LEQUAL);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	glStencilFunc(GL_ALWAYS, 0, 0xFF);
 	
 	glBindBufferRange(
 		GL_UNIFORM_BUFFER, 1, dynamicBuffer,
 		currentDynamicOffsets.skyboxUBO,
 		sizeof(PlanetDynamicUBO));
-	glBindTextureUnit(2, skyboxTex);
-	glDrawElements(GL_TRIANGLES, sphere.count, GL_UNSIGNED_INT,
-		(void*)(intptr_t)sphere.indexOffset);
+	render(vertexArray, sphere);
 
-	frameId = (frameId+1)%3;
+	glDisable(GL_DEPTH_CLAMP);
+}
+
+void RendererGL::renderHdr(
+	const std::vector<uint32_t> closePlanets,
+	const DynamicOffsets currentDynamicOffsets)
+{
+	// No depth test/write
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	// No stencil writes
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	// Samplers
+	glBindSampler(6, diffuseSampler);
+	glBindSampler(7, diffuseSampler);
+	glBindSampler(8, diffuseSampler);
+
+	// Clearing
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+	float clearColor[] = {0.f,0.f,0.f,0.f};
+	glClearNamedFramebufferfv(hdrFbo, GL_COLOR, 0, clearColor);
+
+	// Deferred output bind
+	const std::vector<GLuint> samplers(gbufferTex.size(), attachmentSampler);
+	glBindSamplers(2, samplers.size(), samplers.data());
+	glBindTextures(2, gbufferTex.size(), gbufferTex.data());
+
+	// Skybox Rendering
+	glBindTextureUnit(6, skyboxTex);
+	glStencilFunc(GL_EQUAL, 0, 0xFF);
+	glUseProgram(programSkyboxDeferred.getId());
+
+	render(vertexArray, fullscreenTri);
+
+	// Planet rendering
+	for (uint32_t i : closePlanets)
+	{
+		glStencilFunc(GL_EQUAL, ((i+1)&0xFF), 0xFF);
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
+			currentDynamicOffsets.planetUBOs[i],
+			sizeof(PlanetDynamicUBO));
+		glBindTextureUnit(6, planetDiffuseTextures[i]);
+		glBindTextureUnit(7, planetCloudTextures[i]);
+		glBindTextureUnit(8, planetNightTextures[i]);
+		// If the planet is a star, use same shader as skybox
+		glUseProgram(
+			((planetParams[i].bodyParam.isStar)?
+				programSkyboxDeferred:
+				programPlanetDeferred).getId());
+
+		render(vertexArray, fullscreenTri);
+	}
+}
+
+void RendererGL::renderResolve()
+{
+	// No stencil test/write
+	glStencilFunc(GL_ALWAYS, 0, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	// No depth test/write
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glBindSampler(1, attachmentSampler);
+	glBindTextureUnit(1, hdrTex);
+
+	glUseProgram(programResolve.getId());
+	render(vertexArray, fullscreenTri);
+}
+
+void RendererGL::render(GLuint vertexArray, const Model m)
+{
+	glBindVertexArray(vertexArray);
+	glDrawElementsBaseVertex(GL_TRIANGLES, m.count, GL_UNSIGNED_INT,
+		(void*)(intptr_t)m.indexOffset, m.vertexOffset/sizeof(Vertex));
 }
