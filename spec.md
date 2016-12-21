@@ -26,7 +26,7 @@
 # Understanding the graphics pipeline
 ## Vertex data
 ### Planet vertex data
-A vec4 for world-space position (actually not really world-space; (0,0,0) means camera position, but the orientation and scale are unchanged.)
+A vec4 for model-space position
 
 A vec4 for texture coordinates (last 2 components untouched)
 ## Uniform Buffer Object structures
