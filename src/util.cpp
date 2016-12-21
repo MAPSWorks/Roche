@@ -63,14 +63,11 @@ int getImageSize(const int width, const int height)
 	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*16;
 }
 
-DDSLoader::DDSLoader(const std::string filename)
+bool DDSLoader::open(const std::string filename)
 {
 	this->filename = filename;
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-	if (!in)
-	{
-		throw std::runtime_error("Can't open file" + filename);
-	}
+	if (!in) return false;
 
 	// Magic number
 	in.seekg(0, std::ios::beg);
@@ -78,7 +75,7 @@ DDSLoader::DDSLoader(const std::string filename)
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
 	{
-		throw std::runtime_error("Not a DDS file");
+		return false;
 	}
 
 	// DDS header
@@ -89,7 +86,7 @@ DDSLoader::DDSLoader(const std::string filename)
 
 	if (strncmp(fourCC, "DXT5", 4))
 	{
-		throw std::runtime_error("Format not supported");
+		return false;
 	}
 
 	// Mipmap count check
@@ -114,6 +111,8 @@ DDSLoader::DDSLoader(const std::string filename)
 	width = width >> skipMipmap;
 	height = height >> skipMipmap;
 	mipmapCount -= skipMipmap;
+
+	return true;
 }
 
 int DDSLoader::getMipmapCount()
@@ -137,11 +136,7 @@ void DDSLoader::getImageData(uint32_t mipmapLevel, std::vector<uint8_t> &data)
 	else if (mipmapLevel < 0) mipmapLevel = 0;
 
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-	if (!in)
-	{
-		throw std::runtime_error("Can't open file" + filename);
-	}
-
+	if (!in) return;
 	// Offset into file to get pixel data
 	const int imageSize = sizes[mipmapLevel];
 	const int offset = offsets[mipmapLevel];

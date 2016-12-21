@@ -431,31 +431,8 @@ void RendererGL::createSkybox(SkyboxParameters skyboxParam)
 	const glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
 	skyboxModelMat = glm::scale(glm::mat4_cast(q), glm::vec3(-5e9));
 	// Skybox texture
-	try
-	{
-		DDSLoader loader(skyboxParam.textureFilename);
-		const int mipmapCount = loader.getMipmapCount();
-
-		glCreateTextures(GL_TEXTURE_2D, 1, &skyboxTex);
-		glTextureStorage2D(skyboxTex, 
-			mipmapCount, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, loader.getWidth(0), loader.getHeight(0));
-		for (int j=0;j<mipmapCount;++j)
-		{
-			std::vector<uint8_t> imageData;
-			loader.getImageData(j, imageData);
-			glCompressedTextureSubImage2D(
-				skyboxTex,
-				j, 
-				0, 0, 
-				loader.getWidth(j), loader.getHeight(j), 
-				GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
-				imageData.size(), imageData.data());
-		}
-	}
-	catch (...)
-	{
-		skyboxTex = diffuseTexDefault;
-	}
+	skyboxTex = diffuseTexDefault;
+	loadDDSTexture(skyboxTex, skyboxParam.textureFilename);
 }
 
 void RendererGL::destroy()
@@ -473,9 +450,9 @@ void RendererGL::destroy()
 
 void RendererGL::loadDDSTexture(GLuint &id, const std::string filename)
 {
-	try
+	DDSLoader loader;
+	if (loader.open(filename))
 	{
-		DDSLoader loader(filename);
 		const int mipmapCount = loader.getMipmapCount();
 
 		glCreateTextures(GL_TEXTURE_2D, 1, &id);
@@ -494,10 +471,6 @@ void RendererGL::loadDDSTexture(GLuint &id, const std::string filename)
 				GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
 				imageData.size(), imageData.data());
 		}
-	}
-	catch (...)
-	{
-
 	}
 }
 

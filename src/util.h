@@ -9,7 +9,7 @@ std::string read_file(std::string filename);
 class DDSLoader
 {
 public:
-	DDSLoader(std::string filename);
+	bool open(std::string filename);
 	int getMipmapCount();
 	int getWidth(int mipmapLevel);
 	int getHeight(int mipmapLevel);
