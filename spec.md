@@ -15,13 +15,23 @@
 
 **Skybox**: Background object
 
-**Specular** Light reflected at a certain angle
+**Specular**: Light reflected at a certain angle
+
+**Stream texture**: Texture loaded in a different thread
 
 **UBO**: Uniform Buffer Object
 
 **UV**: Texture coordinates
 
 **UV derivatives**: Rate of change of UVs on a given pixel, to know what level of detail we need for a texture
+
+# Texture streaming
+
+To avoid creating different OpenGL contexts, only the texture loading from disk is done in a separate thread. Texture uploading is done in the main thread after the loading has completed.
+
+Therefore, there is two separate queues : the **Wait Queue** and the **Loaded Queue**: the main thread submits a mipmap level to the Wait Queue. The loading thread then empties the Wait Queue and loads all mipmap levels from disk. It then submit that info (dimensions and pixel data) to the Loaded Queue. The main thread periodically checks the Loaded Queue for loaded mipmap levels and updates the textures accordingly.
+
+Note for later: Use PBOs.
 
 # Understanding the graphics pipeline
 ## Vertex data
