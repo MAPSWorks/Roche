@@ -246,17 +246,51 @@ void RendererGL::init(
 	// Dynamic buffer fences
 	fences.resize(dynamicOffsets.size());
 
-	// Vertex array creation
 	createVertexArray();
-
-	// Shader loading
 	createShaders();
-
 	createRenderTargets();
-
 	createTextures();
-
 	createSkybox(skyboxParam);
+
+	// Texture loading thread
+	texLoadThread = std::thread([&,this]()
+	{
+		while (true)
+		{
+			// Wait for kill or queue not empty
+			{
+				std::unique_lock<std::mutex> lk(texWaitMutex);
+				texWaitCondition.wait(lk, [&]{ return killThread || !texWaitQueue.empty();});
+			}
+
+			if (killThread) return;
+
+			// Get info about texture were are going to load
+			TexWait texWait;
+			{
+				std::lock_guard<std::mutex> lk(texWaitMutex);
+				texWait = texWaitQueue.front();
+				texWaitQueue.pop();
+			}
+
+			// Fill info from loader
+			TexLoaded texLoaded;
+			texLoaded.tex = texWait.tex;
+			texLoaded.level = texWait.level;
+			texLoaded.width  = texWait.loader.getWidth (texWait.level);
+			texLoaded.height = texWait.loader.getHeight(texWait.level);
+			texLoaded.data.reset(new std::vector<uint8_t>());
+
+			// Load image data
+			texWait.loader.getImageData(texLoaded.level, *(texLoaded.data.get()));
+
+			// Push loaded texture into queue
+			{
+				std::lock_guard<std::mutex> lk(texLoadedMutex);
+				texLoadedQueue.push(texLoaded);
+			}
+		}
+	});
 }
 
 void RendererGL::createTextures()
@@ -266,40 +300,36 @@ void RendererGL::createTextures()
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
 
 	const float requestedAnisotropy = 16.f;
-	const float anisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
-
-	// Sampler init
-	glCreateSamplers(1, &diffuseSampler);
-	glSamplerParameterf(diffuseSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
-	glSamplerParameteri(diffuseSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(diffuseSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	textureAnisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
 
 	// Texture init
 	planetTexLoaded.resize(planetCount);
+
+	// All default textures
+	planetDiffuseTextures.resize(planetCount, -1);
+	planetCloudTextures.resize(planetCount, -1);
+	planetNightTextures.resize(planetCount, -1);
 
 	// Default diffuse tex
 	const uint8_t diffuseData[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
 	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &diffuseData);
-
-	planetDiffuseTextures.resize(planetCount, diffuseTexDefault);
-
+	glTextureParameteri(diffuseTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
 	// Default cloud tex
 	const uint8_t cloudData[] = {255, 255, 255, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &cloudTexDefault);
 	glTextureStorage2D(cloudTexDefault, 1, GL_RGBA8, 1, 1);
 	glTextureSubImage2D(cloudTexDefault, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, cloudData);
-
-	planetCloudTextures.resize(planetCount, cloudTexDefault);
+	glTextureParameteri(cloudTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	// Default night tex
 	const uint8_t nightData[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &nightTexDefault);
 	glTextureStorage2D(nightTexDefault, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &nightData);
-
-	planetNightTextures.resize(planetCount, nightTexDefault);
+	glTextureParameteri(nightTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
 }
 
 void RendererGL::createBuffers()
@@ -431,54 +461,124 @@ void RendererGL::createSkybox(SkyboxParameters skyboxParam)
 	const glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
 	skyboxModelMat = glm::scale(glm::mat4_cast(q), glm::vec3(-5e9));
 	// Skybox texture
-	skyboxTex = diffuseTexDefault;
-	loadDDSTexture(skyboxTex, skyboxParam.textureFilename);
+	skyboxTex = -1;
+	skyboxTex = loadDDSTexture(skyboxParam.textureFilename, glm::vec4(0,0,0,1));
 }
 
 void RendererGL::destroy()
 {
-	glDeleteSamplers(1, &diffuseSampler);
-	glDeleteTextures(1, &diffuseTexDefault);
-
 	if (glUnmapNamedBuffer(dynamicBuffer) == GL_FALSE)
 	{
 		throw std::runtime_error("Staging buffer memory corruption");
 	}
 	glDeleteBuffers(1, &staticBuffer);
 	glDeleteBuffers(1, &dynamicBuffer);
+
+	// Kill thread
+	{
+		std::lock_guard<std::mutex> lk(texWaitMutex);
+		killThread = true;
+	}
+	texWaitCondition.notify_one();
 }
 
-void RendererGL::loadDDSTexture(GLuint &id, const std::string filename)
+RendererGL::TexHandle RendererGL::addStreamTexture(const GLuint id)
+{
+	TexHandle handle = nextHandle;
+	streamTextures[handle] = id;
+	nextHandle++;
+	if (nextHandle == -1) nextHandle = 0;
+	return handle;
+}
+
+bool RendererGL::getStreamTexture(const TexHandle tex, GLuint &id)
+{
+	auto it = streamTextures.find(tex);
+	if (it != streamTextures.end())
+	{
+		id = it->second;
+		return true;
+	}
+	return false;
+}
+
+void RendererGL::removeStreamTexture(const TexHandle tex)
+{
+	auto it = streamTextures.find(tex);
+	if (it != streamTextures.end())
+	{
+		glDeleteTextures(1, &(it->second));
+		streamTextures.erase(it);
+	}
+}
+
+/// Converts a RGBA color to a BC3 block (roughly, without interpolation)
+void RGBAToBC3(const glm::vec4 color, std::vector<uint8_t> &block)
+{
+	// RGB8 to 5_6_5
+	uint16_t color0 = 
+		(((int)(color.r*0x1F)&0x1F)<<11) | 
+		(((int)(color.g*0x3F)&0x3F)<<5) | 
+		((int)(color.b*0x1F)&0x1F);
+	uint8_t alpha = (color.a*0xFF);
+
+	block.resize(16);
+	block[0] = color0&0xFF;
+	block[1] = (color0>>8)&0xFF;
+	block[2] = color0&0xFF;
+	block[3] = (color0>>8)&0xFF;
+
+	block[8] = alpha;
+	block[9] = alpha;
+}
+
+RendererGL::TexHandle RendererGL::loadDDSTexture(
+	const std::string filename, 
+	const glm::vec4 defaultColor)
 {
 	DDSLoader loader;
 	if (loader.open(filename))
 	{
 		const int mipmapCount = loader.getMipmapCount();
-
+		// Create texture
+		GLuint id;
 		glCreateTextures(GL_TEXTURE_2D, 1, &id);
 		glTextureStorage2D(id, 
 			mipmapCount, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, 
 			loader.getWidth(0), loader.getHeight(0));
-		for (int j=0;j<mipmapCount;++j)
+		glTextureParameterf(id, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
+		glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		// Default color at highest mipmap
+		glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)(mipmapCount-1));
+		std::vector<uint8_t> block;
+		RGBAToBC3(defaultColor, block);
+		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
+			GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, block.size(), block.data());
+		// Create texture handle
+		TexHandle handle = addStreamTexture(id);
+
+		// Push jobs to queue, from highest mipmap to lowest
 		{
-			std::vector<uint8_t> imageData;
-			loader.getImageData(j, imageData);
-			glCompressedTextureSubImage2D(
-				id,
-				j, 
-				0, 0, 
-				loader.getWidth(j), loader.getHeight(j), 
-				GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
-				imageData.size(), imageData.data());
+			std::lock_guard<std::mutex> lk(texWaitMutex);
+			for (int j=mipmapCount-1;j>=0;--j)
+			{
+				TexWait texWait = {handle, j, loader};
+				texWaitQueue.push(texWait);
+			}
 		}
+		// Wake up loading thread
+		texWaitCondition.notify_one();
+		return handle;
 	}
+	return -1;
 }
 
-void RendererGL::unloadDDSTexture(GLuint &id, const GLuint defaultId)
+void RendererGL::unloadDDSTexture(TexHandle tex)
 {
-	if (id != defaultId)
+	GLuint id;
+	if (getStreamTexture(tex, id))
 		glDeleteTextures(1, &id);
-	id = defaultId;
 }
 
 void RendererGL::render(
@@ -592,9 +692,9 @@ void RendererGL::render(
 	for (uint32_t i : texLoadPlanets)
 	{
 		// Diffuse texture
-		loadDDSTexture(planetDiffuseTextures[i], planetParams[i].assetPaths.diffuseFilename);
-		loadDDSTexture(planetCloudTextures[i]  , planetParams[i].assetPaths.cloudFilename);
-		loadDDSTexture(planetNightTextures[i]  , planetParams[i].assetPaths.nightFilename);
+		planetDiffuseTextures[i] = loadDDSTexture(planetParams[i].assetPaths.diffuseFilename, glm::vec4(1,1,1,1));
+		planetCloudTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.cloudFilename  , glm::vec4(0,0,0,0));
+		planetNightTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.nightFilename  , glm::vec4(0,0,0,0));
 
 		planetTexLoaded[i] = true;
 	}
@@ -602,11 +702,37 @@ void RendererGL::render(
 	// Texture unloading
 	for (uint32_t i : texUnloadPlanets)
 	{
-		unloadDDSTexture(planetDiffuseTextures[i], diffuseTexDefault);
-		unloadDDSTexture(planetCloudTextures[i]  , cloudTexDefault);
-		unloadDDSTexture(planetNightTextures[i]  , nightTexDefault);
+		unloadDDSTexture(planetDiffuseTextures[i]);
+		unloadDDSTexture(planetCloudTextures[i]);
+		unloadDDSTexture(planetNightTextures[i]);
+
+		planetDiffuseTextures[i] = -1;
+		planetCloudTextures[i] = -1;
+		planetNightTextures[i] = -1;
 
 		planetTexLoaded[i] = false;
+	}
+
+	// Texture uploading
+	{
+		std::lock_guard<std::mutex> lk(texLoadedMutex);
+		while (!texLoadedQueue.empty())
+		{
+			TexLoaded texLoaded = texLoadedQueue.front();
+			texLoadedQueue.pop();
+			GLuint id;
+			if (getStreamTexture(texLoaded.tex, id))
+			{
+				glCompressedTextureSubImage2D(
+					id,
+					texLoaded.level, 
+					0, 0, 
+					texLoaded.width, texLoaded.height, 
+					GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+					texLoaded.data->size(), texLoaded.data->data());
+				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.level);
+			}
+		}
 	}
 
 	// Planet sorting from front to back
@@ -692,11 +818,6 @@ void RendererGL::renderHdr(
 	// No stencil writes
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
-	// Samplers
-	glBindSampler(6, diffuseSampler);
-	glBindSampler(7, diffuseSampler);
-	glBindSampler(8, diffuseSampler);
-
 	// Clearing
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 	float clearColor[] = {0.f,0.f,0.f,0.f};
@@ -708,11 +829,27 @@ void RendererGL::renderHdr(
 	glBindTextures(2, gbufferTex.size(), gbufferTex.data());
 
 	// Skybox Rendering
-	glBindTextureUnit(6, skyboxTex);
+	GLuint skyTexId;
+	GLuint skyTex = getStreamTexture(skyboxTex, skyTexId)?skyTexId:diffuseTexDefault;
+
+	glBindTextureUnit(6, skyTex);
 	glStencilFunc(GL_EQUAL, 0, 0xFF);
 	glUseProgram(programSkyboxDeferred.getId());
 
 	render(vertexArray, fullscreenTri);
+
+	// Chose default or custom textures
+	std::vector<GLuint> diffuseTextures(planetCount);
+	std::vector<GLuint> cloudTextures(planetCount);
+	std::vector<GLuint> nightTextures(planetCount);
+
+	for (uint32_t i=0;i<planetCount;++i)
+	{
+		GLuint id;
+		diffuseTextures[i] = (getStreamTexture(planetDiffuseTextures[i], id))?id:diffuseTexDefault;
+		cloudTextures[i]   = (getStreamTexture(planetCloudTextures[i]  , id))?id:cloudTexDefault;
+		nightTextures[i]   = (getStreamTexture(planetNightTextures[i]  , id))?id:nightTexDefault;
+	}
 
 	// Planet rendering
 	for (uint32_t i : closePlanets)
@@ -721,9 +858,10 @@ void RendererGL::renderHdr(
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
 			currentDynamicOffsets.planetUBOs[i],
 			sizeof(PlanetDynamicUBO));
-		glBindTextureUnit(6, planetDiffuseTextures[i]);
-		glBindTextureUnit(7, planetCloudTextures[i]);
-		glBindTextureUnit(8, planetNightTextures[i]);
+
+		glBindTextureUnit(6, diffuseTextures[i]);
+		glBindTextureUnit(7, cloudTextures[i]);
+		glBindTextureUnit(8, nightTextures[i]);
 		// If the planet is a star, use same shader as skybox
 		glUseProgram(
 			((planetParams[i].bodyParam.isStar)?
