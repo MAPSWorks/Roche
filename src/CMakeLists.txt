@@ -20,6 +20,13 @@ project (roche)
 
 add_executable(roche ${SOURCE})
 
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+	message("KHR_Debug enabled")
+	set(COMPILE_DEFS ${COMPILE_DEFS} -DUSE_KHR_DEBUG)
+endif()
+
+target_compile_definitions(roche PRIVATE ${COMPILE_DEFS})
+
 target_compile_features(roche PRIVATE cxx_auto_type cxx_nullptr cxx_range_for)
 
 target_include_directories(roche PRIVATE 

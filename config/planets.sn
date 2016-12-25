@@ -1,6 +1,7 @@
 skybox: {
 	inclination:60.0
 	texture:"tex/skybox.dds"
+	intensity:0.01
 }
 
 planets: [
@@ -15,7 +16,7 @@ planets: [
 			diffuse:"tex/sun/diffuse.dds"
 			isStar:true
 			meanColor:[4.0,4.0,4.0]
-			albedo:400
+			albedo:1
 		}
 	}
 	{
@@ -94,6 +95,7 @@ planets: [
 			night:"tex/earth/night.dds"
 			cloud:"tex/earth/clouds.dds"
 			cloudDispPeriod:0
+			nightTexIntensity:0.01
 		}
 		atmosphere:{
 			maxAltitude:130

@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <cstring>
 #include <algorithm>
+#include <iostream>
+#include <sstream>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,6 +13,41 @@
 #define PI 3.14159265358979323846264338327950288
 
 const bool USE_COHERENT_MEMORY = false;
+
+// Debug output callback
+#define objectLabel(identifier, name) glObjectLabel(identifier, name, 0, #name)
+
+void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
+   GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+{
+	std::stringstream ss;
+	switch (type)
+	{
+		case GL_DEBUG_TYPE_ERROR: ss << "Error"; break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: ss << "Decrecated behavior"; break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: ss << "Undefined behavior"; break;
+		case GL_DEBUG_TYPE_PORTABILITY: ss << "Portability"; break;
+		case GL_DEBUG_TYPE_PERFORMANCE: ss << "Performance"; break;
+		case GL_DEBUG_TYPE_MARKER: ss << "Marker"; break;
+		case GL_DEBUG_TYPE_PUSH_GROUP: ss << "Push group"; break;
+		case GL_DEBUG_TYPE_POP_GROUP: ss << "Pop group"; break;
+		case GL_DEBUG_TYPE_OTHER: ss << "Other"; break;
+	}
+
+	ss << " (";
+
+	switch (severity)
+	{
+		case GL_DEBUG_SEVERITY_HIGH: ss << "high"; break;
+		case GL_DEBUG_SEVERITY_MEDIUM: ss << "medium"; break;
+		case GL_DEBUG_SEVERITY_LOW: ss << "low"; break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION: ss << "notification"; break;
+	}
+
+	ss << "): " << std::string(message);
+
+	std::cout << ss.str() << std::endl;
+}
 
 struct Vertex
 {
@@ -30,7 +67,9 @@ struct PlanetDynamicUBO
 {
 	glm::mat4 modelMat;
 	glm::vec4 lightDir;
+	float albedo;
 	float cloudDisp;
+	float nightTexIntensity;
 };
 
 void generateSphere(
@@ -252,6 +291,33 @@ void RendererGL::init(
 	createTextures();
 	createSkybox(skyboxParam);
 
+#ifdef USE_KHR_DEBUG
+	// Debug output
+	glEnable(GL_DEBUG_OUTPUT);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+	glDebugMessageCallback(debugCallback, nullptr);
+	glDebugMessageInsert(
+		GL_DEBUG_SOURCE_APPLICATION, 
+		GL_DEBUG_TYPE_OTHER, 0, 
+		GL_DEBUG_SEVERITY_NOTIFICATION, 
+		0, "Debug callback enabled");
+
+	// Object labels
+	objectLabel(GL_BUFFER, staticBuffer);
+	objectLabel(GL_BUFFER, dynamicBuffer);
+	objectLabel(GL_VERTEX_ARRAY, vertexArray);
+	objectLabel(GL_SAMPLER, attachmentSampler);
+	objectLabel(GL_TEXTURE, depthStencilTex);
+	objectLabel(GL_TEXTURE, hdrTex);
+	objectLabel(GL_FRAMEBUFFER, hdrFbo);
+	objectLabel(GL_PROGRAM, programPlanet.getId());
+	objectLabel(GL_PROGRAM, programSkybox.getId());
+	objectLabel(GL_PROGRAM, programResolve.getId());
+	objectLabel(GL_TEXTURE, diffuseTexDefault);
+	objectLabel(GL_TEXTURE, cloudTexDefault);
+	objectLabel(GL_TEXTURE, nightTexDefault);
+#endif
+
 	// Texture loading thread
 	texLoadThread = std::thread([&,this]()
 	{
@@ -386,9 +452,11 @@ void RendererGL::createRenderTargets()
 	glSamplerParameteri(attachmentSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	// Depth stencil texture
-	glCreateTextures(GL_TEXTURE_2D, 1, &depthStencilTex);
-	glTextureStorage2D(depthStencilTex, 1, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
+	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &depthStencilTex);
+	glTextureStorage2DMultisample(
+		depthStencilTex, msaaSamples, GL_DEPTH24_STENCIL8, windowWidth, windowHeight, GL_FALSE);
 
+	/*
 	// Gbuffer
 	std::vector<GLenum> formats = {
 		GL_R32F,             // Linear depth
@@ -404,7 +472,7 @@ void RendererGL::createRenderTargets()
 		GL_COLOR_ATTACHMENT3,
 	};
 
-// Textures
+	// Textures
 	gbufferTex.resize(formats.size());
 	glCreateTextures(GL_TEXTURE_2D, gbufferTex.size(), gbufferTex.data());
 	for (uint32_t i=0;i<gbufferTex.size();++i)
@@ -420,11 +488,13 @@ void RendererGL::createRenderTargets()
 	for (uint32_t i=0;i<gbufferTex.size();++i)
 		glNamedFramebufferTexture(gbufferFbo, attachments[i], gbufferTex[i], 0);
 
+	*/
+
 	// HDR
 	// Texture
-	glCreateTextures(GL_TEXTURE_2D, 1, &hdrTex);
-	glTextureStorage2D(hdrTex, 1, GL_RGB16F, 
-		windowWidth, windowHeight);
+	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &hdrTex);
+	glTextureStorage2DMultisample(hdrTex, msaaSamples, GL_RGB16F,
+		windowWidth, windowHeight, GL_FALSE);
 
 	// Framebuffer
 	glCreateFramebuffers(1, &hdrFbo);
@@ -434,21 +504,13 @@ void RendererGL::createRenderTargets()
 
 void RendererGL::createShaders()
 {
-	programPlanetGbuffer.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programPlanetGbuffer.source(GL_FRAGMENT_SHADER, "shaders/planet_gbuffer.frag");
-	programPlanetGbuffer.link();
+	programSkybox.source(GL_VERTEX_SHADER, "shaders/planet.vert");
+	programSkybox.source(GL_FRAGMENT_SHADER, "shaders/skybox_forward.frag");
+	programSkybox.link();
 
-	programSkyboxGbuffer.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programSkyboxGbuffer.source(GL_FRAGMENT_SHADER, "shaders/skybox_gbuffer.frag");
-	programSkyboxGbuffer.link();
-
-	programSkyboxDeferred.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
-	programSkyboxDeferred.source(GL_FRAGMENT_SHADER, "shaders/skybox_deferred.frag");
-	programSkyboxDeferred.link();
-
-	programPlanetDeferred.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
-	programPlanetDeferred.source(GL_FRAGMENT_SHADER, "shaders/planet_deferred.frag");
-	programPlanetDeferred.link();
+	programPlanet.source(GL_VERTEX_SHADER, "shaders/planet.vert");
+	programPlanet.source(GL_FRAGMENT_SHADER, "shaders/planet_forward.frag");
+	programPlanet.link();
 
 	programResolve.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
 	programResolve.source(GL_FRAGMENT_SHADER, "shaders/resolve.frag");
@@ -463,6 +525,7 @@ void RendererGL::createSkybox(SkyboxParameters skyboxParam)
 	// Skybox texture
 	skyboxTex = -1;
 	skyboxTex = loadDDSTexture(skyboxParam.textureFilename, glm::vec4(0,0,0,1));
+	skyboxIntensity = skyboxParam.intensity;
 }
 
 void RendererGL::destroy()
@@ -640,6 +703,7 @@ void RendererGL::render(
 	PlanetDynamicUBO skyboxUBO;
 	skyboxUBO.modelMat = skyboxModelMat;
 	skyboxUBO.lightDir = glm::vec4(0.0);
+	skyboxUBO.albedo = skyboxIntensity;
 
 	// Planet uniform update
 	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
@@ -670,6 +734,8 @@ void RendererGL::render(
 		planetUBOs[i].modelMat = modelMat;
 		planetUBOs[i].lightDir = viewMat*glm::vec4(lightDir,0.0);
 		planetUBOs[i].cloudDisp = planetStates[i].cloudDisp;
+		planetUBOs[i].nightTexIntensity = planetParams[i].bodyParam.nightTexIntensity;
+		planetUBOs[i].albedo = planetParams[i].bodyParam.albedo;
 	}
 
 	// Dynamic data upload
@@ -743,13 +809,13 @@ void RendererGL::render(
 		return distI < distJ;
 	});
 
-	renderGBuffer(closePlanets, currentDynamicOffsets);
 	renderHdr(closePlanets, currentDynamicOffsets);
-	renderResolve();
+	renderResolve(currentDynamicOffsets);
 
 	frameId = (frameId+1)%3;
 }
 
+/*
 void RendererGL::renderGBuffer(
 	const std::vector<uint32_t> closePlanets, 
 	const DynamicOffsets currentDynamicOffsets)
@@ -807,72 +873,91 @@ void RendererGL::renderGBuffer(
 
 	glDisable(GL_DEPTH_CLAMP);
 }
+*/
 
 void RendererGL::renderHdr(
 	const std::vector<uint32_t> closePlanets,
 	const DynamicOffsets currentDynamicOffsets)
 {
-	// No depth test/write
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_FALSE);
+	// Depth test/write
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LESS);
 	// No stencil writes
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	// Clearing
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 	float clearColor[] = {0.f,0.f,0.f,0.f};
+	float clearDepth[] = {1.f};
 	glClearNamedFramebufferfv(hdrFbo, GL_COLOR, 0, clearColor);
-
-	// Deferred output bind
-	const std::vector<GLuint> samplers(gbufferTex.size(), attachmentSampler);
-	glBindSamplers(2, samplers.size(), samplers.data());
-	glBindTextures(2, gbufferTex.size(), gbufferTex.data());
-
-	// Skybox Rendering
-	GLuint skyTexId;
-	GLuint skyTex = getStreamTexture(skyboxTex, skyTexId)?skyTexId:diffuseTexDefault;
-
-	glBindTextureUnit(6, skyTex);
-	glStencilFunc(GL_EQUAL, 0, 0xFF);
-	glUseProgram(programSkyboxDeferred.getId());
-
-	render(vertexArray, fullscreenTri);
+	glClearNamedFramebufferfv(hdrFbo, GL_DEPTH, 0, clearDepth);
 
 	// Chose default or custom textures
 	std::vector<GLuint> diffuseTextures(planetCount);
 	std::vector<GLuint> cloudTextures(planetCount);
 	std::vector<GLuint> nightTextures(planetCount);
 
-	for (uint32_t i=0;i<planetCount;++i)
+	for (uint32_t i : closePlanets)
 	{
 		GLuint id;
-		diffuseTextures[i] = (getStreamTexture(planetDiffuseTextures[i], id))?id:diffuseTexDefault;
-		cloudTextures[i]   = (getStreamTexture(planetCloudTextures[i]  , id))?id:cloudTexDefault;
-		nightTextures[i]   = (getStreamTexture(planetNightTextures[i]  , id))?id:nightTexDefault;
+		diffuseTextures[i] = getStreamTexture(planetDiffuseTextures[i], id)?id:diffuseTexDefault;
+		cloudTextures[i]   = getStreamTexture(planetCloudTextures[i]  , id)?id:cloudTexDefault;
+		nightTextures[i]   = getStreamTexture(planetNightTextures[i]  , id)?id:nightTexDefault;
 	}
 
 	// Planet rendering
 	for (uint32_t i : closePlanets)
 	{
-		glStencilFunc(GL_EQUAL, ((i+1)&0xFF), 0xFF);
+		const bool star = planetParams[i].bodyParam.isStar;
+		glUseProgram(
+			(star?
+			programSkybox:
+			programPlanet).getId());
+
+		// Bind Scene UBO
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
+			currentDynamicOffsets.sceneUBO,
+			sizeof(SceneDynamicUBO));
+
+		// Bind planet UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
 			currentDynamicOffsets.planetUBOs[i],
 			sizeof(PlanetDynamicUBO));
 
-		glBindTextureUnit(6, diffuseTextures[i]);
-		glBindTextureUnit(7, cloudTextures[i]);
-		glBindTextureUnit(8, nightTextures[i]);
-		// If the planet is a star, use same shader as skybox
-		glUseProgram(
-			((planetParams[i].bodyParam.isStar)?
-				programSkyboxDeferred:
-				programPlanetDeferred).getId());
+		// Bind textures
+		glBindTextureUnit(2, diffuseTextures[i]);
+		if (!star)
+		{
+			glBindTextureUnit(3, cloudTextures[i]);
+			glBindTextureUnit(4, nightTextures[i]);
+		}
 
-		render(vertexArray, fullscreenTri);
+		render(vertexArray, planetModels[i]);
 	}
+
+	// Skybox Rendering
+	glEnable(GL_DEPTH_CLAMP);
+	glDepthFunc(GL_LEQUAL);
+
+	glUseProgram(programSkybox.getId());
+
+	// Bind skybox UBO
+	glBindBufferRange(
+		GL_UNIFORM_BUFFER, 1, dynamicBuffer,
+		currentDynamicOffsets.skyboxUBO,
+		sizeof(PlanetDynamicUBO));
+
+	// Bind skybox texture
+	GLuint skyTexId;
+	GLuint skyTex = getStreamTexture(skyboxTex, skyTexId)?skyTexId:diffuseTexDefault;
+
+	glBindTextureUnit(2, skyTex);
+
+	render(vertexArray, sphere);
 }
 
-void RendererGL::renderResolve()
+void RendererGL::renderResolve(const DynamicOffsets currentDynamicOffsets)
 {
 	// No stencil test/write
 	glStencilFunc(GL_ALWAYS, 0, 0xFF);
@@ -883,10 +968,17 @@ void RendererGL::renderResolve()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	glUseProgram(programResolve.getId());
+
+	// Bind Scene UBO
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
+			currentDynamicOffsets.sceneUBO,
+			sizeof(SceneDynamicUBO));
+
+	// Bind HDR MS texture
 	glBindSampler(1, attachmentSampler);
 	glBindTextureUnit(1, hdrTex);
 
-	glUseProgram(programResolve.getId());
 	render(vertexArray, fullscreenTri);
 }
 

@@ -20,7 +20,6 @@ vec4 encodeDerivatives(vec4 deriv)
 	return deriv*1e5;
 }
 
-
 void main()
 {
 	outDepth = passLinearDepth;

@@ -15,7 +15,9 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
 	vec4 lightDir;
+	float albedo;
 	float cloudDisp;
+	float nightIntensity;
 };
 
 layout (location = 0) out vec4 passUv;

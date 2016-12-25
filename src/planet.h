@@ -48,6 +48,7 @@ struct BodyParameters
 	bool isStar; // for lighting computation
 	float albedo; // light intensity from far away
 	float cloudDispPeriod;
+	float nightTexIntensity;
 };
 
 struct AssetPaths
@@ -85,4 +86,5 @@ class SkyboxParameters
 public:
 	float inclination;
 	std::string textureFilename;
+	float intensity;
 };

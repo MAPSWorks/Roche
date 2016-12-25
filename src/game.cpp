@@ -232,6 +232,7 @@ void Game::loadPlanetFiles()
 		shaun::sweeper sky(swp("skybox"));
 		skybox.inclination = glm::radians(get<double>(sky("inclination")));
 		skybox.textureFilename = get<std::string>(sky("texture"));
+		skybox.intensity = get<double>(sky("intensity"));
 
 		shaun::sweeper planetsSweeper(swp("planets"));
 		planetCount = planetsSweeper.value<shaun::list>().elements().size();
@@ -275,6 +276,7 @@ void Game::loadPlanetFiles()
 				planet.assetPaths.cloudFilename = get<std::string>(body("cloud"));
 				planet.assetPaths.modelFilename = get<std::string>(body("model"));
 				planet.bodyParam.cloudDispPeriod = get<double>(body("cloudDispPeriod"));
+				planet.bodyParam.nightTexIntensity = get<double>(body("nightTexIntensity"));
 			}
 			shaun::sweeper atmo(pl("atmosphere"));
 			if (!atmo.is_null())

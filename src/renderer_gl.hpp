@@ -73,7 +73,7 @@ private:
 	TexHandle loadDDSTexture(std::string filename, glm::vec4 defaultColor);
 	void unloadDDSTexture(TexHandle texId);
 
-	void renderResolve();
+	void renderResolve(DynamicOffsets currentDynamicOffsets);
 
 	uint32_t planetCount;
 	int msaaSamples;
@@ -109,10 +109,8 @@ private:
 	GLuint hdrFbo;
 
 	// Shaders
-	ShaderProgram programPlanetGbuffer;
-	ShaderProgram programPlanetDeferred;
-	ShaderProgram programSkyboxGbuffer;
-	ShaderProgram programSkyboxDeferred;
+	ShaderProgram programPlanet;
+	ShaderProgram programSkybox;
 	ShaderProgram programResolve;
 
 	// Current frame % 3 for triple buffering
@@ -143,6 +141,7 @@ private:
 	Model fullscreenTri;
 
 	glm::mat4 skyboxModelMat;
+	float skyboxIntensity;
 
 	// Texture load threading
 	struct TexWait // Texture waiting to be loaded
