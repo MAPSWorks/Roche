@@ -23,6 +23,7 @@ void main()
 	{
 		vec3 s = texelFetch(hdr, ivec2(gl_FragCoord.xy), i).rgb;
 		// Tonemapping
+		vec3 tonemap = s/(s+vec3(1)); // Reinhard (3)
 		color += s;
 	}
 
