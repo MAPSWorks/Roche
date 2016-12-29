@@ -166,7 +166,7 @@ void Game::init()
 	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
-		std::cout << "Some shit happened: " << glewGetErrorString(err) << std::endl;
+		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
 
 	// Screenshot
