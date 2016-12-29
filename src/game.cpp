@@ -176,8 +176,7 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, skybox, msaaSamples, width, height);
-	renderer->setGamma(gamma);
+	renderer->init(planetParams, skybox, msaaSamples, width, height, gamma);
 }
 
 template<class T>

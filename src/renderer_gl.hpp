@@ -23,7 +23,8 @@ public:
 		SkyboxParameters skyboxParam,
 		int msaa,
 		int windowWidth,
-		int windowHeight);
+		int windowHeight,
+		float gamma);
 	void render(
 		glm::dvec3 viewPos, 
 		float fovy,
@@ -79,6 +80,7 @@ private:
 	int msaaSamples;
 	int windowWidth;
 	int windowHeight;
+	float gamma;
 
 	// Buffer holding static data (uploaded once at init)
 	GLuint staticBuffer;

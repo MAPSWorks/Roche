@@ -157,13 +157,15 @@ void RendererGL::init(
 	const SkyboxParameters skyboxParam,
 	const int msaa,
 	const int windowWidth,
-	const int windowHeight)
+	const int windowHeight,
+	const float gamma)
 {
 	this->planetParams = planetParams;
 	this->planetCount = planetParams.size();
 	this->msaaSamples = msaa;
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
+	this->gamma = gamma;
 
 	// Various alignments
 	uint32_t uboMinAlign;
