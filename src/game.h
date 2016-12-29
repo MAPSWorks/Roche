@@ -13,6 +13,8 @@
 #include <atomic>
 #include <thread>
 
+#include <nanogui/screen.h>
+
 #define PI        3.14159265358979323846264338327950288 
 
 class Game
