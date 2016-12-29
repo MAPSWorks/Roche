@@ -2,7 +2,6 @@
 
 layout (location = 0) in vec4 passUv;
 layout (location = 1) in vec4 passNormal;
-layout (location = 2) in float passLinearDepth;
 
 layout (binding = 1, std140) uniform planetDynamicUBO
 {

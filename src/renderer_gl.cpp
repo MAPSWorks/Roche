@@ -53,6 +53,8 @@ struct Vertex
 {
 	glm::vec4 position;
 	glm::vec4 uv;
+	glm::vec4 normal;
+	glm::vec4 tangent;
 };
 
 struct SceneDynamicUBO
@@ -92,9 +94,15 @@ void generateSphere(
 			const float theta = 2*PI*((float)j/(float)meridians);
 			const float ct = cos(theta);
 			const float st = sin(theta);
+			glm::vec3 pos = glm::vec3(cp*ct,cp*st,sp);
+			glm::vec3 normal = glm::normalize(pos);
+			glm::vec3 tangent = glm::cross(normal, glm::vec3(0,0,1));
 			vertices[offset] = {
-				glm::vec4(cp*ct,cp*st,sp,1), 
-				glm::vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0)};
+				glm::vec4(pos,1), 
+				glm::vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0),
+				glm::vec4(normal,0),
+				glm::vec4(tangent,0)
+			};
 			offset++;
 		}
 	}
@@ -430,8 +438,10 @@ void RendererGL::createVertexArray()
 	glVertexArrayVertexBuffer(vertexArray, VERTEX_BINDING, staticBuffer, vertexOffset, sizeof(Vertex));
 	glVertexArrayElementBuffer(vertexArray, staticBuffer);
 
-	const int VERTEX_ATTRIB_POS = 0;
-	const int VERTEX_ATTRIB_UV = 1;
+	const int VERTEX_ATTRIB_POS     = 0;
+	const int VERTEX_ATTRIB_UV      = 1;
+	const int VERTEX_ATTRIB_NORMAL  = 2;
+	const int VERTEX_ATTRIB_TANGENT = 3;
 
 	// Position
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_POS);
@@ -442,6 +452,16 @@ void RendererGL::createVertexArray()
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_UV);
 	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_UV, VERTEX_BINDING);
 	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_UV, 4, GL_FLOAT, false, offsetof(Vertex, uv));
+
+	// Normals
+	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_NORMAL);
+	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_NORMAL, VERTEX_BINDING);
+	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_NORMAL, 4, GL_FLOAT, false, offsetof(Vertex, normal));
+
+	// Tangents
+	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_TANGENT);
+	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_TANGENT, VERTEX_BINDING);
+	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_TANGENT, 4, GL_FLOAT, false, offsetof(Vertex, tangent));
 }
 
 void RendererGL::createRenderTargets()
