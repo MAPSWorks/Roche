@@ -6,6 +6,7 @@
 class Renderer
 {
 public:
+	virtual void windowHints() = 0;
 	virtual void init(
 		std::vector<PlanetParameters> planetParams, 
 		SkyboxParameters skyboxParam,

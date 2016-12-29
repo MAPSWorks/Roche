@@ -18,6 +18,7 @@
 class RendererGL : public Renderer
 {
 public:
+	void windowHints();
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		SkyboxParameters skyboxParam,

@@ -49,6 +49,13 @@ void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
 	std::cout << ss.str() << std::endl;
 }
 
+void RendererGL::windowHints()
+{
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); 
+}
+
 struct Vertex
 {
 	glm::vec4 position;
