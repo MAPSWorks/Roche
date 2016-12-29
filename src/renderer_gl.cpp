@@ -188,8 +188,8 @@ void RendererGL::init(
 		modelsIndices[FULLSCREEN_TRI_INDEX]);
 
 	// Generate models
-	const int planetMeridians = 64;
-	const int planetRings = 64;
+	const int planetMeridians = 128;
+	const int planetRings = 128;
 	generateSphere(planetMeridians, planetRings, false, 
 		modelsVertices[SPHERE_INDEX], 
 		modelsIndices[SPHERE_INDEX]);
