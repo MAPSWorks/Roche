@@ -4,8 +4,6 @@
 #include <stdexcept>
 #include <cstring>
 #include <algorithm>
-#include <iostream>
-#include <sstream>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,7 +13,12 @@
 const bool USE_COHERENT_MEMORY = false;
 
 // Debug output callback
+#ifdef USE_KHR_DEBUG
 #define objectLabel(identifier, name) glObjectLabel(identifier, name, 0, #name)
+
+#include <fstream>
+#include <sstream>
+std::ofstream debugLog("gl_log.txt", std::ios::out | std::ios::binary | std::ios::trunc);
 
 void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
    GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
@@ -44,10 +47,12 @@ void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
 		case GL_DEBUG_SEVERITY_NOTIFICATION: ss << "notification"; break;
 	}
 
-	ss << "): " << std::string(message);
+	ss << "): " << std::string(message) << std::endl;
 
-	std::cout << ss.str() << std::endl;
+	debugLog << ss.str();
 }
+#endif
+
 
 void RendererGL::windowHints()
 {
