@@ -3,6 +3,15 @@
 layout (location = 0) in vec4 passUv;
 layout (location = 1) in vec4 passNormal;
 
+layout (binding = 0, std140) uniform sceneDynamicUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	vec4 viewPos;
+	float invGamma;
+	float exposure;
+};
+
 layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
@@ -29,5 +38,8 @@ void main()
 	night = night*clamp(-light*10+0.2,0,1)*(1-cloud.a);
 	day = mix(day, cloud.rgb, cloud.a);
 
-	outColor = vec4(day*clamp(light,0,1)+night, 1.0);
+	vec3 color = day*clamp(light,0,1)+night;
+	color *= exposure*64;
+
+	outColor = vec4(color, 1.0);
 } 

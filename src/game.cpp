@@ -36,7 +36,7 @@
 #include <glm/ext.hpp>
 
 // Ridiculous hack so glfw callbacks can take a lambda
-nanogui::Screen *guiScreen;
+nanogui::Screen *screenPtr;
 
 const float CAMERA_FOVY = 40.0;
 
@@ -61,6 +61,7 @@ Game::Game()
 
 	msaaSamples = 1;
 	gamma = 2.2;
+	exposure = 0;
 
 	renderer.reset(new RendererGL());
 }
@@ -194,17 +195,10 @@ void Game::initGUI()
 	using namespace Eigen;
 
 	Widget *panel;
+	Slider *slider;
+	TextBox *textBox;
 
-	class DragScreen : public Screen
-	{
-	public:
-		bool mouseDragEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers)
-		{
-			
-		}
-	};
-
-	guiScreen = new DragScreen();
+	guiScreen = new Screen();
 	guiScreen->initialize(win, false);
 
 	class ImmovableWindow : public Window
@@ -231,72 +225,101 @@ void Game::initGUI()
 	panel = new Widget(window);
 	panel->setLayout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 20));
 
-	Slider *slider = new Slider(panel);
+	slider = new Slider(panel);
 	slider->setValue(gamma);
 	slider->setFixedWidth(140);
 	slider->setRange({1.8, 2.4});
 
-	TextBox *textBox = new TextBox(panel);
+	textBox = new TextBox(panel);
 	textBox->setFixedSize(Vector2i(60, 25));
 	textBox->setFontSize(20);
 	textBox->setAlignment(TextBox::Alignment::Right);
 
-	auto showValue = [](float value) {
+	auto showGammaValue = [](float value) {
 		std::stringstream stream;
 		stream << std::fixed << std::setprecision(2) << value;
 		return stream.str();
 	};
 
-	slider->setCallback([this,textBox,showValue](float value) {
-		textBox->setValue(showValue(value));
+	slider->setCallback([this,textBox,showGammaValue](float value) {
+		textBox->setValue(showGammaValue(value));
 		gamma = value;
 	});
 
-	textBox->setValue(showValue(gamma));
+	textBox->setValue(showGammaValue(gamma));
+
+	// Exposure slider
+	new Label(window, "Exposure");
+	panel = new Widget(window);
+	panel->setLayout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 20));
+
+	slider = new Slider(panel);
+	slider->setValue(exposure);
+	slider->setFixedWidth(140);
+	slider->setRange({-10, 10});
+
+	textBox = new TextBox(panel);
+	textBox->setFixedSize(Vector2i(60, 25));
+	textBox->setFontSize(20);
+	textBox->setAlignment(TextBox::Alignment::Right);
+
+	auto showExpValue = [](float value) {
+		std::stringstream stream;
+		stream << std::fixed << std::setprecision(1) << value;
+		return stream.str();
+	};
+
+	slider->setCallback([this,textBox,showExpValue](float value) {
+		textBox->setValue(showExpValue(value));
+		exposure = value;
+	});
+
+	textBox->setValue(showExpValue(exposure));
 
 	guiScreen->setVisible(true);
 	guiScreen->performLayout();
 	
 	// GUI callbacks
+	screenPtr = guiScreen;
 	glfwSetCursorPosCallback(win,
 		[](GLFWwindow *, double x, double y) {
-			guiScreen->cursorPosCallbackEvent(x, y);
+			screenPtr->cursorPosCallbackEvent(x, y);
 		}
 	);
 
 	glfwSetMouseButtonCallback(win,
 		[](GLFWwindow *, int button, int action, int modifiers) {
-			guiScreen->mouseButtonCallbackEvent(button, action, modifiers);
+			screenPtr->mouseButtonCallbackEvent(button, action, modifiers);
 		}
 	);
 
 	glfwSetKeyCallback(win,
 		[](GLFWwindow *, int key, int scancode, int action, int mods) {
-			guiScreen->keyCallbackEvent(key, scancode, action, mods);
+			screenPtr->keyCallbackEvent(key, scancode, action, mods);
 		}
 	);
 
 	glfwSetCharCallback(win,
 		[](GLFWwindow *, unsigned int codepoint) {
-			guiScreen->charCallbackEvent(codepoint);
+			screenPtr->charCallbackEvent(codepoint);
 		}
 	);
 
 	glfwSetDropCallback(win,
 		[](GLFWwindow *, int count, const char **filenames) {
-			guiScreen->dropCallbackEvent(count, filenames);
+			screenPtr->dropCallbackEvent(count, filenames);
 		}
 	);
 
 	glfwSetScrollCallback(win,
 		[](GLFWwindow *, double x, double y) {
-			guiScreen->scrollCallbackEvent(x, y);
+			screenPtr->scrollCallbackEvent(x, y);
 		}
 	);
 
 	glfwSetFramebufferSizeCallback(win,
 		[](GLFWwindow *, int width, int height) {
-			guiScreen->resizeCallbackEvent(width, height);
+			screenPtr->resizeCallbackEvent(width, height);
 		}
 	);
 }
@@ -557,19 +580,37 @@ void Game::update(const double dt)
 	glfwGetCursorPos(win, &posX, &posY);
 	const glm::vec2 move = {-posX+preMousePosX, posY-preMousePosY};
 
-	if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1))
+	bool mouseButton1 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1);
+	bool mouseButton2 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2);
+
+	// Check if we are not clicking on a gui
+	if ((mouseButton1 || mouseButton2) && !dragging)
 	{
-		viewSpeed.x += move.x*sensitivity;
-		viewSpeed.y += move.y*sensitivity;
-		for (int i=0;i<2;++i)
-		{
-			if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
-			if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
-		}
+		dragging = true;
+		nanogui::Widget *w = guiScreen->findWidget(Eigen::Vector2i(posX, posY));
+		canDrag = (!w || w == guiScreen);
 	}
-	else if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
+	else if (dragging && !(mouseButton1 || mouseButton2))
 	{
-		viewSpeed.z += (move.y*sensitivity);
+		dragging = false;
+	}
+
+	if (dragging && canDrag)
+	{
+		if (mouseButton1)
+		{	
+			viewSpeed.x += move.x*sensitivity;
+			viewSpeed.y += move.y*sensitivity;
+			for (int i=0;i<2;++i)
+			{
+				if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
+				if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
+			}
+		}
+		else if (glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2))
+		{
+			viewSpeed.z += (move.y*sensitivity);
+		}
 	}
 
 	cameraPolar.x += viewSpeed.x;
@@ -612,7 +653,7 @@ void Game::update(const double dt)
 		
 	// Scene rendering
 	renderer->render(
-		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), gamma,
+		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), gamma, exposure,
 		planetStates);
 
 	// GUI rendering

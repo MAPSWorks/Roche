@@ -75,6 +75,7 @@ struct SceneDynamicUBO
 	glm::mat4 viewMat;
 	glm::vec4 viewPos;
 	float invGamma;
+	float exposure;
 };
 
 struct PlanetDynamicUBO
@@ -682,6 +683,7 @@ void RendererGL::render(
 		const glm::dvec3 viewCenter,
 		const glm::vec3 viewUp,
 		const float gamma,
+		const float exposure,
 		const std::vector<PlanetState> planetStates)
 {
 	const float closePlanetMinSizePixels = 1;
@@ -731,6 +733,7 @@ void RendererGL::render(
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.viewPos = glm::vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.invGamma = 1.f/gamma;
+	sceneUBO.exposure = glm::pow(2, exposure);
 
 	// Skybox uniform update
 	PlanetDynamicUBO skyboxUBO;

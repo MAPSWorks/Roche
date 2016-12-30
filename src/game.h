@@ -13,6 +13,8 @@
 #include <atomic>
 #include <thread>
 
+#include <nanogui/screen.h>
+
 #define PI        3.14159265358979323846264338327950288 
 
 class Game
@@ -31,9 +33,13 @@ private:
 	void loadPlanetFiles();
 	void loadSettingsFile();
 
+	// GUI
+	nanogui::Screen *guiScreen;
+
 	std::unique_ptr<Renderer> renderer;
 	float gamma;
-
+	float exposure;
+	
 	// Main planet collection
 	uint32_t planetCount;
 	std::vector<PlanetParameters> planetParams; // Immutable parameters
@@ -55,6 +61,8 @@ private:
 
 	// INTERACTION RELATED STUFF
 	double preMousePosX, preMousePosY; // previous cursor position
+	bool dragging; // Indicates if we are currently trying to drag the view
+	bool canDrag; // Indicate if we can drag the view (not over gui,...)
 	glm::vec3 viewSpeed;
 	float maxViewSpeed, viewSmoothness;
 

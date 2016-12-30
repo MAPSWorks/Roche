@@ -11,6 +11,7 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 	mat4 viewMat;
 	vec4 viewPos;
 	float invGamma;
+	float exposure;
 };
 
 layout (binding = 1, std140) uniform planetDynamicUBO

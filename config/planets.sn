@@ -1,7 +1,7 @@
 skybox: {
 	inclination:60.0
 	texture:"tex/skybox.dds"
-	intensity:0.01
+	intensity:0.001
 }
 
 planets: [
@@ -15,8 +15,8 @@ planets: [
 			GM:132712440018
 			diffuse:"tex/sun/diffuse.dds"
 			isStar:true
-			meanColor:[4.0,4.0,4.0]
-			albedo:1
+			meanColor:[1.0,1.0,1.0]
+			albedo:1024
 		}
 	}
 	{

@@ -6,6 +6,7 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 	mat4 viewMat;
 	vec4 viewPos;
 	float invGamma;
+	float exposure;
 };
 
 layout (binding = 1) uniform sampler2DMS hdr;
@@ -23,6 +24,7 @@ void main()
 	{
 		vec3 s = texelFetch(hdr, ivec2(gl_FragCoord.xy), i).rgb;
 		// Tonemapping
+		s/=64.0;
 		vec3 tonemap = s/(s+vec3(1)); // Reinhard (3)
 		color += s;
 	}
