@@ -195,10 +195,34 @@ void Game::initGUI()
 
 	Widget *panel;
 
-	guiScreen = new Screen();
+	class DragScreen : public Screen
+	{
+	public:
+		bool mouseDragEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers)
+		{
+			
+		}
+	};
+
+	guiScreen = new DragScreen();
 	guiScreen->initialize(win, false);
 
-	Window *window = new Window(guiScreen, "Settings");
+	class ImmovableWindow : public Window
+	{
+	public:
+		ImmovableWindow(Widget *parent, const std::string &title) : Window(parent, title) {}
+		bool mouseDragEvent(const Vector2i &, const Vector2i &, int, int)
+		{
+			return false;
+		}
+		bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers)
+		{
+			if (Widget::mouseButtonEvent(p, button, down, modifiers)) return true;
+			return false;
+		}
+	};
+
+	ImmovableWindow *window = new ImmovableWindow(guiScreen, "Settings");
 	window->setPosition(Vector2i(10, 10));
 	window->setLayout(new GroupLayout());
 
