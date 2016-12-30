@@ -25,8 +25,8 @@
 
 #include <glm/ext.hpp>
 
-const int MIN_FLARE_DIST = 100.0;
-const int MAX_PLANET_DIST = 200.0;
+// Ridiculous hack so glfw callbacks can take a lambda
+nanogui::Screen *screenPtr;
 
 const float CAMERA_FOVY = 40.0;
 
@@ -175,6 +175,56 @@ void Game::init()
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
 	renderer->init(planetParams, skybox, msaaSamples, width, height, gamma);
+
+	// GUI
+	guiScreen.initialize(win, false);
+	guiScreen.setVisible(true);
+	guiScreen.performLayout();
+
+	screenPtr = &guiScreen;
+
+	// GUI callbacks
+	glfwSetCursorPosCallback(win,
+		[](GLFWwindow *, double x, double y) {
+			screenPtr->cursorPosCallbackEvent(x, y);
+		}
+	);
+
+	glfwSetMouseButtonCallback(win,
+		[](GLFWwindow *, int button, int action, int modifiers) {
+			screenPtr->mouseButtonCallbackEvent(button, action, modifiers);
+		}
+	);
+
+	glfwSetKeyCallback(win,
+		[](GLFWwindow *, int key, int scancode, int action, int mods) {
+			screenPtr->keyCallbackEvent(key, scancode, action, mods);
+		}
+	);
+
+	glfwSetCharCallback(win,
+		[](GLFWwindow *, unsigned int codepoint) {
+			screenPtr->charCallbackEvent(codepoint);
+		}
+	);
+
+	glfwSetDropCallback(win,
+		[](GLFWwindow *, int count, const char **filenames) {
+			screenPtr->dropCallbackEvent(count, filenames);
+		}
+	);
+
+	glfwSetScrollCallback(win,
+		[](GLFWwindow *, double x, double y) {
+			screenPtr->scrollCallbackEvent(x, y);
+		}
+	);
+
+	glfwSetFramebufferSizeCallback(win,
+		[](GLFWwindow *, int width, int height) {
+			screenPtr->resizeCallbackEvent(width, height);
+		}
+	);
 }
 
 template<class T>
@@ -486,9 +536,14 @@ void Game::update(const double dt)
 		sin(cameraPolar.y))*(double)cameraPolar.z +
 		cameraCenter;
 		
+	// Scene rendering
 	renderer->render(
 		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), 
 		planetStates);
+
+	// GUI rendering
+	guiScreen.drawContents();
+	guiScreen.drawWidgets();
 
 	glfwSwapBuffers(win);
 	glfwPollEvents();

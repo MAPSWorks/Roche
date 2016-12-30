@@ -31,6 +31,9 @@ private:
 
 	void loadPlanetFiles();
 	void loadSettingsFile();
+	
+	// Gui
+	nanogui::Screen guiScreen;
 
 	std::unique_ptr<Renderer> renderer;
 	float gamma;
