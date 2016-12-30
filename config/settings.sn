@@ -13,7 +13,7 @@ video:{
 graphics:{
   skipMipmap:0
   msaaSamples:4
-  gamma:2.0
+  gamma:2.2
 }
 
 controls:{

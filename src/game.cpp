@@ -15,6 +15,16 @@
 #include <functional>
 #include <memory>
 #include <algorithm>
+#include <sstream>
+#include <iomanip>
+
+#include <nanogui/screen.h>
+#include <nanogui/window.h>
+#include <nanogui/widget.h>
+#include <nanogui/label.h>
+#include <nanogui/slider.h>
+#include <nanogui/layout.h>
+#include <nanogui/textbox.h>
 
 #include "renderer_gl.hpp"
 #include "util.h"
@@ -26,7 +36,7 @@
 #include <glm/ext.hpp>
 
 // Ridiculous hack so glfw callbacks can take a lambda
-nanogui::Screen *screenPtr;
+nanogui::Screen *guiScreen;
 
 const float CAMERA_FOVY = 40.0;
 
@@ -174,55 +184,95 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, skybox, msaaSamples, width, height, gamma);
+	renderer->init(planetParams, skybox, msaaSamples, width, height);
+	initGUI();
+}
 
-	// GUI
-	guiScreen.initialize(win, false);
-	guiScreen.setVisible(true);
-	guiScreen.performLayout();
+void Game::initGUI()
+{
+	using namespace nanogui;
+	using namespace Eigen;
 
-	screenPtr = &guiScreen;
+	Widget *panel;
 
+	guiScreen = new Screen();
+	guiScreen->initialize(win, false);
+
+	Window *window = new Window(guiScreen, "Settings");
+	window->setPosition(Vector2i(10, 10));
+	window->setLayout(new GroupLayout());
+
+	// Gamma slider
+	new Label(window, "Gamma");
+	panel = new Widget(window);
+	panel->setLayout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 20));
+
+	Slider *slider = new Slider(panel);
+	slider->setValue(gamma);
+	slider->setFixedWidth(140);
+	slider->setRange({1.8, 2.4});
+
+	TextBox *textBox = new TextBox(panel);
+	textBox->setFixedSize(Vector2i(60, 25));
+	textBox->setFontSize(20);
+	textBox->setAlignment(TextBox::Alignment::Right);
+
+	auto showValue = [](float value) {
+		std::stringstream stream;
+		stream << std::fixed << std::setprecision(2) << value;
+		return stream.str();
+	};
+
+	slider->setCallback([this,textBox,showValue](float value) {
+		textBox->setValue(showValue(value));
+		gamma = value;
+	});
+
+	textBox->setValue(showValue(gamma));
+
+	guiScreen->setVisible(true);
+	guiScreen->performLayout();
+	
 	// GUI callbacks
 	glfwSetCursorPosCallback(win,
 		[](GLFWwindow *, double x, double y) {
-			screenPtr->cursorPosCallbackEvent(x, y);
+			guiScreen->cursorPosCallbackEvent(x, y);
 		}
 	);
 
 	glfwSetMouseButtonCallback(win,
 		[](GLFWwindow *, int button, int action, int modifiers) {
-			screenPtr->mouseButtonCallbackEvent(button, action, modifiers);
+			guiScreen->mouseButtonCallbackEvent(button, action, modifiers);
 		}
 	);
 
 	glfwSetKeyCallback(win,
 		[](GLFWwindow *, int key, int scancode, int action, int mods) {
-			screenPtr->keyCallbackEvent(key, scancode, action, mods);
+			guiScreen->keyCallbackEvent(key, scancode, action, mods);
 		}
 	);
 
 	glfwSetCharCallback(win,
 		[](GLFWwindow *, unsigned int codepoint) {
-			screenPtr->charCallbackEvent(codepoint);
+			guiScreen->charCallbackEvent(codepoint);
 		}
 	);
 
 	glfwSetDropCallback(win,
 		[](GLFWwindow *, int count, const char **filenames) {
-			screenPtr->dropCallbackEvent(count, filenames);
+			guiScreen->dropCallbackEvent(count, filenames);
 		}
 	);
 
 	glfwSetScrollCallback(win,
 		[](GLFWwindow *, double x, double y) {
-			screenPtr->scrollCallbackEvent(x, y);
+			guiScreen->scrollCallbackEvent(x, y);
 		}
 	);
 
 	glfwSetFramebufferSizeCallback(win,
 		[](GLFWwindow *, int width, int height) {
-			screenPtr->resizeCallbackEvent(width, height);
+			guiScreen->resizeCallbackEvent(width, height);
 		}
 	);
 }
@@ -538,12 +588,11 @@ void Game::update(const double dt)
 		
 	// Scene rendering
 	renderer->render(
-		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), 
+		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), gamma,
 		planetStates);
 
 	// GUI rendering
-	guiScreen.drawContents();
-	guiScreen.drawWidgets();
+	guiScreen->drawWidgets();
 
 	glfwSwapBuffers(win);
 	glfwPollEvents();

@@ -24,13 +24,13 @@ public:
 		SkyboxParameters skyboxParam,
 		int msaa,
 		int windowWidth,
-		int windowHeight,
-		float gamma);
+		int windowHeight);
 	void render(
 		glm::dvec3 viewPos, 
 		float fovy,
 		glm::dvec3 viewCenter,
 		glm::vec3 viewUp,
+		float gamma,
 		std::vector<PlanetState> planetStates);
 	void destroy();
 private:
@@ -81,7 +81,6 @@ private:
 	int msaaSamples;
 	int windowWidth;
 	int windowHeight;
-	float gamma;
 
 	// Buffer holding static data (uploaded once at init)
 	GLuint staticBuffer;

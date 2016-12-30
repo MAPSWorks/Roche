@@ -169,15 +169,13 @@ void RendererGL::init(
 	const SkyboxParameters skyboxParam,
 	const int msaa,
 	const int windowWidth,
-	const int windowHeight,
-	const float gamma)
+	const int windowHeight)
 {
 	this->planetParams = planetParams;
 	this->planetCount = planetParams.size();
 	this->msaaSamples = msaa;
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
-	this->gamma = gamma;
 
 	// Various alignments
 	uint32_t uboMinAlign;
@@ -683,6 +681,7 @@ void RendererGL::render(
 		const float fovy,
 		const glm::dvec3 viewCenter,
 		const glm::vec3 viewUp,
+		const float gamma,
 		const std::vector<PlanetState> planetStates)
 {
 	const float closePlanetMinSizePixels = 1;

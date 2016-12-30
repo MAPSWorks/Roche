@@ -13,8 +13,6 @@
 #include <atomic>
 #include <thread>
 
-#include <nanogui/screen.h>
-
 #define PI        3.14159265358979323846264338327950288 
 
 class Game
@@ -27,13 +25,11 @@ public:
 	bool isRunning();
 
 private:
+	void initGUI();
 	bool isPressedOnce(int key);
 
 	void loadPlanetFiles();
 	void loadSettingsFile();
-	
-	// Gui
-	nanogui::Screen guiScreen;
 
 	std::unique_ptr<Renderer> renderer;
 	float gamma;
