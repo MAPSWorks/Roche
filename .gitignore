@@ -6,3 +6,4 @@ build/
 screenshots/
 *.trace
 gl_log.txt
+*.dds
