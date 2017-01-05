@@ -158,6 +158,17 @@ void generateFullscreenTri(std::vector<Vertex> &vertices, std::vector<uint32_t> 
 	indices = {0,1,2};
 }
 
+GLenum DDSFormatToGL(DDSLoader::Format format)
+{
+	switch (format)
+	{
+		case DDSLoader::Format::BC1: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
+		case DDSLoader::Format::BC2: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT;
+		case DDSLoader::Format::BC3: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT;
+	}
+	return 0;
+}
+
 uint32_t align(const uint32_t offset, const uint32_t minAlign)
 {
 	const uint32_t remainder = offset%minAlign;
@@ -364,6 +375,7 @@ void RendererGL::init(
 			TexLoaded texLoaded;
 			texLoaded.tex = texWait.tex;
 			texLoaded.level = texWait.level;
+			texLoaded.format = DDSFormatToGL(texWait.loader.getFormat());
 			texLoaded.width  = texWait.loader.getWidth (texWait.level);
 			texLoaded.height = texWait.loader.getHeight(texWait.level);
 			texLoaded.data.reset(new std::vector<uint8_t>());
@@ -608,24 +620,42 @@ void RendererGL::removeStreamTexture(const TexHandle tex)
 	}
 }
 
-/// Converts a RGBA color to a BC3 block (roughly, without interpolation)
-void RGBAToBC3(const glm::vec4 color, std::vector<uint8_t> &block)
+/// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
+void RGBAToBC(const glm::vec4 color, DDSLoader::Format format, std::vector<uint8_t> &block)
 {
 	// RGB8 to 5_6_5
 	uint16_t color0 = 
 		(((int)(color.r*0x1F)&0x1F)<<11) | 
 		(((int)(color.g*0x3F)&0x3F)<<5) | 
 		((int)(color.b*0x1F)&0x1F);
-	uint8_t alpha = (color.a*0xFF);
 
-	block.resize(16);
+	if (format == DDSLoader::Format::BC1)
+	{
+		block.resize(8);
+	}
+	else 
+	{
+		block.resize(16);
+		if (format == DDSLoader::Format::BC2)
+		{
+			int alpha = (color.a*0xF);
+			uint8_t alphaCodes = (alpha << 4) | alpha;
+			for (int i=8;i<16;++i) block[i] = alphaCodes;
+		}
+		else if (format == DDSLoader::Format::BC3)
+		{
+			uint8_t alpha = (color.a*0xFF);
+			block[8] = alpha;
+			block[9] = alpha;
+		}
+	}
+
 	block[0] = color0&0xFF;
 	block[1] = (color0>>8)&0xFF;
 	block[2] = color0&0xFF;
 	block[3] = (color0>>8)&0xFF;
-
-	block[8] = alpha;
-	block[9] = alpha;
+	char codes = (color.a > 0.5)?0x00:0xFF;
+	for (int i=4;i<8;++i) block[i] = codes;
 }
 
 RendererGL::TexHandle RendererGL::loadDDSTexture(
@@ -640,7 +670,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		GLuint id;
 		glCreateTextures(GL_TEXTURE_2D, 1, &id);
 		glTextureStorage2D(id, 
-			mipmapCount, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, 
+			mipmapCount, DDSFormatToGL(loader.getFormat()), 
 			loader.getWidth(0), loader.getHeight(0));
 		glTextureParameterf(id, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
 		glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -648,9 +678,9 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		// Default color at highest mipmap
 		glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)(mipmapCount-1));
 		std::vector<uint8_t> block;
-		RGBAToBC3(defaultColor, block);
+		RGBAToBC(defaultColor, loader.getFormat(), block);
 		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
-			GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT, block.size(), block.data());
+			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
 		// Create texture handle
 		TexHandle handle = addStreamTexture(id);
 
@@ -830,7 +860,7 @@ void RendererGL::render(
 					texLoaded.level, 
 					0, 0, 
 					texLoaded.width, texLoaded.height, 
-					GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+					texLoaded.format,
 					texLoaded.data->size(), texLoaded.data->data());
 				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.level);
 			}

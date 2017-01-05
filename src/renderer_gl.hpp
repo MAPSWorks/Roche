@@ -157,6 +157,7 @@ private:
 	struct TexLoaded // Texture that have finished loading
 	{
 		TexHandle tex;
+		GLenum format;
 		int level;
 		int width, height;
 		std::shared_ptr<std::vector<uint8_t>> data;

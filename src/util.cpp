@@ -58,9 +58,41 @@ void DDSLoader::setSkipMipmap(const int skipMipmap)
 	DDSLoader::skipMipmap = std::max(0, skipMipmap);
 }
 
-int getImageSize(const int width, const int height)
+DDSLoader::Format DDSLoader::getFormat()
 {
-	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*16;
+	return format;
+}
+
+int getFormatBytesPerBlock(DDSLoader::Format format)
+{
+	switch (format)
+	{
+		case DDSLoader::Format::BC1: return 8;
+		case DDSLoader::Format::BC2: return 16;
+		case DDSLoader::Format::BC3: return 16;
+	}
+}
+
+int getImageSize(const int width, const int height, DDSLoader::Format format)
+{
+	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*getFormatBytesPerBlock(format);
+}
+
+DDSLoader::Format getFourCCFormat(char* fourCC)
+{
+	if (!strncmp(fourCC, "DXT1", 4))
+	{
+		return DDSLoader::Format::BC1;
+	}
+	if (!strncmp(fourCC, "DXT3", 4))
+	{
+		return DDSLoader::Format::BC2;
+	}
+	if (!strncmp(fourCC, "DXT5", 4))
+	{
+		return DDSLoader::Format::BC3;
+	}
+	return DDSLoader::Format::Undefined;
 }
 
 bool DDSLoader::open(const std::string filename)
@@ -81,13 +113,7 @@ bool DDSLoader::open(const std::string filename)
 	// DDS header
 	DDS_HEADER header;
 	in.read((char*)&header, sizeof(DDS_HEADER));
-	char *fourCC;
-	fourCC = (char*)&(header.ddspf.dwFourCC);
-
-	if (strncmp(fourCC, "DXT5", 4))
-	{
-		return false;
-	}
+	format = getFourCCFormat((char*)&(header.ddspf.dwFourCC));
 
 	// Mipmap count check
 	mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
@@ -98,11 +124,12 @@ bool DDSLoader::open(const std::string filename)
 	size_t offset = 128;
 	for (int i=0;i<skipMipmap;++i)
 	{
-		offset += getImageSize(getWidth(i), getHeight(i));
+		offset += getImageSize(getWidth(i), getHeight(i), format);
 	}
+
 	for (int i=skipMipmap;i<mipmapCount;++i)
 	{
-		int size = getImageSize(getWidth(i), getHeight(i));
+		int size = getImageSize(getWidth(i), getHeight(i), format);
 		offsets.push_back(offset);
 		sizes.push_back(size);
 		offset += size;
