@@ -371,25 +371,38 @@ void RendererGL::init(
 				texWaitQueue.pop();
 			}
 
-			// Fill info from loader
-			TexLoaded texLoaded;
-			texLoaded.tex = texWait.tex;
-			texLoaded.level = texWait.level;
-			texLoaded.format = DDSFormatToGL(texWait.loader.getFormat());
-			texLoaded.width  = texWait.loader.getWidth (texWait.level);
-			texLoaded.height = texWait.loader.getHeight(texWait.level);
-			texLoaded.data.reset(new std::vector<uint8_t>());
+			std::shared_ptr<std::vector<uint8_t>> imageData = std::make_shared<std::vector<uint8_t>>();
 
 			// Load image data
 			size_t imageSize;
-			texWait.loader.getImageData(texLoaded.level, 1, &imageSize, nullptr);
-			texLoaded.data->resize(imageSize);
-			texWait.loader.getImageData(texLoaded.level, 1, &imageSize, texLoaded.data->data());
+			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, nullptr);
+			imageData->resize(imageSize);
+			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, imageData->data());
 
+			std::vector<TexLoaded> texLoaded(texWait.mipmapCount);
+			size_t offset = 0;
+
+			for (unsigned int i=0;i<texLoaded.size();++i)
+			{
+				auto &tl = texLoaded[i];
+				tl.tex = texWait.tex;
+				tl.mipmap = texWait.mipmap+i;
+				tl.mipmapOffset = offset;
+				tl.format = DDSFormatToGL(texWait.loader.getFormat());
+				tl.width  = texWait.loader.getWidth (texWait.mipmap);
+				tl.height = texWait.loader.getHeight(texWait.mipmap);
+				tl.data = imageData;
+				// Compute offset of next mipmap
+				size_t size0;
+				texWait.loader.getImageData(texWait.mipmap+i, 1, &size0, nullptr);
+				offset += size0;
+			}
+			
 			// Push loaded texture into queue
 			{
 				std::lock_guard<std::mutex> lk(texLoadedMutex);
-				texLoadedQueue.push(texLoaded);
+				for (auto tl : texLoaded)
+					texLoadedQueue.push(tl);
 			}
 		}
 	});
@@ -687,13 +700,21 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		// Create texture handle
 		TexHandle handle = createStreamTexture(id);
 
-		// Push jobs to queue, from highest mipmap to lowest
+		// Create jobs
+		const int groupLoadMipmap = 8; // Number of highest mipmaps to load together
+		int jobCount = std::max(mipmapCount-groupLoadMipmap+1, 1);
+		std::vector<TexWait> texWait(jobCount);
+		for (int i=0;i<texWait.size();++i)
+		{
+			texWait[i] = {handle, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
+		}
+
+		// Push jobs to queue
 		{
 			std::lock_guard<std::mutex> lk(texWaitMutex);
-			for (int j=mipmapCount-1;j>=0;--j)
+			for (auto tw : texWait)
 			{
-				TexWait texWait = {handle, j, loader};
-				texWaitQueue.push(texWait);
+				texWaitQueue.push(tw);
 			}
 		}
 		// Wake up loading thread
@@ -860,12 +881,12 @@ void RendererGL::render(
 			{
 				glCompressedTextureSubImage2D(
 					id,
-					texLoaded.level, 
+					texLoaded.mipmap, 
 					0, 0, 
 					texLoaded.width, texLoaded.height, 
 					texLoaded.format,
 					texLoaded.data->size(), texLoaded.data->data());
-				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.level);
+				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.mipmap);
 			}
 		}
 	}

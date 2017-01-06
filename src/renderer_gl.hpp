@@ -150,7 +150,8 @@ private:
 	struct TexWait // Texture waiting to be loaded
 	{
 		TexHandle tex;
-		int level;
+		int mipmap;
+		int mipmapCount;
 		DDSLoader loader;
 	};
 
@@ -158,7 +159,8 @@ private:
 	{
 		TexHandle tex;
 		GLenum format;
-		int level;
+		int mipmap;
+		int mipmapOffset;
 		int width, height;
 		std::shared_ptr<std::vector<uint8_t>> data;
 	};
