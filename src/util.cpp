@@ -157,13 +157,14 @@ int DDSLoader::getHeight(const int mipmapLevel)
 	return std::max(1, height>>mipmapLevel);
 }
 
-void DDSLoader::getImageData(uint32_t mipmapLevel, size_t *imageSize, uint8_t *data)
+void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, size_t *imageSize, uint8_t *data)
 {
-	if (mipmapLevel >= getMipmapCount()) return;
+	if (mipmapLevel+mipmapCount-1 >= getMipmapCount()) return;
 	else if (mipmapLevel < 0) mipmapLevel = 0;
 
 	// Offset into file to get pixel data
-	const int size = sizes[mipmapLevel];
+	int size = 0;
+	for (int i=mipmapLevel;i<mipmapLevel+mipmapCount;++i) size += sizes[i];
 	if (imageSize) *imageSize = size;
 
 	if (data)

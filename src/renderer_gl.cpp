@@ -382,9 +382,9 @@ void RendererGL::init(
 
 			// Load image data
 			size_t imageSize;
-			texWait.loader.getImageData(texLoaded.level, &imageSize, nullptr);
+			texWait.loader.getImageData(texLoaded.level, 1, &imageSize, nullptr);
 			texLoaded.data->resize(imageSize);
-			texWait.loader.getImageData(texLoaded.level, &imageSize, texLoaded.data->data());
+			texWait.loader.getImageData(texLoaded.level, 1, &imageSize, texLoaded.data->data());
 
 			// Push loaded texture into queue
 			{
@@ -593,7 +593,7 @@ void RendererGL::destroy()
 	texWaitCondition.notify_one();
 }
 
-RendererGL::TexHandle RendererGL::addStreamTexture(const GLuint id)
+RendererGL::TexHandle RendererGL::createStreamTexture(const GLuint id)
 {
 	TexHandle handle = nextHandle;
 	streamTextures[handle] = id;
@@ -685,7 +685,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
 			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
 		// Create texture handle
-		TexHandle handle = addStreamTexture(id);
+		TexHandle handle = createStreamTexture(id);
 
 		// Push jobs to queue, from highest mipmap to lowest
 		{

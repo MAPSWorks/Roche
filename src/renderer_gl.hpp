@@ -69,7 +69,7 @@ private:
 		std::vector<uint32_t> closePlanets, 
 		DynamicOffsets currentDynamicOffsets);
 
-	TexHandle addStreamTexture(GLuint tex);
+	TexHandle createStreamTexture(GLuint tex);
 	bool getStreamTexture(TexHandle tex, GLuint &id);
 	void removeStreamTexture(TexHandle tex);
 
