@@ -381,7 +381,10 @@ void RendererGL::init(
 			texLoaded.data.reset(new std::vector<uint8_t>());
 
 			// Load image data
-			texWait.loader.getImageData(texLoaded.level, *(texLoaded.data.get()));
+			size_t imageSize;
+			texWait.loader.getImageData(texLoaded.level, &imageSize, nullptr);
+			texLoaded.data->resize(imageSize);
+			texWait.loader.getImageData(texLoaded.level, &imageSize, texLoaded.data->data());
 
 			// Push loaded texture into queue
 			{

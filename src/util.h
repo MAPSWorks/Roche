@@ -22,6 +22,7 @@ public:
 	Format getFormat();
 	void getImageData(uint32_t mipmapLevel, 
 		std::vector<uint8_t> &data);
+	void getImageData(uint32_t mipmapLevel, size_t *imageSize, uint8_t *data);
 
 	static void setSkipMipmap(int skipMipmap);
 
