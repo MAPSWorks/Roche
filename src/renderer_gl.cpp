@@ -517,40 +517,6 @@ void RendererGL::createRenderTargets()
 	glTextureStorage2DMultisample(
 		depthStencilTex, msaaSamples, GL_DEPTH24_STENCIL8, windowWidth, windowHeight, GL_FALSE);
 
-	/*
-	// Gbuffer
-	std::vector<GLenum> formats = {
-		GL_R32F,             // Linear depth
-		GL_RG16,             // UVs
-		GL_RGBA16F,          // UV derivatives
-		GL_RG16F,            // Normals (Spheremap transform)
-	};
-
-	std::vector<GLenum> attachments = {
-		GL_COLOR_ATTACHMENT0,
-		GL_COLOR_ATTACHMENT1,
-		GL_COLOR_ATTACHMENT2,
-		GL_COLOR_ATTACHMENT3,
-	};
-
-	// Textures
-	gbufferTex.resize(formats.size());
-	glCreateTextures(GL_TEXTURE_2D, gbufferTex.size(), gbufferTex.data());
-	for (uint32_t i=0;i<gbufferTex.size();++i)
-	{
-		glTextureStorage2D(gbufferTex[i], 1, formats[i], 
-			windowWidth, windowHeight);
-	}
-
-	// Framebuffer
-	glCreateFramebuffers(1, &gbufferFbo);
-	glNamedFramebufferDrawBuffers(gbufferFbo, attachments.size(), attachments.data());
-	glNamedFramebufferTexture(gbufferFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
-	for (uint32_t i=0;i<gbufferTex.size();++i)
-		glNamedFramebufferTexture(gbufferFbo, attachments[i], gbufferTex[i], 0);
-
-	*/
-
 	// HDR
 	// Texture
 	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &hdrTex);
@@ -904,66 +870,6 @@ void RendererGL::render(
 
 	frameId = (frameId+1)%3;
 }
-
-/*
-void RendererGL::renderGBuffer(
-	const std::vector<uint32_t> closePlanets, 
-	const DynamicOffsets currentDynamicOffsets)
-{
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_STENCIL_TEST);
-	glEnable(GL_CULL_FACE);
-	glDisable(GL_DEPTH_CLAMP);
-	glDepthFunc(GL_LESS);
-	glDepthMask(GL_TRUE);
-
-	// Clearing
-	glBindFramebuffer(GL_FRAMEBUFFER, gbufferFbo);
-	glClearNamedFramebufferfi(gbufferFbo, GL_DEPTH_STENCIL, 0, 1.f, 0);
-
-	// Planet rendering
-	glUseProgram(programPlanetGbuffer.getId());
-
-	// Bind Scene UBO 
-	glBindBufferRange(
-		GL_UNIFORM_BUFFER, 0, dynamicBuffer,
-		currentDynamicOffsets.sceneUBO, sizeof(SceneDynamicUBO));
-
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-
-	for (uint32_t i : closePlanets)
-	{
-		// Stencil value for planet
-		const uint8_t stencilValue = ((i+1)&0xFF);
-
-		glStencilFunc(GL_ALWAYS, stencilValue, 0xFF);
-
-		// Bind planet UBO
-		glBindBufferRange(
-			GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-			currentDynamicOffsets.planetUBOs[i],
-			sizeof(PlanetDynamicUBO));
-		// Draw
-		render(vertexArray, planetModels[i]);
-	}
-
-	// Skybox rendering
-	glUseProgram(programSkyboxGbuffer.getId());
-	
-	glEnable(GL_DEPTH_CLAMP);
-	glDepthFunc(GL_LEQUAL);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-	glStencilFunc(GL_ALWAYS, 0, 0xFF);
-	
-	glBindBufferRange(
-		GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-		currentDynamicOffsets.skyboxUBO,
-		sizeof(PlanetDynamicUBO));
-	render(vertexArray, sphere);
-
-	glDisable(GL_DEPTH_CLAMP);
-}
-*/
 
 void RendererGL::renderHdr(
 	const std::vector<uint32_t> closePlanets,
