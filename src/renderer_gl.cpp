@@ -389,12 +389,13 @@ void RendererGL::init(
 				tl.mipmap = texWait.mipmap+i;
 				tl.mipmapOffset = offset;
 				tl.format = DDSFormatToGL(texWait.loader.getFormat());
-				tl.width  = texWait.loader.getWidth (texWait.mipmap);
-				tl.height = texWait.loader.getHeight(texWait.mipmap);
+				tl.width  = texWait.loader.getWidth (tl.mipmap);
+				tl.height = texWait.loader.getHeight(tl.mipmap);
 				tl.data = imageData;
-				// Compute offset of next mipmap
+				// Compute size of current mipmap + offset of next mipmap
 				size_t size0;
-				texWait.loader.getImageData(texWait.mipmap+i, 1, &size0, nullptr);
+				texWait.loader.getImageData(tl.mipmap, 1, &size0, nullptr);
+				tl.imageSize = size0;
 				offset += size0;
 			}
 			
@@ -520,7 +521,7 @@ void RendererGL::createRenderTargets()
 	// HDR
 	// Texture
 	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &hdrTex);
-	glTextureStorage2DMultisample(hdrTex, msaaSamples, GL_RGB16F,
+	glTextureStorage2DMultisample(hdrTex, msaaSamples, GL_R11F_G11F_B10F,
 		windowWidth, windowHeight, GL_FALSE);
 
 	// Framebuffer
@@ -851,7 +852,7 @@ void RendererGL::render(
 					0, 0, 
 					texLoaded.width, texLoaded.height, 
 					texLoaded.format,
-					texLoaded.data->size(), texLoaded.data->data());
+					texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
 				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.mipmap);
 			}
 		}
