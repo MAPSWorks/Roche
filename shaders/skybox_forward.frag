@@ -27,5 +27,5 @@ layout (location = 0) out vec4 outColor;
 
 void main()
 {
-	outColor = vec4(texture(diffuse, passUv.st).rgb*albedo*exposure*64, 1.0);
+	outColor = vec4(texture(diffuse, passUv.st).rgb*albedo*exposure, 1.0);
 }

@@ -39,7 +39,7 @@ void main()
 	day = mix(day, cloud.rgb, cloud.a);
 
 	vec3 color = day*clamp(light,0,1)+night;
-	color *= exposure*64;
+	color *= exposure;
 
 	outColor = vec4(color, 1.0);
 } 

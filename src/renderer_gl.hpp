@@ -57,7 +57,7 @@ private:
 	void createTextures();
 	void createBuffers();
 	void createVertexArray();
-	void createRenderTargets();
+	void createRendertargets();
 	void createSkybox(SkyboxParameters skyboxParam);
 	void createShaders();
 
@@ -68,6 +68,9 @@ private:
 	void renderHdr(
 		std::vector<uint32_t> closePlanets, 
 		DynamicOffsets currentDynamicOffsets);
+	void renderResolve();
+	void renderBloom();
+	void renderTonemap(DynamicOffsets currentDynamicOffsets);
 
 	TexHandle createStreamTexture(GLuint tex);
 	bool getStreamTexture(TexHandle tex, GLuint &id);
@@ -75,8 +78,6 @@ private:
 
 	TexHandle loadDDSTexture(std::string filename, glm::vec4 defaultColor);
 	void unloadDDSTexture(TexHandle texId);
-
-	void renderResolve(DynamicOffsets currentDynamicOffsets);
 
 	uint32_t planetCount;
 	int msaaSamples;
@@ -101,20 +102,29 @@ private:
 	// VAO
 	GLuint vertexArray;
 
-	// RenderTargets : 
+	// Rendertargets : 
 	GLuint attachmentSampler;
 	GLuint depthStencilTex;
 	// Gbuffer
 	std::vector<GLuint> gbufferTex;
 	GLuint gbufferFbo;
 	// HDR rendertarget
-	GLuint hdrTex;
+	GLuint hdrMSRendertarget;
+	GLuint hdrRendertarget;
+	GLuint highpassRendertargets[5];
+	GLuint bloomRendertargets[4];
 	GLuint hdrFbo;
 
 	// Shaders
 	ShaderProgram programPlanet;
 	ShaderProgram programSkybox;
 	ShaderProgram programResolve;
+	ShaderProgram programHighpass;
+	ShaderProgram programDownsample;
+	ShaderProgram programBlurW;
+	ShaderProgram programBlurH;
+	ShaderProgram programBloomAdd;
+	ShaderProgram programTonemap;
 
 	// Current frame % 3 for triple buffering
 	uint32_t frameId;
