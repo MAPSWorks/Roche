@@ -5,13 +5,13 @@ layout (local_size_x=16, local_size_y=16) in;
 layout (binding = 0, r11f_g11f_b10f) readonly uniform image2D inputImage;
 layout (binding = 1, r11f_g11f_b10f) writeonly uniform image2D outputImage;
 
-const float weights[] = {0.383103,0.241843,0.060626,0.00598};
+const float weights[] = {0.198596,0.175713,0.121703,0.065984,0.028002,0.0093};
 
 void main()
 {
 	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 	vec4 sum = imageLoad(inputImage, coord)*weights[0];
-	for (int i=0;i<3;++i)
+	for (int i=0;i<5;++i)
 	{
 		sum += (
 			imageLoad(inputImage,coord+ivec2( i,0))+

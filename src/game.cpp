@@ -256,7 +256,7 @@ void Game::initGUI()
 	slider = new Slider(panel);
 	slider->setValue(exposure);
 	slider->setFixedWidth(140);
-	slider->setRange({-10, 10});
+	slider->setRange({0, 6});
 
 	textBox = new TextBox(panel);
 	textBox->setFixedSize(Vector2i(60, 25));

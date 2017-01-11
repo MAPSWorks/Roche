@@ -338,7 +338,6 @@ void RendererGL::init(
 	objectLabel(GL_BUFFER, staticBuffer);
 	objectLabel(GL_BUFFER, dynamicBuffer);
 	objectLabel(GL_VERTEX_ARRAY, vertexArray);
-	objectLabel(GL_SAMPLER, attachmentSampler);
 	objectLabel(GL_TEXTURE, depthStencilTex);
 	objectLabel(GL_TEXTURE, hdrMSRendertarget);
 	objectLabel(GL_FRAMEBUFFER, hdrFbo);
@@ -508,13 +507,6 @@ void RendererGL::createVertexArray()
 
 void RendererGL::createRendertargets()
 {
-	// Sampler
-	glCreateSamplers(1, &attachmentSampler);
-	glSamplerParameteri(attachmentSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glSamplerParameteri(attachmentSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(attachmentSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glSamplerParameteri(attachmentSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
-
 	// Depth stencil texture
 	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &depthStencilTex);
 	glTextureStorage2DMultisample(
@@ -528,16 +520,28 @@ void RendererGL::createRendertargets()
 	// HDR Rendertarget
 	glCreateTextures(GL_TEXTURE_2D, 1, &hdrRendertarget);
 	glTextureStorage2D(hdrRendertarget, 1, GL_R11F_G11F_B10F, windowWidth, windowHeight);
+	glTextureParameteri(hdrRendertarget, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTextureParameteri(hdrRendertarget, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
 	// Highpass rendertargets
 	glCreateTextures(GL_TEXTURE_2D, 5, highpassRendertargets);
 	for (int i=0;i<5;++i)
-		glTextureStorage2D(highpassRendertargets[i], 1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
+	{
+		const GLuint tex = highpassRendertargets[i];
+		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	}
 
 	// Bloom rendertargets
 	glCreateTextures(GL_TEXTURE_2D, 4, bloomRendertargets);
 	for (int i=0;i<4;++i)
-		glTextureStorage2D(bloomRendertargets[i], 1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
+	{
+		const GLuint tex = bloomRendertargets[i];
+		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	}
 
 	// Framebuffers
 	glCreateFramebuffers(1, &hdrFbo);
@@ -1030,19 +1034,15 @@ void RendererGL::renderBloom()
 	const GLuint bloomImages[] = {
 		highpassRendertargets[4], // Blur x input  - 16x
 		bloomRendertargets[3],    // Blur y input
-		highpassRendertargets[4], // Add blur input
 		highpassRendertargets[3], // Add image input
 		bloomRendertargets[2],    // ...           - 8x
 		highpassRendertargets[3],
-		bloomRendertargets[2],
 		highpassRendertargets[2],
 		bloomRendertargets[1],    // ...           - 4x
 		highpassRendertargets[2],
-		bloomRendertargets[1],
 		highpassRendertargets[1],
 		bloomRendertargets[0],   // Only blur      - 2x
-		highpassRendertargets[1], 
-		bloomRendertargets[0]
+		highpassRendertargets[1]
 	};
 
 	for (int i=0;i<4;++i)
@@ -1050,8 +1050,8 @@ void RendererGL::renderBloom()
 		const int dispatchSize = workgroupSize<<(4-i);
 
 		// Blur horizontally & vertically
-		const GLuint blurImages[] = {bloomImages[i*4+0], bloomImages[i*4+1]};
-		const int blurPasses = 4;
+		const GLuint blurImages[] = {bloomImages[i*3+0], bloomImages[i*3+1]};
+		const int blurPasses = 2;
 		for (int j=0;j<2;++j)
 		{
 			glUseProgram((j?programBlurW:programBlurH).getId());
@@ -1074,9 +1074,9 @@ void RendererGL::renderBloom()
 			glUseProgram(programBloomAdd.getId());
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-			glBindTextureUnit(0, bloomImages[i*4+2]);
-			glBindImageTexture(1, bloomImages[i*4+3], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-			glBindImageTexture(2, bloomImages[i*4+4], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+			glBindTextureUnit(0, bloomImages[i*3+0]);
+			glBindImageTexture(1, bloomImages[i*3+2], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
+			glBindImageTexture(2, bloomImages[i*3+3], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
 			glDispatchCompute(
 				(int)ceil(2*windowWidth /(float)dispatchSize),
 				(int)ceil(2*windowHeight/(float)dispatchSize), 1);
@@ -1104,9 +1104,7 @@ void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
 			sizeof(SceneDynamicUBO));
 
 	// Bind HDR MS texture
-	glBindSampler(1, attachmentSampler);
 	glBindTextureUnit(1, hdrRendertarget);
-	glBindSampler(2, attachmentSampler);
 	glBindTextureUnit(2, bloomRendertargets[0]);
 
 	render(vertexArray, fullscreenTri);

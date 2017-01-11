@@ -103,7 +103,6 @@ private:
 	GLuint vertexArray;
 
 	// Rendertargets : 
-	GLuint attachmentSampler;
 	GLuint depthStencilTex;
 	// Gbuffer
 	std::vector<GLuint> gbufferTex;
