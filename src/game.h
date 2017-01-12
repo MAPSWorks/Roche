@@ -72,8 +72,6 @@ private:
 	float switchPreviousDist; // Zoom transition amount
 	int switchPreviousPlanet; // index of previous planet
 
-	SkyboxParameters skybox;
-
 	float sensitivity; // Mouse sensitivity
 
 	// camera

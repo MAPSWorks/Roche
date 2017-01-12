@@ -80,11 +80,3 @@ public:
 	float rotationAngle;
 	float cloudDisp;
 };
-
-class SkyboxParameters
-{
-public:
-	float inclination;
-	std::string textureFilename;
-	float intensity;
-};

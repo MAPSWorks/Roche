@@ -9,7 +9,6 @@ public:
 	virtual void windowHints() = 0;
 	virtual void init(
 		std::vector<PlanetParameters> planetParams, 
-		SkyboxParameters skyboxParam,
 		int msaa,
 		int windowWidth,
 		int windowHeight) = 0;

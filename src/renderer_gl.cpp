@@ -177,8 +177,7 @@ uint32_t align(const uint32_t offset, const uint32_t minAlign)
 }
 
 void RendererGL::init(
-	const std::vector<PlanetParameters> planetParams, 
-	const SkyboxParameters skyboxParam,
+	const std::vector<PlanetParameters> planetParams,
 	const int msaa,
 	const int windowWidth,
 	const int windowHeight)
@@ -269,10 +268,6 @@ void RendererGL::init(
 		// Scene UBO
 		dynamicOffsets[i].sceneUBO = currentOffset;
 		currentOffset += sizeof(SceneDynamicUBO);
-		// Skybox UBO
-		currentOffset = align(currentOffset, uboMinAlign);
-		dynamicOffsets[i].skyboxUBO = currentOffset;
-		currentOffset += sizeof(PlanetDynamicUBO);
 		// Planet UBOs
 		dynamicOffsets[i].planetUBOs.resize(planetCount);
 		for (uint32_t j=0;j<planetCount;++j)
@@ -321,8 +316,7 @@ void RendererGL::init(
 	createShaders();
 	createRendertargets();
 	createTextures();
-	createSkybox(skyboxParam);
-
+	
 #ifdef USE_KHR_DEBUG
 	// Debug output
 	glEnable(GL_DEBUG_OUTPUT);
@@ -342,7 +336,7 @@ void RendererGL::init(
 	objectLabel(GL_TEXTURE, hdrMSRendertarget);
 	objectLabel(GL_FRAMEBUFFER, hdrFbo);
 	objectLabel(GL_PROGRAM, programPlanet.getId());
-	objectLabel(GL_PROGRAM, programSkybox.getId());
+	objectLabel(GL_PROGRAM, programSun.getId());
 	objectLabel(GL_PROGRAM, programTonemap.getId());
 	objectLabel(GL_TEXTURE, diffuseTexDefault);
 	objectLabel(GL_TEXTURE, cloudTexDefault);
@@ -551,9 +545,9 @@ void RendererGL::createRendertargets()
 
 void RendererGL::createShaders()
 {
-	programSkybox.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programSkybox.source(GL_FRAGMENT_SHADER, "shaders/skybox_forward.frag");
-	programSkybox.link();
+	programSun.source(GL_VERTEX_SHADER, "shaders/planet.vert");
+	programSun.source(GL_FRAGMENT_SHADER, "shaders/sun_forward.frag");
+	programSun.link();
 
 	programPlanet.source(GL_VERTEX_SHADER, "shaders/planet.vert");
 	programPlanet.source(GL_FRAGMENT_SHADER, "shaders/planet_forward.frag");
@@ -580,17 +574,6 @@ void RendererGL::createShaders()
 	programTonemap.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
 	programTonemap.source(GL_FRAGMENT_SHADER, "shaders/tonemap.frag");
 	programTonemap.link();
-}
-
-void RendererGL::createSkybox(SkyboxParameters skyboxParam)
-{
-	// Skybox model matrix
-	const glm::quat q = glm::rotate(glm::quat(), skyboxParam.inclination, glm::vec3(1,0,0));
-	skyboxModelMat = glm::scale(glm::mat4_cast(q), glm::vec3(-5e9));
-	// Skybox texture
-	skyboxTex = -1;
-	skyboxTex = loadDDSTexture(skyboxParam.textureFilename, glm::vec4(0,0,0,1));
-	skyboxIntensity = skyboxParam.intensity;
 }
 
 void RendererGL::destroy()
@@ -795,12 +778,6 @@ void RendererGL::render(
 	sceneUBO.invGamma = 1.f/gamma;
 	sceneUBO.exposure = glm::pow(2, exposure);
 
-	// Skybox uniform update
-	PlanetDynamicUBO skyboxUBO;
-	skyboxUBO.modelMat = skyboxModelMat;
-	skyboxUBO.lightDir = glm::vec4(0.0);
-	skyboxUBO.albedo = skyboxIntensity;
-
 	// Planet uniform update
 	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
@@ -839,8 +816,6 @@ void RendererGL::render(
 
 	memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.sceneUBO, 
 		&sceneUBO, sizeof(SceneDynamicUBO));
-	memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.skyboxUBO,
-		&skyboxUBO, sizeof(PlanetDynamicUBO));
 	for (uint32_t i=0;i<planetUBOs.size();++i)
 		memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.planetUBOs[i], 
 			&planetUBOs[i], sizeof(PlanetDynamicUBO));
@@ -950,7 +925,7 @@ void RendererGL::renderHdr(
 		const bool star = planetParams[i].bodyParam.isStar;
 		glUseProgram(
 			(star?
-			programSkybox:
+			programSun:
 			programPlanet).getId());
 
 		// Bind Scene UBO
@@ -973,26 +948,6 @@ void RendererGL::renderHdr(
 
 		render(vertexArray, planetModels[i]);
 	}
-
-	// Skybox Rendering
-	glEnable(GL_DEPTH_CLAMP);
-	glDepthFunc(GL_LEQUAL);
-
-	glUseProgram(programSkybox.getId());
-
-	// Bind skybox UBO
-	glBindBufferRange(
-		GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-		currentDynamicOffsets.skyboxUBO,
-		sizeof(PlanetDynamicUBO));
-
-	// Bind skybox texture
-	GLuint skyTexId;
-	GLuint skyTex = getStreamTexture(skyboxTex, skyTexId)?skyTexId:diffuseTexDefault;
-
-	glBindTextureUnit(2, skyTex);
-
-	render(vertexArray, sphere);
 }
 
 void RendererGL::renderResolve()

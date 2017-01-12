@@ -185,7 +185,7 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, skybox, msaaSamples, width, height);
+	renderer->init(planetParams, msaaSamples, width, height);
 	initGUI();
 }
 
@@ -372,11 +372,6 @@ void Game::loadPlanetFiles()
 		shaun::parser p;
 		shaun::object obj = p.parse(read_file("config/planets.sn").c_str());
 		shaun::sweeper swp(&obj);
-
-		shaun::sweeper sky(swp("skybox"));
-		skybox.inclination = glm::radians(get<double>(sky("inclination")));
-		skybox.textureFilename = get<std::string>(sky("texture"));
-		skybox.intensity = get<double>(sky("intensity"));
 
 		shaun::sweeper planetsSweeper(swp("planets"));
 		planetCount = planetsSweeper.value<shaun::list>().elements().size();

@@ -21,7 +21,6 @@ public:
 	void windowHints();
 	void init(
 		std::vector<PlanetParameters> planetParams, 
-		SkyboxParameters skyboxParam,
 		int msaa,
 		int windowWidth,
 		int windowHeight);
@@ -48,7 +47,6 @@ private:
 		uint32_t size;
 
 		uint32_t sceneUBO;
-		uint32_t skyboxUBO;
 		std::vector<uint32_t> planetUBOs;
 	};
 
@@ -58,7 +56,6 @@ private:
 	void createBuffers();
 	void createVertexArray();
 	void createRendertargets();
-	void createSkybox(SkyboxParameters skyboxParam);
 	void createShaders();
 
 	void render(GLuint vertexArray, Model m);
@@ -116,7 +113,7 @@ private:
 
 	// Shaders
 	ShaderProgram programPlanet;
-	ShaderProgram programSkybox;
+	ShaderProgram programSun;
 	ShaderProgram programResolve;
 	ShaderProgram programHighpass;
 	ShaderProgram programDownsample;
@@ -144,17 +141,12 @@ private:
 	GLuint diffuseTexDefault;
 	GLuint cloudTexDefault;
 	GLuint nightTexDefault;
-	TexHandle skyboxTex;
 
 	float textureAnisotropy;
 
 	// Models
 	Model sphere;
 	Model fullscreenTri;
-
-	glm::mat4 skyboxModelMat;
-	float skyboxIntensity;
-
 	// Texture load threading
 	struct TexWait // Texture waiting to be loaded
 	{

@@ -1,9 +1,3 @@
-skybox: {
-	inclination:60.0
-	texture:"tex/skybox.dds"
-	intensity:0.001
-}
-
 planets: [
 	{
 		name:"Sun"
