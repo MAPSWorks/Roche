@@ -316,7 +316,7 @@ void RendererGL::init(
 	createShaders();
 	createRendertargets();
 	createTextures();
-	
+
 #ifdef USE_KHR_DEBUG
 	// Debug output
 	glEnable(GL_DEBUG_OUTPUT);
@@ -546,11 +546,11 @@ void RendererGL::createRendertargets()
 void RendererGL::createShaders()
 {
 	programSun.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programSun.source(GL_FRAGMENT_SHADER, "shaders/sun_forward.frag");
+	programSun.source(GL_FRAGMENT_SHADER, "shaders/sun.frag");
 	programSun.link();
 
 	programPlanet.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programPlanet.source(GL_FRAGMENT_SHADER, "shaders/planet_forward.frag");
+	programPlanet.source(GL_FRAGMENT_SHADER, "shaders/planet.frag");
 	programPlanet.link();
 
 	programResolve.source(GL_COMPUTE_SHADER, "shaders/resolve.comp");
