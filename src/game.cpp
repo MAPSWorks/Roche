@@ -367,25 +367,28 @@ glm::vec4 get(shaun::sweeper swp)
 
 void Game::loadPlanetFiles()
 {
-	try 
+	using namespace shaun;
+	try
 	{
-		shaun::parser p;
-		shaun::object obj = p.parse(read_file("config/planets.sn").c_str());
-		shaun::sweeper swp(&obj);
+		parser p;
+		object obj = p.parse(read_file("config/planets.sn").c_str());
+		sweeper swp(&obj);
 
-		shaun::sweeper planetsSweeper(swp("planets"));
-		planetCount = planetsSweeper.value<shaun::list>().elements().size();
+		ambientColor = (float)get<double>(swp("ambientColor"));
+
+		sweeper planetsSweeper(swp("planets"));
+		planetCount = planetsSweeper.value<list>().elements().size();
 		planetParams.resize(planetCount);
 		planetStates.resize(planetCount);
 		planetParents.resize(planetCount, -1);
 		for (uint32_t i=0;i<planetCount;++i)
 		{
 			PlanetParameters planet;
-			shaun::sweeper pl(planetsSweeper[i]);
-			planet.name = std::string(pl("name").value<shaun::string>());
+			sweeper pl(planetsSweeper[i]);
+			planet.name = std::string(pl("name").value<string>());
 			planet.parentName = get<std::string>(pl("parent"));
 
-			shaun::sweeper orbit(pl("orbit"));
+			sweeper orbit(pl("orbit"));
 			if (!orbit.is_null())
 			{
 				planet.orbitParam.ecc = get<double>(orbit("ecc"));
@@ -395,7 +398,7 @@ void Game::loadPlanetFiles()
 				planet.orbitParam.arg = glm::radians(get<double>(orbit("arg")));
 				planet.orbitParam.m0  = glm::radians(get<double>(orbit("m0" )));
 			}
-			shaun::sweeper body(pl("body"));
+			sweeper body(pl("body"));
 			if (!body.is_null())
 			{
 				planet.bodyParam.radius = get<double>(body("radius"));
@@ -417,7 +420,7 @@ void Game::loadPlanetFiles()
 				planet.bodyParam.cloudDispPeriod = get<double>(body("cloudDispPeriod"));
 				planet.bodyParam.nightTexIntensity = get<double>(body("nightTexIntensity"));
 			}
-			shaun::sweeper atmo(pl("atmosphere"));
+			sweeper atmo(pl("atmosphere"));
 			if (!atmo.is_null())
 			{
 				planet.atmoParam.maxHeight = get<double>(atmo("maxAltitude"));
@@ -429,7 +432,7 @@ void Game::loadPlanetFiles()
 				planet.atmoParam.scaleHeight = get<double>(atmo("scaleHeight"));
 			}
 
-			shaun::sweeper ring(pl("ring"));
+			sweeper ring(pl("ring"));
 			if (!ring.is_null())
 			{
 				planet.ringParam.hasRings = true;
@@ -464,7 +467,7 @@ void Game::loadPlanetFiles()
 			}
 		}	
 	} 
-	catch (shaun::parse_error e)
+	catch (parse_error e)
 	{
 		std::cout << e << std::endl;
 	}
@@ -648,7 +651,8 @@ void Game::update(const double dt)
 		
 	// Scene rendering
 	renderer->render(
-		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1), gamma, exposure,
+		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1),
+		gamma, exposure, ambientColor,
 		planetStates);
 
 	// GUI rendering

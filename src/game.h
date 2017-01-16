@@ -39,6 +39,7 @@ private:
 	std::unique_ptr<Renderer> renderer;
 	float gamma;
 	float exposure;
+	float ambientColor;
 	
 	// Main planet collection
 	uint32_t planetCount;

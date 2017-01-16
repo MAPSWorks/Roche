@@ -1,3 +1,4 @@
+ambientColor:0.0002
 planets: [
 	{
 		name:"Sun"
@@ -89,7 +90,7 @@ planets: [
 			night:"tex/earth/night.dds"
 			cloud:"tex/earth/clouds.dds"
 			cloudDispPeriod:0
-			nightTexIntensity:0.01
+			nightTexIntensity:0.04
 		}
 		atmosphere:{
 			maxAltitude:130

@@ -8,6 +8,7 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 	mat4 projMat;
 	mat4 viewMat;
 	vec4 viewPos;
+	float ambientColor;
 	float invGamma;
 	float exposure;
 };
@@ -33,7 +34,7 @@ void main()
 	vec3 night = texture(night, passUv.st).rgb * nightIntensity;
 	vec4 cloud = texture(cloud, passUv.st+vec2(cloudDisp, 0)) * vec4(vec3(albedo),1);
 
-	float light = dot(lightDir.xyz, passNormal.xyz);
+	float light = max(dot(lightDir.xyz, passNormal.xyz), ambientColor);
 
 	night = night*clamp(-light*10+0.2,0,1)*(1-cloud.a);
 	day = mix(day, cloud.rgb, cloud.a);

@@ -31,6 +31,7 @@ public:
 		glm::vec3 viewUp,
 		float gamma,
 		float exposure,
+		float ambientColor,
 		std::vector<PlanetState> planetStates);
 	void destroy();
 private:

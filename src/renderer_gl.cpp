@@ -74,6 +74,7 @@ struct SceneDynamicUBO
 	glm::mat4 projMat;
 	glm::mat4 viewMat;
 	glm::vec4 viewPos;
+	float ambientColor;
 	float invGamma;
 	float exposure;
 };
@@ -727,6 +728,7 @@ void RendererGL::render(
 		const glm::vec3 viewUp,
 		const float gamma,
 		const float exposure,
+		const float ambientColor,
 		const std::vector<PlanetState> planetStates)
 {
 	const float closePlanetMinSizePixels = 1;
@@ -775,6 +777,7 @@ void RendererGL::render(
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.viewPos = glm::vec4(0.0,0.0,0.0,1.0);
+	sceneUBO.ambientColor = ambientColor;
 	sceneUBO.invGamma = 1.f/gamma;
 	sceneUBO.exposure = glm::pow(2, exposure);
 
