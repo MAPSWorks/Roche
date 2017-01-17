@@ -1,16 +1,13 @@
-#include "planet.h"
-#include "util.h"
+#include "planet.hpp"
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <random>
+#include <iostream>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-#include <iostream>
 
 #include "thirdparty/shaun/sweeper.hpp"
 #include <glm/ext.hpp>

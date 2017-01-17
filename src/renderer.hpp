@@ -1,6 +1,6 @@
 #pragma once
 
-#include "planet.h"
+#include "planet.hpp"
 #include <glm/glm.hpp>
 
 class Renderer

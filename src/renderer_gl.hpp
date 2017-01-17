@@ -3,7 +3,7 @@
 #include "renderer.hpp"
 #include "shader.hpp"
 #include "fence.hpp"
-#include "util.h"
+#include "ddsloader.hpp"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>

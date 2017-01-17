@@ -10,7 +10,7 @@ set(SOURCE
 	main.cpp
 	shader.cpp
 	planet.cpp
-	util.cpp
+	ddsloader.cpp
 	renderer_gl.cpp
 	shader.cpp
 	fence.cpp

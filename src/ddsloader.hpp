@@ -1,10 +1,7 @@
 #pragma once
 
 #include <string>
-#include <fstream>
 #include <vector>
-
-std::string read_file(std::string filename);
 
 class DDSLoader
 {

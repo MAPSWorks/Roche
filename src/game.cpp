@@ -2,7 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-#include "game.h"
+#include "game.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 
 #include <nanogui/screen.h>
 #include <nanogui/window.h>
@@ -27,7 +28,6 @@
 #include <nanogui/textbox.h>
 
 #include "renderer_gl.hpp"
-#include "util.h"
 
 #include "thirdparty/shaun/sweeper.hpp"
 #include "thirdparty/shaun/parser.hpp"
@@ -107,12 +107,30 @@ void ssThread(
 	}
 }
 
+std::string readFile(const std::string filename)
+{
+	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+	if (in)
+	{
+		std::string contents;
+		in.seekg(0, std::ios::end);
+		contents.resize(in.tellg());
+		in.seekg(0, std::ios::beg);
+		in.read(&contents[0], contents.size());
+		in.close();
+		return(contents);
+	}
+	throw std::runtime_error("Can't open" + filename);
+	return "";
+}
+
 void Game::loadSettingsFile()
 {
 	try 
 	{
 		shaun::parser p;
-		shaun::object obj = p.parse(read_file("config/settings.sn").c_str());
+		std::string fileContent = readFile("config/settings.sn");
+		shaun::object obj = p.parse(fileContent.c_str());
 		shaun::sweeper swp(&obj);
 
 		shaun::sweeper video(swp("video"));
@@ -371,7 +389,8 @@ void Game::loadPlanetFiles()
 	try
 	{
 		parser p;
-		object obj = p.parse(read_file("config/planets.sn").c_str());
+		std::string fileContent = readFile("config/planets.sn");
+		object obj = p.parse(fileContent.c_str());
 		sweeper swp(&obj);
 
 		ambientColor = (float)get<double>(swp("ambientColor"));

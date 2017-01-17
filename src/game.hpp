@@ -1,10 +1,9 @@
-#ifndef GAME_H
-#define GAME_H
+#pragma once
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "planet.h"
+#include "planet.hpp"
 #include "renderer.hpp"
 #include <glm/glm.hpp>
 
@@ -86,5 +85,3 @@ private:
 	bool fullscreen;
 	int msaaSamples;
 };
-
-#endif

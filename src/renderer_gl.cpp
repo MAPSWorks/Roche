@@ -1,5 +1,5 @@
 #include "renderer_gl.hpp"
-#include "util.h"
+#include "ddsloader.hpp"
 
 #include <stdexcept>
 #include <cstring>
