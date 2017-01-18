@@ -1,3 +1,5 @@
 https://software.intel.com/en-us/blogs/2014/07/15/an-investigation-of-fast-real-time-gpu-based-image-blur-algorithms
 https://software.intel.com/en-us/articles/compute-shader-hdr-and-bloom
 https://mynameismjp.wordpress.com/2012/10/24/msaa-overview/
+http://simonwinder.com/projects/simulation-of-lens-flare-in-the-human-eye/
+http://luthuli.cs.uiuc.edu/~daf/courses/rendering/papers3/spencer95.pdf

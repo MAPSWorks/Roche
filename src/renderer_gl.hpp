@@ -49,11 +49,13 @@ private:
 
 		uint32_t sceneUBO;
 		std::vector<uint32_t> planetUBOs;
+		std::vector<uint32_t> flareUBOs;
 	};
 
 	typedef int32_t TexHandle;
 
 	void createTextures();
+	void createFlare();
 	void createBuffers();
 	void createVertexArray();
 	void createRendertargets();
@@ -68,6 +70,9 @@ private:
 		DynamicOffsets currentDynamicOffsets);
 	void renderResolve();
 	void renderBloom();
+	void renderFlares(
+		std::vector<uint32_t> farPlanets, 
+		DynamicOffsets currentDynamicOffsets);
 	void renderTonemap(DynamicOffsets currentDynamicOffsets);
 
 	TexHandle createStreamTexture(GLuint tex);
@@ -110,7 +115,10 @@ private:
 	GLuint hdrRendertarget;
 	GLuint highpassRendertargets[5];
 	GLuint bloomRendertargets[4];
+	GLuint appliedBloomRendertarget;
+
 	GLuint hdrFbo;
+	GLuint appliedBloomFbo;
 
 	// Shaders
 	ShaderProgram programPlanet;
@@ -121,12 +129,16 @@ private:
 	ShaderProgram programBlurW;
 	ShaderProgram programBlurH;
 	ShaderProgram programBloomAdd;
+	ShaderProgram programBloomApply;
+	ShaderProgram programFlare;
 	ShaderProgram programTonemap;
 
 	// Current frame % 3 for triple buffering
 	uint32_t frameId;
 
 	std::vector<PlanetParameters> planetParams; // Static parameters
+	std::vector<uint32_t> previousFrameClosePlanets;
+	std::vector<uint32_t> previousFrameFarPlanets;
 	std::vector<Model> planetModels; // Offsets and count in buffer
 	std::vector<bool> planetTexLoaded; // indicates if the texture are loaded for a planet
 
@@ -143,11 +155,17 @@ private:
 	GLuint cloudTexDefault;
 	GLuint nightTexDefault;
 
+	GLuint flareIntensityTex;
+	GLuint flareLinesTex;
+	GLuint flareHaloTex;
+
 	float textureAnisotropy;
 
 	// Models
 	Model sphere;
+	Model flareModel;
 	Model fullscreenTri;
+
 	// Texture load threading
 	struct TexWait // Texture waiting to be loaded
 	{

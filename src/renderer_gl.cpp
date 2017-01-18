@@ -88,6 +88,13 @@ struct PlanetDynamicUBO
 	float nightTexIntensity;
 };
 
+struct FlareDynamicUBO
+{
+	glm::mat4 modelMat;
+	glm::vec4 color;
+	float brightness;
+};
+
 void generateSphere(
 	const int meridians, 
 	const int rings, 
@@ -159,6 +166,31 @@ void generateFullscreenTri(std::vector<Vertex> &vertices, std::vector<uint32_t> 
 	indices = {0,1,2};
 }
 
+void generateFlareModel(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices)
+{
+	const int detail = 32;
+	vertices.resize((detail+1)*2);
+
+	for (int i=0;i<=detail;++i)
+	{
+		const float f = i/(float)detail;
+		const glm::vec2 pos = glm::vec2(cos(f*2*PI),sin(f*2*PI));
+		vertices[i*2+0] = {glm::vec4(0,0,0,1), glm::vec4(f, 0, 0.5, 0.5)};
+		vertices[i*2+1] = {glm::vec4(pos,0,1), glm::vec4(f, 1, pos*glm::vec2(0.5)+glm::vec2(0.5))};
+	}
+
+	indices.resize(detail*6);
+	for (int i=0;i<detail;++i)
+	{
+		indices[i*6+0] = (i*2)+0;
+		indices[i*6+1] = (i*2)+1;
+		indices[i*6+2] = (i*2)+2;
+		indices[i*6+3] = (i*2)+2;
+		indices[i*6+4] = (i*2)+1;
+		indices[i*6+5] = (i*2)+3;
+	}
+}
+
 GLenum DDSFormatToGL(DDSLoader::Format format)
 {
 	switch (format)
@@ -200,16 +232,22 @@ void RendererGL::init(
 	std::vector<std::vector<Vertex>> modelsVertices;
 	std::vector<std::vector<uint32_t>> modelsIndices;
 
-	modelsVertices.resize(2);
-	modelsIndices.resize(2);
+	modelsVertices.resize(3);
+	modelsIndices.resize(3);
 
 	const size_t FULLSCREEN_TRI_INDEX = 0;
-	const size_t SPHERE_INDEX = 1;
+	const size_t FLARE_MODEL_INDEX = 1;
+	const size_t SPHERE_INDEX = 2;
 
 	// Fullscreen tri
 	generateFullscreenTri(
 		modelsVertices[FULLSCREEN_TRI_INDEX],
 		modelsIndices[FULLSCREEN_TRI_INDEX]);
+
+	// Flare
+	generateFlareModel(
+		modelsVertices[FLARE_MODEL_INDEX],
+		modelsIndices[FLARE_MODEL_INDEX]);
 
 	// Generate models
 	const int planetMeridians = 128;
@@ -255,6 +293,7 @@ void RendererGL::init(
 	}
 
 	fullscreenTri = models[FULLSCREEN_TRI_INDEX];
+	flareModel = models[FLARE_MODEL_INDEX];
 	sphere = models[SPHERE_INDEX];
 
 	staticBufferSize = currentOffset;
@@ -276,6 +315,13 @@ void RendererGL::init(
 			currentOffset = align(currentOffset, uboMinAlign);
 			dynamicOffsets[i].planetUBOs[j] = currentOffset;
 			currentOffset += sizeof(PlanetDynamicUBO);
+		}
+		dynamicOffsets[i].flareUBOs.resize(planetCount);
+		for (uint32_t j=0;j<planetCount;++j)
+		{
+			currentOffset = align(currentOffset, uboMinAlign);
+			dynamicOffsets[i].flareUBOs[j] = currentOffset;
+			currentOffset += sizeof(FlareDynamicUBO);
 		}
 		dynamicOffsets[i].size = currentOffset - dynamicOffsets[i].offset;
 	}
@@ -425,21 +471,53 @@ void RendererGL::createTextures()
 	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
 	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &diffuseData);
-	glTextureParameteri(diffuseTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	
 	// Default cloud tex
 	const uint8_t cloudData[] = {255, 255, 255, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &cloudTexDefault);
 	glTextureStorage2D(cloudTexDefault, 1, GL_RGBA8, 1, 1);
 	glTextureSubImage2D(cloudTexDefault, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, cloudData);
-	glTextureParameteri(cloudTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	// Default night tex
 	const uint8_t nightData[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &nightTexDefault);
 	glTextureStorage2D(nightTexDefault, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &nightData);
-	glTextureParameteri(nightTexDefault, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+
+	createFlare();
+}
+
+void RendererGL::createFlare()
+{
+	const int flareSize = 512;
+	const int mipmapCount = 1 + floor(log2(flareSize));
+	{
+		std::vector<uint16_t> pixelData;
+		Renderer::generateFlareIntensityTex(flareSize, pixelData);
+		glCreateTextures(GL_TEXTURE_1D, 1, &flareIntensityTex);
+		glTextureStorage1D(flareIntensityTex, mipmapCount, GL_R16F, flareSize);
+		glTextureSubImage1D(flareIntensityTex, 0, 0, flareSize, GL_RED, GL_HALF_FLOAT, pixelData.data());
+		glTextureParameteri(flareIntensityTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glGenerateTextureMipmap(flareIntensityTex);
+	}
+	{
+		std::vector<uint8_t> pixelData;
+		Renderer::generateFlareLinesTex(flareSize, pixelData);
+		glCreateTextures(GL_TEXTURE_2D, 1, &flareLinesTex);
+		glTextureStorage2D(flareLinesTex, mipmapCount, GL_R8, flareSize, flareSize);
+		glTextureSubImage2D(flareLinesTex, 0, 0, 0, flareSize, flareSize, GL_RED, GL_UNSIGNED_BYTE, pixelData.data());
+		glGenerateTextureMipmap(flareLinesTex);
+		glBindTextureUnit(0, flareLinesTex);
+	}
+	{
+		std::vector<uint16_t> pixelData;
+		Renderer::generateFlareHaloTex(flareSize, pixelData);
+		glCreateTextures(GL_TEXTURE_1D, 1, &flareHaloTex);
+		glTextureStorage1D(flareHaloTex, mipmapCount, GL_RGBA16F, flareSize);
+		glTextureSubImage1D(flareHaloTex, 0, 0, flareSize, GL_RGBA, GL_HALF_FLOAT, pixelData.data());
+		glTextureParameteri(flareHaloTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glGenerateTextureMipmap(flareHaloTex);
+	}
 }
 
 void RendererGL::createBuffers()
@@ -538,10 +616,17 @@ void RendererGL::createRendertargets()
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	}
 
+	// Bloom applied rendertarget
+	glCreateTextures(GL_TEXTURE_2D, 1, &appliedBloomRendertarget);
+	glTextureStorage2D(appliedBloomRendertarget, 1, GL_R11F_G11F_B10F, windowWidth, windowHeight);
+
 	// Framebuffers
 	glCreateFramebuffers(1, &hdrFbo);
 	glNamedFramebufferTexture(hdrFbo, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
 	glNamedFramebufferTexture(hdrFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+
+	glCreateFramebuffers(1, &appliedBloomFbo);
+	glNamedFramebufferTexture(appliedBloomFbo, GL_COLOR_ATTACHMENT0, appliedBloomRendertarget, 0);
 }
 
 void RendererGL::createShaders()
@@ -571,6 +656,13 @@ void RendererGL::createShaders()
 
 	programBloomAdd.source(GL_COMPUTE_SHADER, "shaders/bloom_add.comp");
 	programBloomAdd.link();
+
+	programBloomApply.source(GL_COMPUTE_SHADER, "shaders/bloom_apply.comp");
+	programBloomApply.link();
+
+	programFlare.source(GL_VERTEX_SHADER, "shaders/flare.vert");
+	programFlare.source(GL_FRAGMENT_SHADER, "shaders/flare.frag");
+	programFlare.link();
 
 	programTonemap.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
 	programTonemap.source(GL_FRAGMENT_SHADER, "shaders/tonemap.frag");
@@ -733,6 +825,8 @@ void RendererGL::render(
 {
 	const float closePlanetMinSizePixels = 1;
 	const float closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
+	const float farPlanetMinDistance = closePlanetMaxDistance*0.35;
+	const float farPlanetOptimalDistance = closePlanetMaxDistance*2.0;
 	const float texLoadDistance = closePlanetMaxDistance*1.4;
 	const float texUnloadDistance = closePlanetMaxDistance*1.6;
 
@@ -740,6 +834,10 @@ void RendererGL::render(
 	const uint32_t nextFrameId = (frameId+1)%3;
 	const auto &currentDynamicOffsets = dynamicOffsets[frameId];
 	const auto &nextDynamicOffsets = dynamicOffsets[nextFrameId]; 
+
+	// Projection and view matrices
+	const glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e10);
+	const glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
 
 	// Planet classification
 	std::vector<uint32_t> closePlanets;
@@ -763,14 +861,23 @@ void RendererGL::render(
 			texUnloadPlanets.push_back(i);
 		}
 
-		if (dist < closePlanetMaxDistance)
-			closePlanets.push_back(i);
-		else
-			farPlanets.push_back(i);
+		// Don't render planets behind the view
+		if ((viewMat*glm::vec4(planetStates[i].position - viewPos,1.0)).z < 0)
+		{
+			if (dist < closePlanetMaxDistance)
+			{
+				// Detailed model
+				closePlanets.push_back(i);
+			}
+			if (dist > farPlanetMinDistance || planetParams[i].bodyParam.isStar)
+			{
+				// Flares
+				farPlanets.push_back(i);
+			}
+		}
 	}
 
-	const glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e6);
-	const glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
+	const float exp = glm::pow(2, exposure);
 
 	// Scene uniform update
 	SceneDynamicUBO sceneUBO;
@@ -779,9 +886,10 @@ void RendererGL::render(
 	sceneUBO.viewPos = glm::vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = ambientColor;
 	sceneUBO.invGamma = 1.f/gamma;
-	sceneUBO.exposure = glm::pow(2, exposure);
+	sceneUBO.exposure = exp;
 
 	// Planet uniform update
+	// Close planets (detailed model)
 	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
 	{
@@ -813,6 +921,45 @@ void RendererGL::render(
 		planetUBOs[i].nightTexIntensity = planetParams[i].bodyParam.nightTexIntensity;
 		planetUBOs[i].albedo = planetParams[i].bodyParam.albedo;
 	}
+	// Far away planets (flare)
+	std::vector<FlareDynamicUBO> flareUBOs(planetCount);
+	for (uint32_t i : farPlanets)
+	{
+		const glm::vec3 planetPos = glm::vec3(planetStates[i].position - viewPos);
+		const glm::vec4 clip = projMat*viewMat*glm::vec4(planetPos,1.0);
+		const glm::vec2 screen = glm::vec2(clip)/clip.w;
+		const float FLARE_SIZE_DEGREES = 20.0;
+		const glm::mat4 modelMat = 
+			glm::translate(glm::mat4(), glm::vec3(screen, 0.0))*
+			glm::scale(glm::mat4(), 
+				glm::vec3(windowHeight/(float)windowWidth,1.0,0.0)*
+				FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
+
+		const float phaseAngle = glm::acos(glm::dot(
+			(glm::vec3)glm::normalize(planetStates[i].position), 
+			glm::normalize(planetPos)));
+		const float phase = (1-phaseAngle/PI)*cos(phaseAngle)+(1/PI)*sin(phaseAngle);
+		const bool isStar = planetParams[i].bodyParam.isStar;
+		const float radius = planetParams[i].bodyParam.radius;
+		const double dist = glm::distance(viewPos, planetStates[i].position)/radius;
+		const float fade = glm::clamp(isStar?
+			(float)   dist/10:
+			(float) ((dist-farPlanetMinDistance)/
+							(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
+		const glm::vec3 cutDist = planetPos*0.005f;
+		
+		const float brightness = std::min(4.0f,
+			exp*
+			radius*radius*
+			(isStar?100000.f:
+			planetParams[i].bodyParam.albedo*0.2f*phase
+			/glm::dot(cutDist,cutDist)))
+			*fade;
+
+		flareUBOs[i].modelMat = modelMat;
+		flareUBOs[i].color = glm::vec4(planetParams[i].bodyParam.meanColor,1.0);
+		flareUBOs[i].brightness = brightness;
+	}
 
 	// Dynamic data upload
 	fences[nextFrameId].wait();
@@ -820,8 +967,15 @@ void RendererGL::render(
 	memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.sceneUBO, 
 		&sceneUBO, sizeof(SceneDynamicUBO));
 	for (uint32_t i=0;i<planetUBOs.size();++i)
+	{
 		memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.planetUBOs[i], 
 			&planetUBOs[i], sizeof(PlanetDynamicUBO));
+	}
+	for (uint32_t i=0;i<planetUBOs.size();++i)
+	{
+		memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.flareUBOs[i],
+			&flareUBOs[i], sizeof(FlareDynamicUBO));
+	}
 
 	if (!USE_COHERENT_MEMORY)
 		glFlushMappedNamedBufferRange(dynamicBuffer, nextDynamicOffsets.offset, nextDynamicOffsets.size);
@@ -883,12 +1037,15 @@ void RendererGL::render(
 		return distI < distJ;
 	});
 
-	renderHdr(closePlanets, currentDynamicOffsets);
+	renderHdr(previousFrameClosePlanets, currentDynamicOffsets);
 	renderResolve();
 	renderBloom();
+	renderFlares(previousFrameFarPlanets, currentDynamicOffsets);
 	renderTonemap(currentDynamicOffsets);
 
 	frameId = (frameId+1)%3;
+	previousFrameClosePlanets = closePlanets;
+	previousFrameFarPlanets = farPlanets;
 }
 
 void RendererGL::renderHdr(
@@ -901,6 +1058,8 @@ void RendererGL::renderHdr(
 	glDepthFunc(GL_LESS);
 	// No stencil writes
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	// No blending
+	glDisable(GL_BLEND);
 
 	// Clearing
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
@@ -968,7 +1127,6 @@ void RendererGL::renderResolve()
 void RendererGL::renderBloom()
 {
 	const int workgroupSize = 16;
-
 	// Highpass
 	glUseProgram(programHighpass.getId());
 	glBindImageTexture(0, hdrRendertarget         , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
@@ -1041,6 +1199,56 @@ void RendererGL::renderBloom()
 		}
 	}
 	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	glUseProgram(programBloomApply.getId());
+	glBindImageTexture(0, hdrRendertarget, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R11F_G11F_B10F);
+	glBindTextureUnit(1, bloomRendertargets[0]);
+	glBindImageTexture(2, appliedBloomRendertarget, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+	glDispatchCompute(
+		(int)ceil(windowWidth /(float)workgroupSize),
+		(int)ceil(windowHeight/(float)workgroupSize), 1);
+
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
+void RendererGL::renderFlares(
+	const std::vector<uint32_t> farPlanets, 
+	const DynamicOffsets currentDynamicOffsets)
+{
+	// No depth test/writes
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	// No stencil writes
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	// Blending add
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, appliedBloomFbo);
+
+	glUseProgram(programFlare.getId());
+
+	for (uint32_t i : farPlanets)
+	{
+		// Bind Scene UBO
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
+			currentDynamicOffsets.sceneUBO,
+			sizeof(SceneDynamicUBO));
+
+		// Bind planet UBO
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
+			currentDynamicOffsets.flareUBOs[i],
+			sizeof(PlanetDynamicUBO));
+
+		// Bind textures
+		glBindTextureUnit(2, flareIntensityTex);
+		glBindTextureUnit(3, flareLinesTex);
+		glBindTextureUnit(4, flareHaloTex);
+
+		render(vertexArray, flareModel);
+	}
 }
 
 void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
@@ -1052,6 +1260,8 @@ void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
+	glDisable(GL_BLEND);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glUseProgram(programTonemap.getId());
@@ -1061,9 +1271,8 @@ void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
 			currentDynamicOffsets.sceneUBO,
 			sizeof(SceneDynamicUBO));
 
-	// Bind HDR MS texture
-	glBindTextureUnit(1, hdrRendertarget);
-	glBindTextureUnit(2, bloomRendertargets[0]);
+	// Bind image after bloom is done
+	glBindTextureUnit(1, appliedBloomRendertarget);
 
 	render(vertexArray, fullscreenTri);
 }

@@ -11,6 +11,7 @@ set(SOURCE
 	shader.cpp
 	planet.cpp
 	ddsloader.cpp
+	renderer.cpp
 	renderer_gl.cpp
 	shader.cpp
 	fence.cpp

@@ -30,9 +30,9 @@ layout (location = 0) out vec4 outColor;
 
 void main()
 {
-	vec3 day = texture(diffuse, passUv.st).rgb * albedo;
+	vec3 day = texture(diffuse, passUv.st).rgb;
 	vec3 night = texture(night, passUv.st).rgb * nightIntensity;
-	vec4 cloud = texture(cloud, passUv.st+vec2(cloudDisp, 0)) * vec4(vec3(albedo),1);
+	vec4 cloud = texture(cloud, passUv.st+vec2(cloudDisp, 0));
 
 	float light = max(dot(lightDir.xyz, passNormal.xyz), ambientColor);
 

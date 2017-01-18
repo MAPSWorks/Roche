@@ -23,4 +23,9 @@ public:
 		std::vector<PlanetState> planetStates) = 0;
 	
 	virtual void destroy() = 0;
+
+protected:
+	void generateFlareIntensityTex(int dimensions, std::vector<uint16_t> &pixelData);
+	void generateFlareLinesTex(int dimensions, std::vector<uint8_t> &pixelData);
+	void generateFlareHaloTex(int dimensions, std::vector<uint16_t> &pixelData);
 };

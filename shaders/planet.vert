@@ -33,6 +33,6 @@ void main(void)
 	passNormal = normalize(viewMat*modelMat*inNormal);
 	gl_Position = projMat*viewMat*modelMat*inPosition;
 	// Logarithmic depth buffer
-	gl_Position.z = log2(max(1e-6, 1.0+gl_Position.w)) * (2.0/log2(5e8 + 1.0)) - 1.0;
+	gl_Position.z = log2(max(1e-6, 1.0+gl_Position.w)) * (2.0/log2(5e10 + 1.0)) - 1.0;
 	gl_Position.z *= gl_Position.w;
 }
