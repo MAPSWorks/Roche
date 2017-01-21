@@ -631,42 +631,45 @@ void RendererGL::createRendertargets()
 
 void RendererGL::createShaders()
 {
-	programSun.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programSun.source(GL_FRAGMENT_SHADER, "shaders/sun.frag");
-	programSun.link();
+	Shader planetVert(GL_VERTEX_SHADER, "shaders/planet.vert");
+	Shader deferredVert(GL_VERTEX_SHADER, "shaders/deferred.vert");
 
-	programPlanet.source(GL_VERTEX_SHADER, "shaders/planet.vert");
-	programPlanet.source(GL_FRAGMENT_SHADER, "shaders/planet.frag");
-	programPlanet.link();
+	programSun.addShader(planetVert);
+	programSun.addShader(GL_FRAGMENT_SHADER, "shaders/sun.frag");
+	programSun.compileAndLink();
 
-	programResolve.source(GL_COMPUTE_SHADER, "shaders/resolve.comp");
-	programResolve.link();
+	programPlanet.addShader(planetVert);
+	programPlanet.addShader(GL_FRAGMENT_SHADER, "shaders/planet.frag");
+	programPlanet.compileAndLink();
 
-	programHighpass.source(GL_COMPUTE_SHADER, "shaders/highpass.comp");
-	programHighpass.link();
+	programResolve.addShader(GL_COMPUTE_SHADER, "shaders/resolve.comp");
+	programResolve.compileAndLink();
 
-	programDownsample.source(GL_COMPUTE_SHADER, "shaders/downsample.comp");
-	programDownsample.link();
+	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
+	programHighpass.compileAndLink();
 
-	programBlurW.source(GL_COMPUTE_SHADER, "shaders/blur_w.comp");
-	programBlurW.link();
+	programDownsample.addShader(GL_COMPUTE_SHADER, "shaders/downsample.comp");
+	programDownsample.compileAndLink();
 
-	programBlurH.source(GL_COMPUTE_SHADER, "shaders/blur_h.comp");
-	programBlurH.link();
+	programBlurW.addShader(GL_COMPUTE_SHADER, "shaders/blur_w.comp");
+	programBlurW.compileAndLink();
 
-	programBloomAdd.source(GL_COMPUTE_SHADER, "shaders/bloom_add.comp");
-	programBloomAdd.link();
+	programBlurH.addShader(GL_COMPUTE_SHADER, "shaders/blur_h.comp");
+	programBlurH.compileAndLink();
 
-	programBloomApply.source(GL_COMPUTE_SHADER, "shaders/bloom_apply.comp");
-	programBloomApply.link();
+	programBloomAdd.addShader(GL_COMPUTE_SHADER, "shaders/bloom_add.comp");
+	programBloomAdd.compileAndLink();
 
-	programFlare.source(GL_VERTEX_SHADER, "shaders/flare.vert");
-	programFlare.source(GL_FRAGMENT_SHADER, "shaders/flare.frag");
-	programFlare.link();
+	programBloomApply.addShader(GL_COMPUTE_SHADER, "shaders/bloom_apply.comp");
+	programBloomApply.compileAndLink();
 
-	programTonemap.source(GL_VERTEX_SHADER, "shaders/deferred.vert");
-	programTonemap.source(GL_FRAGMENT_SHADER, "shaders/tonemap.frag");
-	programTonemap.link();
+	programFlare.addShader(GL_VERTEX_SHADER, "shaders/flare.vert");
+	programFlare.addShader(GL_FRAGMENT_SHADER, "shaders/flare.frag");
+	programFlare.compileAndLink();
+
+	programTonemap.addShader(deferredVert);
+	programTonemap.addShader(GL_FRAGMENT_SHADER, "shaders/tonemap.frag");
+	programTonemap.compileAndLink();
 }
 
 void RendererGL::destroy()
