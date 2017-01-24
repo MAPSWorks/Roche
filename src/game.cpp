@@ -207,7 +207,22 @@ void Game::init()
 	initGUI();
 }
 
-void Game::initGUI()
+class ImmovableWindow : public nanogui::Window
+{
+public:
+	ImmovableWindow(Widget *parent, const std::string &title) : Window(parent, title) {}
+	bool mouseDragEvent(const Eigen::Vector2i &, const Eigen::Vector2i &, int, int)
+	{
+		return false;
+	}
+	bool mouseButtonEvent(const Eigen::Vector2i &p, int button, bool down, int modifiers)
+	{
+		if (Widget::mouseButtonEvent(p, button, down, modifiers)) return true;
+		return false;
+	}
+};
+
+void Game::createSettingsWindow()
 {
 	using namespace nanogui;
 	using namespace Eigen;
@@ -216,24 +231,7 @@ void Game::initGUI()
 	Slider *slider;
 	TextBox *textBox;
 
-	guiScreen = new Screen();
-	guiScreen->initialize(win, false);
-
-	class ImmovableWindow : public Window
-	{
-	public:
-		ImmovableWindow(Widget *parent, const std::string &title) : Window(parent, title) {}
-		bool mouseDragEvent(const Vector2i &, const Vector2i &, int, int)
-		{
-			return false;
-		}
-		bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers)
-		{
-			if (Widget::mouseButtonEvent(p, button, down, modifiers)) return true;
-			return false;
-		}
-	};
-
+	// Settings window
 	ImmovableWindow *window = new ImmovableWindow(guiScreen, "Settings");
 	window->setPosition(Vector2i(10, 10));
 	window->setLayout(new GroupLayout());
@@ -293,6 +291,17 @@ void Game::initGUI()
 	});
 
 	textBox->setValue(showExpValue(exposure));
+}
+
+void Game::initGUI()
+{
+	using namespace nanogui;
+	using namespace Eigen;
+
+	guiScreen = new Screen();
+	guiScreen->initialize(win, false);
+
+	createSettingsWindow();
 
 	guiScreen->setVisible(true);
 	guiScreen->performLayout();
@@ -673,6 +682,29 @@ void Game::update(const double dt)
 		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1),
 		gamma, exposure, ambientColor,
 		planetStates);
+
+	auto a = renderer->getProfilerTimes();
+
+	// Display profiler in console
+	if (isPressedOnce(GLFW_KEY_F5) && !a.empty())
+	{
+		uint64_t full = a[0].second;
+		int largestName = 0;
+		for (auto p : a)
+		{
+			if (p.first.size() > largestName) largestName = p.first.size();
+		}
+		for (auto p : a)
+		{
+			std::cout.width(largestName);
+			std::cout << std::left << p.first;
+			uint64_t nano = (double)p.second;
+			double percent = 100*nano/(double)full;
+			double micro = nano/1E6;
+			std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl; 
+		}
+		std::cout << "-------------------------" << std::endl;
+	}
 
 	// GUI rendering
 	guiScreen->drawWidgets();

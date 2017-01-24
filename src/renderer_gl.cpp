@@ -826,6 +826,10 @@ void RendererGL::render(
 		const float ambientColor,
 		const std::vector<PlanetState> planetStates)
 {
+
+	profiler.begin("Full frame");
+	profiler.begin("Uniform update");
+
 	const float closePlanetMinSizePixels = 1;
 	const float closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
 	const float farPlanetMinDistance = closePlanetMaxDistance*0.35;
@@ -985,6 +989,8 @@ void RendererGL::render(
 
 	fences[nextFrameId].lock();
 
+	profiler.end();
+
 	// Texture loading
 	for (uint32_t i : texLoadPlanets)
 	{
@@ -1010,6 +1016,7 @@ void RendererGL::render(
 		planetTexLoaded[i] = false;
 	}
 
+	profiler.begin("Texture uploading");
 	// Texture uploading
 	{
 		std::lock_guard<std::mutex> lk(texLoadedMutex);
@@ -1031,6 +1038,7 @@ void RendererGL::render(
 			}
 		}
 	}
+	profiler.end();
 
 	// Planet sorting from front to back
 	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
@@ -1040,11 +1048,23 @@ void RendererGL::render(
 		return distI < distJ;
 	});
 
+	profiler.begin("Planets");
 	renderHdr(previousFrameClosePlanets, currentDynamicOffsets);
+	profiler.end();
+	profiler.begin("Resolve");
 	renderResolve();
+	profiler.end();
+	profiler.begin("Bloom");
 	renderBloom();
+	profiler.end();
+	profiler.begin("Flares");
 	renderFlares(previousFrameFarPlanets, currentDynamicOffsets);
+	profiler.end();
+	profiler.begin("Tonemapping");
 	renderTonemap(currentDynamicOffsets);
+	profiler.end();
+
+	profiler.end();
 
 	frameId = (frameId+1)%3;
 	previousFrameClosePlanets = closePlanets;
@@ -1285,4 +1305,62 @@ void RendererGL::render(GLuint vertexArray, const Model m)
 	glBindVertexArray(vertexArray);
 	glDrawElementsBaseVertex(GL_TRIANGLES, m.count, GL_UNSIGNED_INT,
 		(void*)(intptr_t)m.indexOffset, m.vertexOffset/sizeof(Vertex));
+}
+
+void GPUProfilerGL::begin(const std::string name)
+{
+	int id = (bufferId+1)%2;
+	auto &val = queries[id][name].first;
+	if (val == 0)
+	{
+		glGenQueries(1, &val);
+	}
+	glQueryCounter(val, GL_TIMESTAMP);
+	names.push(name);
+	orderedNames[id].push_back(name);
+}
+
+void GPUProfilerGL::end()
+{
+	std::string name = names.top();
+	names.pop();
+	int id = (bufferId+1)%2;
+	auto &val = queries[id][name].second;
+	if (val == 0)
+	{
+		glCreateQueries(GL_TIMESTAMP, 1, &val);
+	}
+	glQueryCounter(val, GL_TIMESTAMP);
+	lastQuery = val;
+}
+
+std::vector<std::pair<std::string,uint64_t>> GPUProfilerGL::get()
+{
+	std::vector<std::pair<std::string,uint64_t>> result;
+	auto &m = queries[bufferId];
+	for (const std::string name : orderedNames[bufferId])
+	{
+		auto val = m.find(name);
+		GLuint q1 = val->second.first;
+		GLuint q2 = val->second.second;
+		if (q1 && q2)
+		{
+			uint64_t start, end;
+			glGetQueryObjectui64v(q1, GL_QUERY_RESULT, &start);
+			glGetQueryObjectui64v(q2, GL_QUERY_RESULT, &end);
+			result.push_back(std::make_pair(name, end-start));
+		}
+		if (q1) glDeleteQueries(1, &q1);
+		if (q2) glDeleteQueries(1, &q2);
+	}
+
+	m.clear();
+	orderedNames[bufferId].clear();
+	bufferId = (bufferId+1)%2;
+	return result;
+}
+
+std::vector<std::pair<std::string,uint64_t>> RendererGL::getProfilerTimes()
+{
+	return profiler.get();
 }

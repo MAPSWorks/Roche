@@ -2,6 +2,7 @@
 
 #include "planet.hpp"
 #include <glm/glm.hpp>
+#include <map>
 
 class Renderer
 {
@@ -23,6 +24,7 @@ public:
 		std::vector<PlanetState> planetStates) = 0;
 	
 	virtual void destroy() = 0;
+	virtual std::vector<std::pair<std::string,uint64_t>> getProfilerTimes()=0;
 
 protected:
 	void generateFlareIntensityTex(int dimensions, std::vector<uint16_t> &pixelData);

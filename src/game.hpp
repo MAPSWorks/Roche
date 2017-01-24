@@ -32,6 +32,9 @@ private:
 	void loadPlanetFiles();
 	void loadSettingsFile();
 
+	void createSettingsWindow();
+	void createProfilerWindow();
+
 	// GUI
 	nanogui::Screen *guiScreen;
 

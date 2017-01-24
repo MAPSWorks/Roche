@@ -14,6 +14,21 @@
 #include <memory>
 #include <queue>
 #include <map>
+#include <stack>
+
+class GPUProfilerGL
+{
+public:
+	void begin(std::string name);
+	void end();
+	std::vector<std::pair<std::string,uint64_t>> get();
+private:
+	std::map<std::string, std::pair<GLuint, GLuint>> queries[2];
+	std::stack<std::string> names;
+	std::vector<std::string> orderedNames[2];
+	int bufferId;
+	GLuint lastQuery;
+};
 
 class RendererGL : public Renderer
 {
@@ -34,6 +49,8 @@ public:
 		float ambientColor,
 		std::vector<PlanetState> planetStates);
 	void destroy();
+
+	std::vector<std::pair<std::string,uint64_t>> getProfilerTimes();
 private:
 	struct Model
 	{
@@ -81,6 +98,8 @@ private:
 
 	TexHandle loadDDSTexture(std::string filename, glm::vec4 defaultColor);
 	void unloadDDSTexture(TexHandle texId);
+
+	GPUProfilerGL profiler;
 
 	uint32_t planetCount;
 	int msaaSamples;
