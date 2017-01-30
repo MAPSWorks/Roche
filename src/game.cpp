@@ -127,33 +127,34 @@ std::string readFile(const std::string filename)
 
 void Game::loadSettingsFile()
 {
+	using namespace shaun;
 	try 
 	{
-		shaun::parser p;
+		parser p;
 		std::string fileContent = readFile("config/settings.sn");
-		shaun::object obj = p.parse(fileContent.c_str());
-		shaun::sweeper swp(&obj);
+		object obj = p.parse(fileContent.c_str());
+		sweeper swp(&obj);
 
-		shaun::sweeper video(swp("video"));
+		sweeper video(swp("video"));
 		auto fs = video("fullscreen");
-		fullscreen = (fs.is_null())?true:(bool)fs.value<shaun::boolean>();
+		fullscreen = (fs.is_null())?true:(bool)fs.value<boolean>();
 
 		if (!fullscreen)
 		{
-			width = video("width").value<shaun::number>();
-			height = video("height").value<shaun::number>();
+			width = video("width").value<number>();
+			height = video("height").value<number>();
 		}
 
-		shaun::sweeper graphics(swp("graphics"));
-		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<shaun::number>());
-		msaaSamples = graphics("msaaSamples").value<shaun::number>();
-		ssaa = graphics("ssaa").value<shaun::number>();
-		gamma = graphics("gamma").value<shaun::number>();
+		sweeper graphics(swp("graphics"));
+		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<number>());
+		msaaSamples = graphics("msaaSamples").value<number>();
+		ssaa = graphics("ssaa").value<boolean>();
+		gamma = graphics("gamma").value<number>();
 
-		shaun::sweeper controls(swp("controls"));
-		sensitivity = controls("sensitivity").value<shaun::number>();
+		sweeper controls(swp("controls"));
+		sensitivity = controls("sensitivity").value<number>();
 	} 
-	catch (shaun::parse_error e)
+	catch (parse_error e)
 	{
 		std::cout << e << std::endl;
 	}

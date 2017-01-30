@@ -87,5 +87,5 @@ private:
 	uint32_t width, height;
 	bool fullscreen;
 	int msaaSamples;
-	float ssaa;
+	bool ssaa;
 };

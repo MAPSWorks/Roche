@@ -37,7 +37,7 @@ public:
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
-		float ssaa,
+		bool ssaa,
 		int windowWidth,
 		int windowHeight);
 	void render(
