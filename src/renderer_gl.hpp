@@ -37,6 +37,7 @@ public:
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
+		float ssaa,
 		int windowWidth,
 		int windowHeight);
 	void render(
@@ -85,7 +86,6 @@ private:
 	void renderHdr(
 		std::vector<uint32_t> closePlanets, 
 		DynamicOffsets currentDynamicOffsets);
-	void renderResolve();
 	void renderBloom();
 	void renderFlares(
 		std::vector<uint32_t> farPlanets, 
@@ -131,24 +131,19 @@ private:
 	GLuint gbufferFbo;
 	// HDR rendertarget
 	GLuint hdrMSRendertarget;
-	GLuint hdrRendertarget;
 	GLuint highpassRendertargets[5];
 	GLuint bloomRendertargets[4];
-	GLuint appliedBloomRendertarget;
 
 	GLuint hdrFbo;
-	GLuint appliedBloomFbo;
 
 	// Shaders
 	ShaderProgram programPlanet;
 	ShaderProgram programSun;
-	ShaderProgram programResolve;
 	ShaderProgram programHighpass;
 	ShaderProgram programDownsample;
 	ShaderProgram programBlurW;
 	ShaderProgram programBlurH;
 	ShaderProgram programBloomAdd;
-	ShaderProgram programBloomApply;
 	ShaderProgram programFlare;
 	ShaderProgram programTonemap;
 

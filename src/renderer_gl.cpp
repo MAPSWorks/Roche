@@ -212,6 +212,7 @@ uint32_t align(const uint32_t offset, const uint32_t minAlign)
 void RendererGL::init(
 	const std::vector<PlanetParameters> planetParams,
 	const int msaa,
+	const float ssaa,
 	const int windowWidth,
 	const int windowHeight)
 {
@@ -363,6 +364,9 @@ void RendererGL::init(
 	createShaders();
 	createRendertargets();
 	createTextures();
+
+	glEnable(GL_SAMPLE_SHADING);
+	glMinSampleShading(ssaa);
 
 #ifdef USE_KHR_DEBUG
 	// Debug output
@@ -590,12 +594,6 @@ void RendererGL::createRendertargets()
 	glTextureStorage2DMultisample(hdrMSRendertarget, msaaSamples, GL_R11F_G11F_B10F,
 		windowWidth, windowHeight, GL_FALSE);
 
-	// HDR Rendertarget
-	glCreateTextures(GL_TEXTURE_2D, 1, &hdrRendertarget);
-	glTextureStorage2D(hdrRendertarget, 1, GL_R11F_G11F_B10F, windowWidth, windowHeight);
-	glTextureParameteri(hdrRendertarget, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTextureParameteri(hdrRendertarget, GL_TEXTURE_WRAP_T, GL_CLAMP);
-
 	// Highpass rendertargets
 	glCreateTextures(GL_TEXTURE_2D, 5, highpassRendertargets);
 	for (int i=0;i<5;++i)
@@ -604,6 +602,8 @@ void RendererGL::createRendertargets()
 		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
 
 	// Bloom rendertargets
@@ -614,19 +614,14 @@ void RendererGL::createRendertargets()
 		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
-
-	// Bloom applied rendertarget
-	glCreateTextures(GL_TEXTURE_2D, 1, &appliedBloomRendertarget);
-	glTextureStorage2D(appliedBloomRendertarget, 1, GL_R11F_G11F_B10F, windowWidth, windowHeight);
 
 	// Framebuffers
 	glCreateFramebuffers(1, &hdrFbo);
 	glNamedFramebufferTexture(hdrFbo, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
 	glNamedFramebufferTexture(hdrFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
-
-	glCreateFramebuffers(1, &appliedBloomFbo);
-	glNamedFramebufferTexture(appliedBloomFbo, GL_COLOR_ATTACHMENT0, appliedBloomRendertarget, 0);
 }
 
 void RendererGL::createShaders()
@@ -642,9 +637,6 @@ void RendererGL::createShaders()
 	programPlanet.addShader(GL_FRAGMENT_SHADER, "shaders/planet.frag");
 	programPlanet.compileAndLink();
 
-	programResolve.addShader(GL_COMPUTE_SHADER, "shaders/resolve.comp");
-	programResolve.compileAndLink();
-
 	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
 	programHighpass.compileAndLink();
 
@@ -659,9 +651,6 @@ void RendererGL::createShaders()
 
 	programBloomAdd.addShader(GL_COMPUTE_SHADER, "shaders/bloom_add.comp");
 	programBloomAdd.compileAndLink();
-
-	programBloomApply.addShader(GL_COMPUTE_SHADER, "shaders/bloom_apply.comp");
-	programBloomApply.compileAndLink();
 
 	programFlare.addShader(GL_VERTEX_SHADER, "shaders/flare.vert");
 	programFlare.addShader(GL_FRAGMENT_SHADER, "shaders/flare.frag");
@@ -1016,7 +1005,6 @@ void RendererGL::render(
 		planetTexLoaded[i] = false;
 	}
 
-	profiler.begin("Texture uploading");
 	// Texture uploading
 	{
 		std::lock_guard<std::mutex> lk(texLoadedMutex);
@@ -1038,7 +1026,6 @@ void RendererGL::render(
 			}
 		}
 	}
-	profiler.end();
 
 	// Planet sorting from front to back
 	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
@@ -1050,9 +1037,6 @@ void RendererGL::render(
 
 	profiler.begin("Planets");
 	renderHdr(previousFrameClosePlanets, currentDynamicOffsets);
-	profiler.end();
-	profiler.begin("Resolve");
-	renderResolve();
 	profiler.end();
 	profiler.begin("Bloom");
 	renderBloom();
@@ -1135,24 +1119,12 @@ void RendererGL::renderHdr(
 	}
 }
 
-void RendererGL::renderResolve()
-{
-	const int workgroupSize = 16;
-	glUseProgram(programResolve.getId());
-	glBindImageTexture(0, hdrMSRendertarget, 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-	glBindImageTexture(1, hdrRendertarget  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-	glDispatchCompute(
-		(int)ceil(windowWidth/(float)workgroupSize), 
-		(int)ceil(windowHeight/(float)workgroupSize), 1);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-}
-
 void RendererGL::renderBloom()
 {
 	const int workgroupSize = 16;
 	// Highpass
 	glUseProgram(programHighpass.getId());
-	glBindImageTexture(0, hdrRendertarget         , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
+	glBindImageTexture(0, hdrMSRendertarget       , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
 	glBindImageTexture(1, highpassRendertargets[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
 	glDispatchCompute(
 		(int)ceil(windowWidth/(float)workgroupSize), 
@@ -1221,18 +1193,6 @@ void RendererGL::renderBloom()
 				(int)ceil(2*windowHeight/(float)dispatchSize), 1);
 		}
 	}
-	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-	glUseProgram(programBloomApply.getId());
-	glBindImageTexture(0, hdrRendertarget, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R11F_G11F_B10F);
-	glBindTextureUnit(1, bloomRendertargets[0]);
-	glBindImageTexture(2, appliedBloomRendertarget, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-	glDispatchCompute(
-		(int)ceil(windowWidth /(float)workgroupSize),
-		(int)ceil(windowHeight/(float)workgroupSize), 1);
-
-	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 }
 
 void RendererGL::renderFlares(
@@ -1249,7 +1209,7 @@ void RendererGL::renderFlares(
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, appliedBloomFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 
 	glUseProgram(programFlare.getId());
 
@@ -1295,7 +1255,8 @@ void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
 			sizeof(SceneDynamicUBO));
 
 	// Bind image after bloom is done
-	glBindTextureUnit(1, appliedBloomRendertarget);
+	glBindTextureUnit(1, hdrMSRendertarget);
+	glBindTextureUnit(2, bloomRendertargets[0]);
 
 	render(vertexArray, fullscreenTri);
 }

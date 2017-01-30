@@ -60,6 +60,7 @@ Game::Game()
 	quit = false;
 
 	msaaSamples = 1;
+	ssaa = 0.0;
 	gamma = 2.2;
 	exposure = 0;
 
@@ -146,6 +147,7 @@ void Game::loadSettingsFile()
 		shaun::sweeper graphics(swp("graphics"));
 		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<shaun::number>());
 		msaaSamples = graphics("msaaSamples").value<shaun::number>();
+		ssaa = graphics("ssaa").value<shaun::number>();
 		gamma = graphics("gamma").value<shaun::number>();
 
 		shaun::sweeper controls(swp("controls"));
@@ -203,7 +205,7 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, msaaSamples, width, height);
+	renderer->init(planetParams, msaaSamples, ssaa, width, height);
 	initGUI();
 }
 

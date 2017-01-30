@@ -14,8 +14,8 @@ void main()
 		for (int j=0;j<2;++j)
 		{
 			vec3 c = imageLoad(inputImage, 2*coord+ivec2(i,j)).rgb;
-			color = max(color,c);
+			color += c;
 		}
 	}
-	imageStore(outputImage, coord, vec4(color*0.1,1));
+	imageStore(outputImage, coord, vec4(color*0.25*0.5,1));
 }

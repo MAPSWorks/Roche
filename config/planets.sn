@@ -11,7 +11,7 @@ planets: [
 			diffuse:"tex/sun/diffuse.dds"
 			isStar:true
 			meanColor:[1.0,1.0,0.9]
-			albedo:10
+			albedo:5
 		}
 	}
 	{
