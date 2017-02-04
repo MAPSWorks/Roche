@@ -932,7 +932,7 @@ void RendererGL::render(
 		const glm::vec2 screen = glm::vec2(clip)/clip.w;
 		const float FLARE_SIZE_DEGREES = 20.0;
 		const glm::mat4 modelMat = 
-			glm::translate(glm::mat4(), glm::vec3(screen, 0.0))*
+			glm::translate(glm::mat4(), glm::vec3(screen, 0.999))*
 			glm::scale(glm::mat4(), 
 				glm::vec3(windowHeight/(float)windowWidth,1.0,0.0)*
 				FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
@@ -953,9 +953,9 @@ void RendererGL::render(
 		const float brightness = std::min(4.0f,
 			exp*
 			radius*radius*
-			(isStar?100000.f:
-			planetParams[i].bodyParam.albedo*0.2f*phase
-			/glm::dot(cutDist,cutDist)))
+			(isStar?100.f:
+			planetParams[i].bodyParam.albedo*0.2f*phase)
+			/glm::dot(cutDist,cutDist))
 			*fade;
 
 		FlareDynamicUBO ubo;
@@ -1209,8 +1209,9 @@ void RendererGL::renderFlares(
 	const DynamicOffsets currentDynamicOffsets)
 {
 	// No depth test/writes
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
+	glEnable(GL_DEPTH_TEST);
 	// No stencil writes
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
