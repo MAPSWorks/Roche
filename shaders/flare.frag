@@ -32,7 +32,7 @@ void main()
 	float intensity = texture(intensityTex, passUv.t).r;
 	float lines = texture(linesTex, passUv.pq).r;
 	float haloCoord = (passUv.t*SIZE_DEGREES-1.647)/2.422;
-	vec3 halo = texture(haloTex, clamp(haloCoord,0,1)).rgb;
+	vec3 halo = texture(haloTex, clamp(haloCoord,0,1)).rgb*0.2;
 	float fade = pow(1-clamp(passUv.t,0,1),2.2);
 
 	outColor = vec4(color.xyz*(vec3(intensity)+halo)*lines*brightness*fade,1.0);
