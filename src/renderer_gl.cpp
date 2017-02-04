@@ -914,11 +914,14 @@ void RendererGL::render(
 				glm::vec3(glm::normalize(-planetStates[i].position)):
 				glm::vec3(0.f);
 
-		planetUBOs[i].modelMat = modelMat;
-		planetUBOs[i].lightDir = viewMat*glm::vec4(lightDir,0.0);
-		planetUBOs[i].cloudDisp = planetStates[i].cloudDisp;
-		planetUBOs[i].nightTexIntensity = planetParams[i].bodyParam.nightTexIntensity;
-		planetUBOs[i].albedo = planetParams[i].bodyParam.albedo;
+		PlanetDynamicUBO ubo;
+		ubo.modelMat = modelMat;
+		ubo.lightDir = viewMat*glm::vec4(lightDir,0.0);
+		ubo.cloudDisp = planetStates[i].cloudDisp;
+		ubo.nightTexIntensity = planetParams[i].bodyParam.nightTexIntensity;
+		ubo.albedo = planetParams[i].bodyParam.albedo;
+
+		planetUBOs[i] = ubo;
 	}
 	// Far away planets (flare)
 	std::vector<FlareDynamicUBO> flareUBOs(planetCount);
@@ -955,9 +958,12 @@ void RendererGL::render(
 			/glm::dot(cutDist,cutDist)))
 			*fade;
 
-		flareUBOs[i].modelMat = modelMat;
-		flareUBOs[i].color = glm::vec4(planetParams[i].bodyParam.meanColor,1.0);
-		flareUBOs[i].brightness = brightness;
+		FlareDynamicUBO ubo;
+		ubo.modelMat = modelMat;
+		ubo.color = glm::vec4(planetParams[i].bodyParam.meanColor,1.0);
+		ubo.brightness = brightness;
+
+		flareUBOs[i] = ubo;
 	}
 
 	// Dynamic data upload
