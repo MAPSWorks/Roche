@@ -452,21 +452,20 @@ void Game::loadPlanetFiles()
 				planet.bodyParam.nightTexIntensity = get<double>(body("nightTexIntensity"));
 			}
 			sweeper atmo(pl("atmosphere"));
+			planet.atmoParam.hasAtmosphere = !atmo.is_null();
 			if (!atmo.is_null())
 			{
+				planet.atmoParam.hasAtmosphere = true;
 				planet.atmoParam.maxHeight = get<double>(atmo("maxAltitude"));
-				planet.atmoParam.K_R = get<double>(atmo("K_R"));
-				planet.atmoParam.K_M = get<double>(atmo("K_M"));
-				planet.atmoParam.E   = get<double>(atmo("E"));
-				planet.atmoParam.C_R = get<glm::vec3>(atmo("C_R"));
-				planet.atmoParam.G_M = get<double>(atmo("G_M"));
+				planet.atmoParam.K = get<glm::vec4>(atmo("K"));
+				planet.atmoParam.density = get<double>(atmo("density"));
 				planet.atmoParam.scaleHeight = get<double>(atmo("scaleHeight"));
 			}
 
 			sweeper ring(pl("ring"));
+			planet.ringParam.hasRings = !ring.is_null();
 			if (!ring.is_null())
 			{
-				planet.ringParam.hasRings = true;
 				planet.ringParam.innerDistance = get<double>(ring("inner"));
 				planet.ringParam.outerDistance = get<double>(ring("outer"));
 				float rightAscension = glm::radians(get<double>(ring("rightAscension")));

@@ -120,37 +120,57 @@ float scatOptic(const glm::vec2 a, const glm::vec2 b,
 	return sum * glm::length(step) / maxHeight;
 }
 
-float raySphereFar(const glm::vec2 origin, const glm::vec2 ray, const float radius)
+float intersectsSphereNear(glm::vec3 ori, glm::vec3 dir, float radius)
 {
-	const float b = glm::dot(origin, ray);
-	const float c = glm::dot(origin, origin) - radius*radius;
+	const float b = glm::dot(ori,dir);
+	const float c = glm::dot(ori,ori)-radius*radius;
+	return -b-sqrt(b*b-c);
+}
+
+float intersectsSphereFar(glm::vec3 ori, glm::vec3 dir, float radius)
+{
+	const float b = glm::dot(ori,dir);
+	const float c = glm::dot(ori,ori)-radius*radius;
 	return -b+sqrt(b*b-c);
 }
 
 void AtmosphericParameters::generateLookupTable(std::vector<float> &table, const size_t size, const float radius)
 {
 	/*  2 channel lookup table :
-	 *  x-axis for altitude (0.0 for sl, 1.0 for maxHeight)
-	 *  y-axis for cosine of angle of ray /2
+	 *  y-axis for altitude (0.0 for sl, 1.0 for maxHeight)
+	 *  x-axis for cosine of angle of ray
 	 *  First channel for air density
 	 *  Second channel for out scattering factor
 	 */
 	table.resize(size*size*2);
 
+	size_t index = 0;
 	for (int i=0;i<size;++i)
 	{
 		const float altitude = (float)i/(float)size * maxHeight;
 		const float density = glm::exp(-altitude/scaleHeight);
 		for (int j=0;j<size;++j)
 		{
-			const size_t index = (i+j*size)*2;
-			const float angle = (float)j*PI/(float)size;
+			const float angle = acos(2*(float)j/(float)(size-1)-1);
 			const glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
 			const glm::vec2 rayOri = glm::vec2(0, radius + altitude);
-			const float t = raySphereFar(rayOri, rayDir, radius+maxHeight);
-			const glm::vec2 u = rayOri + rayDir*t;
+			// Test against planet surface
+			const float b = glm::dot(rayOri, rayDir);
+			const float r1 = radius;
+			const float c1 = glm::dot(rayOri, rayOri)-r1*r1;
+			float depth = 1000; // max optical depth
+			// If it doesn't intersect the planet
+			if ((b*b-c1) < 0)
+			{
+				const float r2 = radius+maxHeight;
+				const float c2 = glm::dot(rayOri,rayOri)-r2*r2;
+				const float t = -b+sqrt(b*b-c2);
+				const glm::vec2 u = rayOri + rayDir*t;
+				depth = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 50);
+			}
 			table[index+0] = density;
-			table[index+1] = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 50)*(4*PI);
+			table[index+1] = depth;
+			index += 2;
 		}
 	}
 }

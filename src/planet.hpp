@@ -14,11 +14,8 @@ struct OrbitalParameters
 
 struct AtmosphericParameters
 {
-	float K_R; /// Rayleigh scattering constant
-	float K_M; /// Mie scattering constant
-	float E;   /// Sunlight intensity;
-	float G_M; /// Mie G constant
-	glm::vec3 C_R; /// 1 / sunlight wavelength^4
+	glm::vec4 K;
+	float density;
 	float maxHeight; /// Max atmospheric height
 	float scaleHeight; /// Scale height
 	bool hasAtmosphere;

@@ -112,16 +112,17 @@ void ShaderProgram::compileAndLink()
 		std::string newSource = source;
 		for (auto c : constants)
 		{
-			newSource.insert(firstLine, "#define " + c.first + " (" + c.second + ")\n");
-			firstLine = source.find_first_of("\n", firstLine)+1;
+			std::string define = "#define " + c.first + " (" + c.second + ")\n";
+			newSource.insert(firstLine, define);
+			firstLine += define.size();
 		}
-		newSource.insert(firstLine, "#line 1");
+		newSource.insert(firstLine, "#line 2\n");
 
 		// Compile shader
 		GLint success;
 		GLchar log[2048];
 
-		std::vector<const char *> sources = {source.c_str()};
+		std::vector<const char *> sources = {newSource.c_str()};
 
 		GLuint shaderId = glCreateShader(type);
 		glShaderSource(shaderId, sources.size(), sources.data(), nullptr);

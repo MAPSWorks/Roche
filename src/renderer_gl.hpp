@@ -138,6 +138,7 @@ private:
 
 	// Shaders
 	ShaderProgram programPlanet;
+	ShaderProgram programPlanetAtmo;
 	ShaderProgram programSun;
 	ShaderProgram programHighpass;
 	ShaderProgram programDownsample;
@@ -163,6 +164,7 @@ private:
 	std::vector<TexHandle> planetDiffuseTextures; // Diffuse texture for each planet
 	std::vector<TexHandle> planetCloudTextures;
 	std::vector<TexHandle> planetNightTextures;
+	std::vector<GLuint> atmoLookupTables;
 
 	// Textures
 	GLuint diffuseTexDefault;

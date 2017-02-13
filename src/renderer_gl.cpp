@@ -82,10 +82,15 @@ struct SceneDynamicUBO
 struct PlanetDynamicUBO
 {
 	glm::mat4 modelMat;
+	glm::vec4 planetPos;
 	glm::vec4 lightDir;
+	glm::vec4 K;
 	float albedo;
 	float cloudDisp;
 	float nightTexIntensity;
+	float atmoDensity;
+	float radius;
+	float atmoHeight;
 };
 
 struct FlareDynamicUBO
@@ -472,6 +477,7 @@ void RendererGL::createTextures()
 	planetDiffuseTextures.resize(planetCount, -1);
 	planetCloudTextures.resize(planetCount, -1);
 	planetNightTextures.resize(planetCount, -1);
+	atmoLookupTables.resize(planetCount, -1);
 
 	// Default diffuse tex
 	const uint8_t diffuseData[] = {0, 0, 0};
@@ -494,15 +500,20 @@ void RendererGL::createTextures()
 	createFlare();
 }
 
+int mipmapCount(int size)
+{
+	return 1 + floor(log2(size));
+}
+
 void RendererGL::createFlare()
 {
 	const int flareSize = 512;
-	const int mipmapCount = 1 + floor(log2(flareSize));
+	const int mips = mipmapCount(flareSize);
 	{
 		std::vector<uint16_t> pixelData;
 		Renderer::generateFlareIntensityTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareIntensityTex);
-		glTextureStorage1D(flareIntensityTex, mipmapCount, GL_R16F, flareSize);
+		glTextureStorage1D(flareIntensityTex, mips, GL_R16F, flareSize);
 		glTextureSubImage1D(flareIntensityTex, 0, 0, flareSize, GL_RED, GL_HALF_FLOAT, pixelData.data());
 		glTextureParameteri(flareIntensityTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
 		glGenerateTextureMipmap(flareIntensityTex);
@@ -511,7 +522,7 @@ void RendererGL::createFlare()
 		std::vector<uint8_t> pixelData;
 		Renderer::generateFlareLinesTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_2D, 1, &flareLinesTex);
-		glTextureStorage2D(flareLinesTex, mipmapCount, GL_R8, flareSize, flareSize);
+		glTextureStorage2D(flareLinesTex, mips, GL_R8, flareSize, flareSize);
 		glTextureSubImage2D(flareLinesTex, 0, 0, 0, flareSize, flareSize, GL_RED, GL_UNSIGNED_BYTE, pixelData.data());
 		glGenerateTextureMipmap(flareLinesTex);
 		glBindTextureUnit(0, flareLinesTex);
@@ -520,7 +531,7 @@ void RendererGL::createFlare()
 		std::vector<uint16_t> pixelData;
 		Renderer::generateFlareHaloTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareHaloTex);
-		glTextureStorage1D(flareHaloTex, mipmapCount, GL_RGBA16F, flareSize);
+		glTextureStorage1D(flareHaloTex, mips, GL_RGBA16F, flareSize);
 		glTextureSubImage1D(flareHaloTex, 0, 0, flareSize, GL_RGBA, GL_HALF_FLOAT, pixelData.data());
 		glTextureParameteri(flareHaloTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
 		glGenerateTextureMipmap(flareHaloTex);
@@ -630,6 +641,7 @@ void RendererGL::createRendertargets()
 void RendererGL::createShaders()
 {
 	Shader planetVert(GL_VERTEX_SHADER, "shaders/planet.vert");
+	Shader planetFrag(GL_FRAGMENT_SHADER, "shaders/planet.frag");
 	Shader deferredVert(GL_VERTEX_SHADER, "shaders/deferred.vert");
 
 	programSun.addShader(planetVert);
@@ -637,8 +649,13 @@ void RendererGL::createShaders()
 	programSun.compileAndLink();
 
 	programPlanet.addShader(planetVert);
-	programPlanet.addShader(GL_FRAGMENT_SHADER, "shaders/planet.frag");
+	programPlanet.addShader(planetFrag);
 	programPlanet.compileAndLink();
+
+	programPlanetAtmo.addShader(planetVert);
+	programPlanetAtmo.addShader(planetFrag);
+	programPlanetAtmo.setConstant("HAS_ATMO", "");
+	programPlanetAtmo.compileAndLink();
 
 	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
 	programHighpass.compileAndLink();
@@ -892,34 +909,39 @@ void RendererGL::render(
 	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
 	{
-		const glm::vec3 planetPos = planetStates[i].position - viewPos;
+		const PlanetState state = planetStates[i];
+		const PlanetParameters params = planetParams[i];
+
+		const glm::vec3 planetPos = state.position - viewPos;
 
 		// Planet rotation
 		const glm::vec3 north = glm::vec3(0,0,1);
-		const glm::vec3 rotAxis = planetParams[i].bodyParam.rotationAxis;
+		const glm::vec3 rotAxis = params.bodyParam.rotationAxis;
 		const glm::quat q = glm::rotate(glm::quat(), 
 			(float)acos(glm::dot(north, rotAxis)), 
 			glm::cross(north, rotAxis))*
-			glm::rotate(glm::quat(), planetStates[i].rotationAngle, north);
+			glm::rotate(glm::quat(), state.rotationAngle, north);
 
 		// Model matrix
 		const glm::mat4 modelMat = 
 			glm::translate(glm::mat4(), planetPos)*
 			glm::mat4_cast(q)*
-			glm::scale(glm::mat4(), glm::vec3(planetParams[i].bodyParam.radius));
+			glm::scale(glm::mat4(), glm::vec3(params.bodyParam.radius));
 
 		// Light direction
-		const glm::vec3 lightDir = 
-			(glm::length(planetStates[i].position) > 0.1)?
-				glm::vec3(glm::normalize(-planetStates[i].position)):
-				glm::vec3(0.f);
+		const glm::vec3 lightDir = glm::vec3(glm::normalize(-state.position));
 
 		PlanetDynamicUBO ubo;
 		ubo.modelMat = modelMat;
+		ubo.planetPos = viewMat*glm::vec4(planetPos, 1.0);
 		ubo.lightDir = viewMat*glm::vec4(lightDir,0.0);
-		ubo.cloudDisp = planetStates[i].cloudDisp;
-		ubo.nightTexIntensity = planetParams[i].bodyParam.nightTexIntensity;
-		ubo.albedo = planetParams[i].bodyParam.albedo;
+		ubo.K = params.atmoParam.K;
+		ubo.cloudDisp = state.cloudDisp;
+		ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
+		ubo.albedo = params.bodyParam.albedo;
+		ubo.atmoDensity = params.atmoParam.density;
+		ubo.radius = params.bodyParam.radius;
+		ubo.atmoHeight = params.atmoParam.maxHeight;
 
 		planetUBOs[i] = ubo;
 	}
@@ -927,7 +949,10 @@ void RendererGL::render(
 	std::vector<FlareDynamicUBO> flareUBOs(planetCount);
 	for (uint32_t i : farPlanets)
 	{
-		const glm::vec3 planetPos = glm::vec3(planetStates[i].position - viewPos);
+		const PlanetState state = planetStates[i];
+		const PlanetParameters params = planetParams[i];
+
+		const glm::vec3 planetPos = glm::vec3(state.position - viewPos);
 		const glm::vec4 clip = projMat*viewMat*glm::vec4(planetPos,1.0);
 		const glm::vec2 screen = glm::vec2(clip)/clip.w;
 		const float FLARE_SIZE_DEGREES = 20.0;
@@ -938,12 +963,12 @@ void RendererGL::render(
 				FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
 
 		const float phaseAngle = glm::acos(glm::dot(
-			(glm::vec3)glm::normalize(planetStates[i].position), 
+			(glm::vec3)glm::normalize(state.position), 
 			glm::normalize(planetPos)));
 		const float phase = (1-phaseAngle/PI)*cos(phaseAngle)+(1/PI)*sin(phaseAngle);
-		const bool isStar = planetParams[i].bodyParam.isStar;
-		const float radius = planetParams[i].bodyParam.radius;
-		const double dist = glm::distance(viewPos, planetStates[i].position)/radius;
+		const bool isStar = params.bodyParam.isStar;
+		const float radius = params.bodyParam.radius;
+		const double dist = glm::distance(viewPos, state.position)/radius;
 		const float fade = glm::clamp(isStar?
 			(float)   dist/10:
 			(float) ((dist-farPlanetMinDistance)/
@@ -954,13 +979,13 @@ void RendererGL::render(
 			exp*
 			radius*radius*
 			(isStar?100.f:
-			planetParams[i].bodyParam.albedo*0.2f*phase)
+			params.bodyParam.albedo*0.2f*phase)
 			/glm::dot(cutDist,cutDist))
 			*fade;
 
 		FlareDynamicUBO ubo;
 		ubo.modelMat = modelMat;
-		ubo.color = glm::vec4(planetParams[i].bodyParam.meanColor,1.0);
+		ubo.color = glm::vec4(params.bodyParam.meanColor,1.0);
 		ubo.brightness = brightness;
 
 		flareUBOs[i] = ubo;
@@ -997,6 +1022,25 @@ void RendererGL::render(
 		planetCloudTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.cloudFilename  , glm::vec4(0,0,0,0));
 		planetNightTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.nightFilename  , glm::vec4(0,0,0,0));
 
+		// Generate atmospheric scattering lookup texture
+		if (planetParams[i].atmoParam.hasAtmosphere)
+		{
+			const int size = 128;
+			std::vector<float> table;
+			planetParams[i].atmoParam.generateLookupTable(table, size, planetParams[i].bodyParam.radius);
+
+			GLuint &tex = atmoLookupTables[i];
+
+			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
+			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
+			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
+			glGenerateTextureMipmap(tex);
+		}
+
 		planetTexLoaded[i] = true;
 	}
 
@@ -1010,6 +1054,11 @@ void RendererGL::render(
 		planetDiffuseTextures[i] = -1;
 		planetCloudTextures[i] = -1;
 		planetNightTextures[i] = -1;
+
+		if (planetParams[i].atmoParam.hasAtmosphere)
+		{
+			glDeleteTextures(1, &atmoLookupTables[i]);
+		}
 
 		planetTexLoaded[i] = false;
 	}
@@ -1101,10 +1150,11 @@ void RendererGL::renderHdr(
 	for (uint32_t i : closePlanets)
 	{
 		const bool star = planetParams[i].bodyParam.isStar;
+		const bool hasAtmo = planetParams[i].atmoParam.hasAtmosphere;
 		glUseProgram(
 			(star?
 			programSun:
-			programPlanet).getId());
+			(hasAtmo?programPlanetAtmo:programPlanet)).getId());
 
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
@@ -1122,6 +1172,11 @@ void RendererGL::renderHdr(
 		{
 			glBindTextureUnit(3, cloudTextures[i]);
 			glBindTextureUnit(4, nightTextures[i]);
+		}
+
+		if (hasAtmo)
+		{
+			glBindTextureUnit(5, atmoLookupTables[i]);
 		}
 
 		render(vertexArray, planetModels[i]);

@@ -16,10 +16,15 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
+	vec4 planetPos;
 	vec4 lightDir;
+	vec4 K;
 	float albedo;
 	float cloudDisp;
 	float nightIntensity;
+	float atmoDensity;
+	float radius;
+	float atmoHeight;
 };
 
 layout (binding = 2) uniform sampler2D diffuse;
