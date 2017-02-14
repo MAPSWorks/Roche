@@ -195,12 +195,12 @@ void Game::init()
 	}
 	glfwMakeContextCurrent(win);
 
+	glewExperimental = true;
 	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
 		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
-
 	// Screenshot
 	screenshotBuffer.resize(width*height*4);
 	screenshotThread = std::thread(
