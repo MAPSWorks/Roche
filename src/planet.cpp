@@ -158,16 +158,11 @@ void AtmosphericParameters::generateLookupTable(std::vector<float> &table, const
 			const float b = glm::dot(rayOri, rayDir);
 			const float r1 = radius;
 			const float c1 = glm::dot(rayOri, rayOri)-r1*r1;
-			float depth = 1000; // max optical depth
-			// If it doesn't intersect the planet
-			if ((b*b-c1) < 0)
-			{
-				const float r2 = radius+maxHeight;
-				const float c2 = glm::dot(rayOri,rayOri)-r2*r2;
-				const float t = -b+sqrt(b*b-c2);
-				const glm::vec2 u = rayOri + rayDir*t;
-				depth = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 50);
-			}
+			const float r2 = radius+maxHeight;
+			const float c2 = glm::dot(rayOri,rayOri)-r2*r2;
+			const float t = -b+sqrt(b*b-c2);
+			const glm::vec2 u = rayOri + rayDir*t;
+			const float depth = scatOptic(rayOri, u, radius, scaleHeight, maxHeight, 500);
 			table[index+0] = density;
 			table[index+1] = depth;
 			index += 2;

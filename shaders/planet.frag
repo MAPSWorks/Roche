@@ -67,7 +67,7 @@ float mie(float c, float cc)
 	return 1.5*a/b;
 }
 
-const int IN_SAMPLES = 10;
+const int IN_SAMPLES = 5;
 
 vec3 in_scattering(vec3 viewer, vec3 frag_pos, vec3 light_dir, float radius, float atmos_height)
 {
