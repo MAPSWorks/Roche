@@ -60,7 +60,7 @@ planets: [
 	atmosphere:{
 		maxAltitude:250
 		scaleHeight:15.9
-		K:[0.4,0.3,0.2,0.0]
+		K:[2,1.5,1.0,0.0]
 		density:5
 	}
 }
@@ -142,7 +142,7 @@ planets: [
 	atmosphere:{
 		maxAltitude:170
 		scaleHeight:11.1
-		K:[0.4,0.2,0.1,0.0009]
+		K:[0.3,0.24,0.20,0.00001]
 		density:0.009
 	}
 }
