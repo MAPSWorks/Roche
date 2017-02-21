@@ -88,7 +88,6 @@ struct PlanetDynamicUBO
 	float albedo;
 	float cloudDisp;
 	float nightTexIntensity;
-	float atmoDensity;
 	float radius;
 	float atmoHeight;
 };
@@ -939,7 +938,6 @@ void RendererGL::render(
 		ubo.cloudDisp = state.cloudDisp;
 		ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
 		ubo.albedo = params.bodyParam.albedo;
-		ubo.atmoDensity = params.atmoParam.density;
 		ubo.radius = params.bodyParam.radius;
 		ubo.atmoHeight = params.atmoParam.maxHeight;
 

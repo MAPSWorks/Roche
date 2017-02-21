@@ -22,7 +22,6 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 	float albedo;
 	float cloudDisp;
 	float nightIntensity;
-	float atmoDensity;
 	float radius;
 	float atmoHeight;
 };
