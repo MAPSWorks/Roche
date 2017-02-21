@@ -57,7 +57,6 @@ float mie(float c, float cc)
 
 	return 1.5*a/b;
 }
-
 #endif
 
 void main()

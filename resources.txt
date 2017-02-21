@@ -3,3 +3,5 @@ https://software.intel.com/en-us/articles/compute-shader-hdr-and-bloom
 https://mynameismjp.wordpress.com/2012/10/24/msaa-overview/
 http://simonwinder.com/projects/simulation-of-lens-flare-in-the-human-eye/
 http://luthuli.cs.uiuc.edu/~daf/courses/rendering/papers3/spencer95.pdf
+http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter16.html
+https://community.eveonline.com/news/dev-blogs/awesome-looking-planets/
