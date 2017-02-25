@@ -16,6 +16,7 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
+	mat4 atmoMat;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;

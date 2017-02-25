@@ -18,6 +18,7 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
+	mat4 atmoMat;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;
@@ -95,8 +96,13 @@ layout (location = 3) out vec4 passScattering;
 void main(void)
 {
 	passUv = inUv;
-	passNormal = normalize(viewMat*modelMat*inNormal);
-	passPosition = viewMat*modelMat*inPosition;
+	mat4 mMat = modelMat;
+#if defined(IS_ATMO)
+	mMat = atmoMat;
+#endif
+
+	passNormal = normalize(viewMat*mMat*inNormal);
+	passPosition = viewMat*mMat*inPosition;
 	gl_Position = projMat*passPosition;
 	// Logarithmic depth buffer
 	gl_Position.z = log2(max(1e-6, 1.0+gl_Position.w)) * (2.0/log2(5e10 + 1.0)) - 1.0;

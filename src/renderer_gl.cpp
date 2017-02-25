@@ -82,6 +82,7 @@ struct SceneDynamicUBO
 struct PlanetDynamicUBO
 {
 	glm::mat4 modelMat;
+	glm::mat4 atmoMat;
 	glm::vec4 planetPos;
 	glm::vec4 lightDir;
 	glm::vec4 K;
@@ -658,6 +659,11 @@ void RendererGL::createShaders()
 	programPlanetAtmo.setConstant("HAS_ATMO", "");
 	programPlanetAtmo.compileAndLink();
 
+	programAtmo.addShader(planetVert);
+	programAtmo.addShader(GL_FRAGMENT_SHADER, "shaders/atmo.frag");
+	programAtmo.setConstant("IS_ATMO", "");
+	programAtmo.compileAndLink();
+
 	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
 	programHighpass.compileAndLink();
 
@@ -859,6 +865,7 @@ void RendererGL::render(
 	// Planet classification
 	std::vector<uint32_t> closePlanets;
 	std::vector<uint32_t> farPlanets;
+	std::vector<uint32_t> atmoPlanets;
 
 	std::vector<uint32_t> texLoadPlanets;
 	std::vector<uint32_t> texUnloadPlanets;
@@ -885,6 +892,11 @@ void RendererGL::render(
 			{
 				// Detailed model
 				closePlanets.push_back(i);
+				// Planet atmospheres
+				if (planetParams[i].atmoParam.hasAtmosphere)
+				{
+					atmoPlanets.push_back(i);
+				}
 			}
 			if (dist > farPlanetMinDistance || planetParams[i].bodyParam.isStar)
 			{
@@ -929,11 +941,17 @@ void RendererGL::render(
 			glm::mat4_cast(q)*
 			glm::scale(glm::mat4(), glm::vec3(params.bodyParam.radius));
 
+		const glm::mat4 atmoMat = 
+			glm::translate(glm::mat4(), planetPos)*
+			glm::mat4_cast(q)*
+			glm::scale(glm::mat4(), -glm::vec3(params.bodyParam.radius+params.atmoParam.maxHeight));
+
 		// Light direction
 		const glm::vec3 lightDir = glm::vec3(glm::normalize(-state.position));
 
 		PlanetDynamicUBO ubo;
 		ubo.modelMat = modelMat;
+		ubo.atmoMat = atmoMat;
 		ubo.planetPos = viewMat*glm::vec4(planetPos, 1.0);
 		ubo.lightDir = viewMat*glm::vec4(lightDir,0.0);
 		ubo.K = params.atmoParam.K;
@@ -1093,8 +1111,24 @@ void RendererGL::render(
 		return distI < distJ;
 	});
 
+	// Atmosphere sorting from back to front
+	std::sort(atmoPlanets.begin(), atmoPlanets.end(), [&](int i, int j)
+	{
+		const float distI = glm::distance(planetStates[i].position, viewPos);
+		const float distJ = glm::distance(planetStates[j].position, viewPos);
+		return distI > distJ;
+	});
+
+	// Backface culling
+	glFrontFace(GL_CCW);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
 	profiler.begin("Planets");
 	renderHdr(previousFrameClosePlanets, currentDynamicOffsets);
+	profiler.end();
+	profiler.begin("Atmospheres");
+	renderAtmo(previousFrameAtmoPlanets, currentDynamicOffsets);
 	profiler.end();
 	profiler.begin("Bloom");
 	renderBloom();
@@ -1111,6 +1145,7 @@ void RendererGL::render(
 	frameId = (frameId+1)%bufferFrames;
 	previousFrameClosePlanets = closePlanets;
 	previousFrameFarPlanets = farPlanets;
+	previousFrameAtmoPlanets = atmoPlanets;
 }
 
 void RendererGL::renderHdr(
@@ -1179,6 +1214,37 @@ void RendererGL::renderHdr(
 			glBindTextureUnit(5, atmoLookupTables[i]);
 		}
 
+		render(vertexArray, planetModels[i]);
+	}
+}
+
+void RendererGL::renderAtmo(
+	const std::vector<uint32_t> atmoPlanets,
+	const DynamicOffsets currentDynamicOffsets)
+{
+	// Only depth test
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LESS);
+	// No stencil writes
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	// Blending
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_SRC_ALPHA);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+
+	for (uint32_t i : atmoPlanets)
+	{
+		glUseProgram(programAtmo.getId());
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
+			currentDynamicOffsets.sceneUBO,
+			sizeof(SceneDynamicUBO));
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
+			currentDynamicOffsets.planetUBOs[i],
+			sizeof(PlanetDynamicUBO));
+		glBindTextureUnit(2, atmoLookupTables[i]);
 		render(vertexArray, planetModels[i]);
 	}
 }
@@ -1263,15 +1329,16 @@ void RendererGL::renderFlares(
 	const std::vector<uint32_t> farPlanets, 
 	const DynamicOffsets currentDynamicOffsets)
 {
-	// No depth test/writes
-	//glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_FALSE);
+	// Only depth test
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LESS);
 	// No stencil writes
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	// Blending add
 	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);

@@ -80,11 +80,11 @@ private:
 	void createShaders();
 
 	void render(GLuint vertexArray, Model m);
-	void renderGBuffer(
-		std::vector<uint32_t> closePlanets, 
-		DynamicOffsets currentDynamicOffsets);
 	void renderHdr(
 		std::vector<uint32_t> closePlanets, 
+		DynamicOffsets currentDynamicOffsets);
+	void renderAtmo(
+		std::vector<uint32_t> atmoPlanets,
 		DynamicOffsets currentDynamicOffsets);
 	void renderBloom();
 	void renderFlares(
@@ -139,6 +139,7 @@ private:
 	// Shaders
 	ShaderProgram programPlanet;
 	ShaderProgram programPlanetAtmo;
+	ShaderProgram programAtmo;
 	ShaderProgram programSun;
 	ShaderProgram programHighpass;
 	ShaderProgram programDownsample;
@@ -155,6 +156,7 @@ private:
 	std::vector<PlanetParameters> planetParams; // Static parameters
 	std::vector<uint32_t> previousFrameClosePlanets;
 	std::vector<uint32_t> previousFrameFarPlanets;
+	std::vector<uint32_t> previousFrameAtmoPlanets;
 	std::vector<Model> planetModels; // Offsets and count in buffer
 	std::vector<bool> planetTexLoaded; // indicates if the texture are loaded for a planet
 

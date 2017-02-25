@@ -18,6 +18,6 @@ void main()
 	}
 	const vec3 value = sum*SAMPLES_MUL;
 	const float lum = dot(vec3(0.2126, 0.7152, 0.0722), value);
-	const vec3 finalColor = lum>1.0?value:vec3(0);
+	const vec3 finalColor = (lum>1.0&&lum<10000)?value:vec3(0);
 	imageStore(outputImage, coord, vec4(finalColor,1.0));
 }
