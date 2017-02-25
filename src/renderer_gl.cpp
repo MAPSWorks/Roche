@@ -226,6 +226,8 @@ void RendererGL::init(
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
 
+	this->bufferFrames = 3; // triple-buffering
+
 	// Various alignments
 	uint32_t uboMinAlign;
 	uint32_t ssboMinAlign;
@@ -305,7 +307,7 @@ void RendererGL::init(
 
 	// Offsets in dynamic buffer
 	currentOffset = 0;
-	dynamicOffsets.resize(3); // triple buffering
+	dynamicOffsets.resize(bufferFrames); // x-buffering
 	for (uint32_t i=0;i<dynamicOffsets.size();++i)
 	{
 		currentOffset = align(currentOffset, uboMinAlign);
@@ -846,7 +848,7 @@ void RendererGL::render(
 	const float texUnloadDistance = closePlanetMaxDistance*1.6;
 
 	// Triple buffer of dynamic UBO
-	const uint32_t nextFrameId = (frameId+1)%3;
+	const uint32_t nextFrameId = (frameId+1)%bufferFrames;
 	const auto &currentDynamicOffsets = dynamicOffsets[frameId];
 	const auto &nextDynamicOffsets = dynamicOffsets[nextFrameId]; 
 
@@ -1106,7 +1108,7 @@ void RendererGL::render(
 
 	profiler.end();
 
-	frameId = (frameId+1)%3;
+	frameId = (frameId+1)%bufferFrames;
 	previousFrameClosePlanets = closePlanets;
 	previousFrameFarPlanets = farPlanets;
 }

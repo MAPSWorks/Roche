@@ -150,6 +150,7 @@ private:
 
 	// Current frame % 3 for triple buffering
 	uint32_t frameId;
+	uint32_t bufferFrames;
 
 	std::vector<PlanetParameters> planetParams; // Static parameters
 	std::vector<uint32_t> previousFrameClosePlanets;
