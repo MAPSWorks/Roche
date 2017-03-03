@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <random>
 #include <iostream>
+#include <fstream>
+#include <string>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -14,55 +16,40 @@
 
 #define PI 3.14159265358979323846264338327950288 
 
-void RingParameters::generateRings(std::vector<uint8_t> &pixelBuffer, const int seed)
+void RingParameters::loadFile(
+	const std::string filename,
+	std::vector<float> &pixelData) const
 {
-	// Create larger buffer for better anti-aliasing
-	const int upscale = 4;
-	std::vector<float> refBuffer(pixelBuffer.size()*upscale, 1.0);
+	std::ifstream in(filename);
 
-	// Random init
-	std::mt19937 rng(seed);
-	std::uniform_real_distribution<> dis(0, 1);
-
-	// Populate gaps
-	const int maxGapsize = refBuffer.size()/20;
-	for (int i=0;i<100;++i)
+	if (!in)
 	{
-		// multiply generated range by opacity
-		const int gapSize = dis(rng)*maxGapsize;
-		const int gapOffset = dis(rng)*(refBuffer.size()-gapSize+1);
-		const float gapOpacity = std::max((float)dis(rng),0.4f);
-		for (int j=gapOffset;j<gapOffset+gapSize;++j)
-			refBuffer[j] *= gapOpacity;
+		throw std::runtime_error("Can't open ring file " + filename);
 	}
 
-	// brightness equalization
-	float mean = 0.f;
-	for (float v : refBuffer)
-		mean += v;
-	mean /= refBuffer.size();
-	const float mul = 1.0/mean;
-	for (auto &v : refBuffer)
-		v *= mul;
+	// Clear values
+	pixelData.clear();
+	in.seekg(0, std::ios::beg);
 
-	// fading on edges
-	const int fade = refBuffer.size()/10;
-	for (int i=0;i<fade;++i)
+	std::string number = "";
+
+	while (!in.eof())
 	{
-		refBuffer[refBuffer.size()-i-1] *= i/(float)fade;
-		refBuffer[i] *= i/(float)fade;
+		char c;
+		in.read(&c, 1);
+		if (c == ' ' || c == '\t' || c == '\n')
+		{
+			if (number.size() > 0)
+			{
+				pixelData.push_back(std::stof(number.c_str()));
+				number = "";
+			}
+		}
+		else
+		{
+			number += c;
+		}
 	}
-
-	// Downscaling
-	for (int i=0;i<pixelBuffer.size();++i)
-	{
-		float mean = 0.f;
-		for (int j=i*upscale;j<(i+1)*upscale;++j)
-			mean += refBuffer[j];
-		mean /= upscale;
-		pixelBuffer[i] = (unsigned char)(mean*255);
-	}
-
 }
 
 glm::dvec3 OrbitalParameters::computePosition(const double epoch, const double parentGM)
@@ -134,7 +121,10 @@ float intersectsSphereFar(glm::vec3 ori, glm::vec3 dir, float radius)
 	return -b+sqrt(b*b-c);
 }
 
-void AtmosphericParameters::generateLookupTable(std::vector<float> &table, const size_t size, const float radius)
+void AtmosphericParameters::generateLookupTable(
+	std::vector<float> &table,
+	const size_t size,
+	const float radius) const
 {
 	/*  2 channel lookup table :
 	 *  y-axis for altitude (0.0 for sl, 1.0 for maxHeight)

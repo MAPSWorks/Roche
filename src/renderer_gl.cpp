@@ -83,6 +83,8 @@ struct PlanetDynamicUBO
 {
 	glm::mat4 modelMat;
 	glm::mat4 atmoMat;
+	glm::mat4 ringFarMat;
+	glm::mat4 ringNearMat;
 	glm::vec4 planetPos;
 	glm::vec4 lightDir;
 	glm::vec4 K;
@@ -196,6 +198,45 @@ void generateFlareModel(std::vector<Vertex> &vertices, std::vector<uint32_t> &in
 	}
 }
 
+void generateRingModel(
+	const int meridians,
+	const float near,
+	const float far,
+	std::vector<Vertex> &vertices, 
+	std::vector<uint32_t> &indices)
+{
+	vertices.resize((meridians+1)*2);
+	indices.resize(meridians*6);
+
+	{
+		int offset = 0;
+		for (int i=0;i<=meridians;++i)
+		{
+			float angle = (PI*i)/(float)meridians;
+			glm::vec2 pos = glm::vec2(cos(angle),sin(angle));
+			vertices[offset+0] = {glm::vec4(pos*near, 0.0,1.0), glm::vec4(pos*1.f,0.0,0.0)};
+			vertices[offset+1] = {glm::vec4(pos*far , 0.0,1.0), glm::vec4(pos*2.f,0.0,0.0)};
+			offset += 2;
+		}
+	}
+
+	{
+		int offset = 0;
+		int vert = 0;
+		for (int i=0;i<meridians;++i)
+		{
+			indices[offset+0] = vert+2;
+			indices[offset+1] = vert+0;
+			indices[offset+2] = vert+1;
+			indices[offset+3] = vert+2;
+			indices[offset+4] = vert+1;
+			indices[offset+5] = vert+3;
+			offset += 6;
+			vert += 2; 
+		}
+	}
+}
+
 GLenum DDSFormatToGL(DDSLoader::Format format)
 {
 	switch (format)
@@ -266,16 +307,34 @@ void RendererGL::init(
 
 	// Keep track of model number for each planet
 	std::vector<uint32_t> modelNumber(planetCount);
+	std::vector<uint32_t> ringModelNumber(planetCount);
 	// Load custom models
 	for (uint32_t i=0;i<planetCount;++i)
 	{
-		if (planetParams[i].assetPaths.modelFilename != "")
+		const PlanetParameters param = planetParams[i];
+		if (param.assetPaths.modelFilename != "")
 		{
 			throw std::runtime_error("Custom model not supported");
 		}
 		else
 		{
 			modelNumber[i] = SPHERE_INDEX;
+		}
+		// Rings
+		if (param.ringParam.hasRings)
+		{
+			const int modelNum = modelsVertices.size();
+			modelsVertices.emplace_back();
+			modelsIndices.emplace_back();
+
+			float near = param.ringParam.innerDistance;
+			float far = param.ringParam.outerDistance;
+			const int ringMeridians = 128;
+			generateRingModel(ringMeridians, near, far, 
+				modelsVertices[modelNum], 
+				modelsIndices[modelNum]);
+
+			ringModelNumber[i] = modelNum;
 		}
 	}
 
@@ -341,6 +400,12 @@ void RendererGL::init(
 	for (uint32_t i=0;i<modelNumber.size();++i)
 	{
 		planetModels[i] = models[modelNumber[i]];
+	}
+
+	ringModels.resize(planetCount);
+	for (uint32_t i=0;i<ringModelNumber.size();++i)
+	{
+		ringModels[i] = models[ringModelNumber[i]];
 	}
 
 	// Create static & dynamic buffers
@@ -480,6 +545,8 @@ void RendererGL::createTextures()
 	planetCloudTextures.resize(planetCount, -1);
 	planetNightTextures.resize(planetCount, -1);
 	atmoLookupTables.resize(planetCount, -1);
+	ringTextures1.resize(planetCount, -1);
+	ringTextures2.resize(planetCount, -1);
 
 	// Default diffuse tex
 	const uint8_t diffuseData[] = {0, 0, 0};
@@ -647,7 +714,8 @@ void RendererGL::createShaders()
 	Shader deferredVert(GL_VERTEX_SHADER, "shaders/deferred.vert");
 
 	programSun.addShader(planetVert);
-	programSun.addShader(GL_FRAGMENT_SHADER, "shaders/sun.frag");
+	programSun.addShader(planetFrag);
+	programSun.setConstant("IS_STAR", "");
 	programSun.compileAndLink();
 
 	programPlanet.addShader(planetVert);
@@ -663,6 +731,16 @@ void RendererGL::createShaders()
 	programAtmo.addShader(GL_FRAGMENT_SHADER, "shaders/atmo.frag");
 	programAtmo.setConstant("IS_ATMO", "");
 	programAtmo.compileAndLink();
+
+	programRingFar.addShader(planetVert);
+	programRingFar.addShader(GL_FRAGMENT_SHADER, "shaders/ring.frag");
+	programRingFar.setConstant("IS_FAR_RING", "");
+	programRingFar.compileAndLink();
+
+	programRingNear.addShader(planetVert);
+	programRingNear.addShader(GL_FRAGMENT_SHADER, "shaders/ring.frag");
+	programRingNear.setConstant("IS_NEAR_RING", "");
+	programRingNear.compileAndLink();
 
 	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
 	programHighpass.compileAndLink();
@@ -941,10 +1019,29 @@ void RendererGL::render(
 			glm::mat4_cast(q)*
 			glm::scale(glm::mat4(), glm::vec3(params.bodyParam.radius));
 
+		// Atmosphere matrix
 		const glm::mat4 atmoMat = 
 			glm::translate(glm::mat4(), planetPos)*
 			glm::mat4_cast(q)*
 			glm::scale(glm::mat4(), -glm::vec3(params.bodyParam.radius+params.atmoParam.maxHeight));
+
+		// Ring matrices
+		const glm::vec3 towards = normalize(planetPos);
+		const glm::vec3 up = params.ringParam.normal;
+		const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
+		const glm::vec3 right = normalize(glm::cross(towards, up));
+		const glm::vec3 newTowards = glm::cross(right, up);
+
+		const glm::mat4 lookAtFar = glm::mat4(glm::mat3(sideflip*right, -newTowards, up));
+		const glm::mat4 lookAtNear = glm::mat4(glm::mat3(-sideflip*right, newTowards, up));
+
+		const glm::mat4 ringFarMat = 
+			glm::translate(glm::mat4(), planetPos)*
+			lookAtFar;
+
+		const glm::mat4 ringNearMat =
+			glm::translate(glm::mat4(), planetPos)*
+			lookAtNear;
 
 		// Light direction
 		const glm::vec3 lightDir = glm::vec3(glm::normalize(-state.position));
@@ -952,6 +1049,8 @@ void RendererGL::render(
 		PlanetDynamicUBO ubo;
 		ubo.modelMat = modelMat;
 		ubo.atmoMat = atmoMat;
+		ubo.ringFarMat = ringFarMat;
+		ubo.ringNearMat = ringNearMat;
 		ubo.planetPos = viewMat*glm::vec4(planetPos, 1.0);
 		ubo.lightDir = viewMat*glm::vec4(lightDir,0.0);
 		ubo.K = params.atmoParam.K;
@@ -1035,17 +1134,18 @@ void RendererGL::render(
 	// Texture loading
 	for (uint32_t i : texLoadPlanets)
 	{
+		const PlanetParameters param = planetParams[i];
 		// Diffuse texture
-		planetDiffuseTextures[i] = loadDDSTexture(planetParams[i].assetPaths.diffuseFilename, glm::vec4(1,1,1,1));
-		planetCloudTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.cloudFilename  , glm::vec4(0,0,0,0));
-		planetNightTextures[i]   = loadDDSTexture(planetParams[i].assetPaths.nightFilename  , glm::vec4(0,0,0,0));
+		planetDiffuseTextures[i] = loadDDSTexture(param.assetPaths.diffuseFilename, glm::vec4(1,1,1,1));
+		planetCloudTextures[i]   = loadDDSTexture(param.assetPaths.cloudFilename  , glm::vec4(0,0,0,0));
+		planetNightTextures[i]   = loadDDSTexture(param.assetPaths.nightFilename  , glm::vec4(0,0,0,0));
 
 		// Generate atmospheric scattering lookup texture
-		if (planetParams[i].atmoParam.hasAtmosphere)
+		if (param.atmoParam.hasAtmosphere)
 		{
 			const int size = 128;
 			std::vector<float> table;
-			planetParams[i].atmoParam.generateLookupTable(table, size, planetParams[i].bodyParam.radius);
+			planetParams[i].atmoParam.generateLookupTable(table, size, param.bodyParam.radius);
 
 			GLuint &tex = atmoLookupTables[i];
 
@@ -1057,6 +1157,62 @@ void RendererGL::render(
 			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
 			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
 			glGenerateTextureMipmap(tex);
+		}
+
+		// Load ring textures
+		if (param.ringParam.hasRings)
+		{
+			// Load files
+			std::vector<float> backscat, forwardscat, unlit, transparency, color;
+			param.ringParam.loadFile(param.ringParam.backscatFilename, backscat);
+			param.ringParam.loadFile(param.ringParam.forwardscatFilename, forwardscat);
+			param.ringParam.loadFile(param.ringParam.unlitFilename, unlit);
+			param.ringParam.loadFile(param.ringParam.transparencyFilename, transparency);
+			param.ringParam.loadFile(param.ringParam.colorFilename, color);
+
+			size_t size = backscat.size();
+
+			// Check sizes
+			if (size != forwardscat.size() &&
+				size != unlit.size() &&
+				size != transparency.size() &&
+				size*3 != color.size())
+			{
+				throw std::runtime_error("Ring texture sizes don't match");
+			}
+
+			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
+			std::vector<float> t1(size*3);
+			std::vector<float> t2(size*4);
+			for (int i=0;i<size;++i)
+			{
+				t1[i*3+0] = backscat[i];
+				t1[i*3+1] = forwardscat[i];
+				t1[i*3+2] = unlit[i];
+				t2[i*4+0] = color[i*3+0];
+				t2[i*4+1] = color[i*3+1];
+				t2[i*4+2] = color[i*3+2];
+				t2[i*4+3] = transparency[i];
+			}
+
+			GLuint &tex1 = ringTextures1[i];
+			GLuint &tex2 = ringTextures2[i];
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
+			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
+			glTextureParameteri(tex1, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex1, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex1, GL_TEXTURE_WRAP_S, GL_CLAMP);
+			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
+			glGenerateTextureMipmap(tex1);
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
+			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
+			glTextureParameteri(tex2, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex2, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex2, GL_TEXTURE_WRAP_S, GL_CLAMP);
+			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
+			glGenerateTextureMipmap(tex2);
 		}
 
 		planetTexLoaded[i] = true;
@@ -1076,6 +1232,12 @@ void RendererGL::render(
 		if (planetParams[i].atmoParam.hasAtmosphere)
 		{
 			glDeleteTextures(1, &atmoLookupTables[i]);
+		}
+
+		if (planetParams[i].ringParam.hasRings)
+		{
+			glDeleteTextures(1, &ringTextures1[i]);
+			glDeleteTextures(2, &ringTextures2[i]);
 		}
 
 		planetTexLoaded[i] = false;
@@ -1237,15 +1399,38 @@ void RendererGL::renderAtmo(
 
 	for (uint32_t i : atmoPlanets)
 	{
-		glUseProgram(programAtmo.getId());
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
 			currentDynamicOffsets.sceneUBO,
 			sizeof(SceneDynamicUBO));
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
 			currentDynamicOffsets.planetUBOs[i],
 			sizeof(PlanetDynamicUBO));
+
+		bool hasRings = planetParams[i].ringParam.hasRings;
+
+		// Far rings
+		if (hasRings)
+		{
+			glUseProgram(programRingFar.getId());
+			glBindTextureUnit(2, ringTextures1[i]);
+			glBindTextureUnit(3, ringTextures2[i]);
+			render(vertexArray, ringModels[i]);
+		}
+
+		// Atmosphere
+		glUseProgram(programAtmo.getId());
+		
 		glBindTextureUnit(2, atmoLookupTables[i]);
 		render(vertexArray, planetModels[i]);
+
+		// Near rings
+		if (hasRings)
+		{
+			glUseProgram(programRingNear.getId());
+			glBindTextureUnit(2, ringTextures1[i]);
+			glBindTextureUnit(3, ringTextures2[i]);
+			render(vertexArray, ringModels[i]);
+		}
 	}
 }
 

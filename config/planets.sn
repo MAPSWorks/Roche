@@ -63,6 +63,17 @@ planets: [
 		K:[2,1.5,1.0,0.0]
 		density:5
 	}
+	ring:{
+		inner:8000
+		outer:16000
+		rightAscension:40.589
+		declination:83.537
+		backscat:"tex/saturn/rings_backscat.txt"
+		forwardscat:"tex/saturn/rings_forwardscat.txt"
+		unlit:"tex/saturn/rings_unlit.txt"
+		transparency:"tex/saturn/rings_transparency.txt"
+		color:"tex/saturn/rings_color.txt"
+	}
 }
 {
 	name:"Earth"
@@ -338,8 +349,11 @@ planets: [
 		outer:139826
 		rightAscension:40.589
 		declination:83.537
-		seed:1909802985
-		color:[0.6,0.6,0.6,1.0]
+		backscat:"tex/saturn/rings_backscat.txt"
+		forwardscat:"tex/saturn/rings_forwardscat.txt"
+		unlit:"tex/saturn/rings_unlit.txt"
+		transparency:"tex/saturn/rings_transparency.txt"
+		color:"tex/saturn/rings_color.txt"
 	}
 }
 {

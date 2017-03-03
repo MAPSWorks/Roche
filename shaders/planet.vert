@@ -19,6 +19,8 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
 	mat4 atmoMat;
+	mat4 ringFarMat;
+	mat4 ringNearMat;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;
@@ -99,6 +101,12 @@ void main(void)
 	mat4 mMat = modelMat;
 #if defined(IS_ATMO)
 	mMat = atmoMat;
+#endif
+#if defined(IS_FAR_RING)
+	mMat = ringFarMat;
+#endif
+#if defined(IS_NEAR_RING)
+	mMat = ringNearMat;
 #endif
 
 	passNormal = normalize(viewMat*mMat*inNormal);

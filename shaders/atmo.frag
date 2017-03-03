@@ -18,6 +18,8 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
 	mat4 atmoMat;
+	mat4 ringFarMat;
+	mat4 ringNearMat;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;
@@ -55,7 +57,7 @@ float ray_sphere_near(vec3 ori, vec3 ray, float radius)
 	return -b-sqrt(b*b-c);
 }
 
-const int IN_SAMPLES = 50;
+const int IN_SAMPLES = 10;
 
 vec3 in_scattering(vec3 viewer, vec3 view_dir, vec3 light_dir, float radius, float atmos_height)
 {
@@ -64,7 +66,9 @@ vec3 in_scattering(vec3 viewer, vec3 view_dir, vec3 light_dir, float radius, flo
 
 	float b = dot(viewer, view_dir);
 	float c = dot(viewer,viewer) - pow(radius+atmos_height,2);
+	if (b*b-c <= 0) return vec3(0,0,0);
 	float near = -b-sqrt(b*b-c);
+	if (near < 0) return vec3(0,0,0);
 
 	float len = (far-near)/float(IN_SAMPLES);
 	vec3 step = view_dir*len;
@@ -108,7 +112,9 @@ void main()
 	vec3 scat = in_scattering(viewer, view_dir, lightDir.xyz, radius, atmoHeight)
 		* (K.xyz*rayleigh(cc) + K.www*mie(c,cc));
 
+	scat = clamp(scat, vec3(0),vec3(2));
+
 	float angle_view = dot(norm_v, -normalize(view_dir))*0.5+0.5;
-	float opacity = exp(-texture(atmo, vec2(angle_view, 1.0)).g);
+	float opacity = exp(-texture(atmo, vec2(angle_view, 1.0)).g*0.5);
 	outColor = vec4(scat, opacity);
 }

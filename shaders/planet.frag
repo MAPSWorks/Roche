@@ -21,6 +21,8 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 {
 	mat4 modelMat;
 	mat4 atmoMat;
+	mat4 ringFarMat;
+	mat4 ringNearMat;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;
@@ -30,7 +32,6 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 	float radius;
 	float atmoHeight;
 };
-
 layout (binding = 2) uniform sampler2D diffuse;
 layout (binding = 3) uniform sampler2D cloud;
 layout (binding = 4) uniform sampler2D night;
@@ -63,9 +64,14 @@ float mie(float c, float cc)
 void main()
 {
 	vec3 day = texture(diffuse, passUv.st).rgb;
+
+#if !defined(IS_STAR)
 	float light = clamp(max(dot(lightDir.xyz, passNormal.xyz), ambientColor),0,1);
 
 	vec3 color = day*light;
+#else
+	vec3 color = day*albedo;
+#endif
 
 #if defined(HAS_ATMO)
 	vec3 night = texture(night, passUv.st).rgb * nightIntensity;
@@ -85,6 +91,8 @@ void main()
 
 	vec3 scat = passScattering.rgb * (K.xyz*rayleigh(cc) + K.www*mie(c,cc));
 
+	scat = clamp(scat, vec3(0),vec3(2));
+
 	float angle_light = dot(norm_v, lightDir.xyz)*0.5+0.5;
 	float angle_view = dot(norm_v, -normalize(view_dir))*0.5+0.5;
 	color = color*
@@ -92,7 +100,9 @@ void main()
 		exp(-texture(atmo, vec2(angle_light,0)).g*(K.xyz+K.www))+scat+night;
 #endif
 
+#if !defined(IS_STAR)
 	color *= exposure;
+#endif
 
 	outColor = vec4(color, 1.0);
 } 

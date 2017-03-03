@@ -141,6 +141,8 @@ private:
 	ShaderProgram programPlanetAtmo;
 	ShaderProgram programAtmo;
 	ShaderProgram programSun;
+	ShaderProgram programRingFar;
+	ShaderProgram programRingNear;
 	ShaderProgram programHighpass;
 	ShaderProgram programDownsample;
 	ShaderProgram programBlurW;
@@ -158,6 +160,7 @@ private:
 	std::vector<uint32_t> previousFrameFarPlanets;
 	std::vector<uint32_t> previousFrameAtmoPlanets;
 	std::vector<Model> planetModels; // Offsets and count in buffer
+	std::vector<Model> ringModels;
 	std::vector<bool> planetTexLoaded; // indicates if the texture are loaded for a planet
 
 	// Contains all streamed textures
@@ -168,6 +171,8 @@ private:
 	std::vector<TexHandle> planetCloudTextures;
 	std::vector<TexHandle> planetNightTextures;
 	std::vector<GLuint> atmoLookupTables;
+	std::vector<GLuint> ringTextures1;
+	std::vector<GLuint> ringTextures2;
 
 	// Textures
 	GLuint diffuseTexDefault;

@@ -20,7 +20,7 @@ struct AtmosphericParameters
 	float scaleHeight; /// Scale height
 	bool hasAtmosphere;
 
-	void generateLookupTable(std::vector<float> &table, size_t size, float radius);
+	void generateLookupTable(std::vector<float> &table, size_t size, float radius) const;
 };
 
 struct RingParameters
@@ -28,11 +28,14 @@ struct RingParameters
 	bool hasRings;
 	float innerDistance; /// distance to planet of inner ring
 	float outerDistance; /// distance to planet of outer ring
-	int seed; /// seed for ring generation
 	glm::vec3 normal; /// Plane normal (normalized)
-	glm::vec4 color;
+	std::string backscatFilename;
+	std::string forwardscatFilename;
+	std::string unlitFilename;
+	std::string transparencyFilename;
+	std::string colorFilename;
 
-	void generateRings(std::vector<uint8_t> &pixelBuf, int seed);
+	void loadFile(std::string filename, std::vector<float> &pixelData) const;
 };
 
 struct BodyParameters

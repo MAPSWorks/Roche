@@ -7,3 +7,4 @@ screenshots/
 *.trace
 gl_log.txt
 *.dds
+rings_*.txt
