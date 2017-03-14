@@ -460,7 +460,7 @@ void Game::loadPlanetFiles()
 				bodyParam.nightTexIntensity = get<double>(body("nightTexIntensity"));
 			}
 			sweeper atmo(pl("atmosphere"));
-			planet.atmoParam.hasAtmosphere = !atmo.is_null();
+			atmoParam.hasAtmosphere = !atmo.is_null();
 			if (!atmo.is_null())
 			{
 				atmoParam.hasAtmosphere = true;
@@ -471,7 +471,7 @@ void Game::loadPlanetFiles()
 			}
 
 			sweeper ring(pl("ring"));
-			planet.ringParam.hasRings = !ring.is_null();
+			ringParam.hasRings = !ring.is_null();
 			if (!ring.is_null())
 			{
 				ringParam.innerDistance = get<double>(ring("inner"));
@@ -482,11 +482,11 @@ void Game::loadPlanetFiles()
 					-sin(rightAscension)*cos(declination),
 					 cos(rightAscension)*cos(declination),
 					 sin(declination));
-				ringParam.backscatFilename = get<std::string>(ring("backscat"));
-				ringParam.forwardscatFilename = get<std::string>(ring("forwardscat"));
-				ringParam.unlitFilename = get<std::string>(ring("unlit"));
-				ringParam.transparencyFilename = get<std::string>(ring("transparency"));
-				ringParam.colorFilename = get<std::string>(ring("color"));
+				assetPaths.backscatFilename = get<std::string>(ring("backscat"));
+				assetPaths.forwardscatFilename = get<std::string>(ring("forwardscat"));
+				assetPaths.unlitFilename = get<std::string>(ring("unlit"));
+				assetPaths.transparencyFilename = get<std::string>(ring("transparency"));
+				assetPaths.colorFilename = get<std::string>(ring("color"));
 			}
 			planetParams[i] = planet;
 		}

@@ -29,11 +29,6 @@ struct RingParameters
 	float innerDistance; /// distance to planet of inner ring
 	float outerDistance; /// distance to planet of outer ring
 	glm::vec3 normal; /// Plane normal (normalized)
-	std::string backscatFilename;
-	std::string forwardscatFilename;
-	std::string unlitFilename;
-	std::string transparencyFilename;
-	std::string colorFilename;
 
 	void loadFile(std::string filename, std::vector<float> &pixelData) const;
 };
@@ -57,6 +52,12 @@ struct AssetPaths
 	std::string cloudFilename;
 	std::string nightFilename;
 	std::string modelFilename;
+	// Ring assets
+	std::string backscatFilename;
+	std::string forwardscatFilename;
+	std::string unlitFilename;
+	std::string transparencyFilename;
+	std::string colorFilename;
 };
 
 // Immutable state

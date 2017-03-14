@@ -1164,11 +1164,13 @@ void RendererGL::render(
 		{
 			// Load files
 			std::vector<float> backscat, forwardscat, unlit, transparency, color;
-			param.ringParam.loadFile(param.ringParam.backscatFilename, backscat);
-			param.ringParam.loadFile(param.ringParam.forwardscatFilename, forwardscat);
-			param.ringParam.loadFile(param.ringParam.unlitFilename, unlit);
-			param.ringParam.loadFile(param.ringParam.transparencyFilename, transparency);
-			param.ringParam.loadFile(param.ringParam.colorFilename, color);
+			const RingParameters ringParam = param.ringParam;
+			const AssetPaths assetPaths = param.assetPaths;
+			ringParam.loadFile(assetPaths.backscatFilename, backscat);
+			ringParam.loadFile(assetPaths.forwardscatFilename, forwardscat);
+			ringParam.loadFile(assetPaths.unlitFilename, unlit);
+			ringParam.loadFile(assetPaths.transparencyFilename, transparency);
+			ringParam.loadFile(assetPaths.colorFilename, color);
 
 			size_t size = backscat.size();
 

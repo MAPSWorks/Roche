@@ -1,3 +1,3 @@
 TODO
 
-move ring filenames to assetPaths
+add ring shadows
