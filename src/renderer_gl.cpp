@@ -8,51 +8,10 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+using namespace glm;
+using namespace std;
+
 #define PI 3.14159265358979323846264338327950288
-
-const bool USE_COHERENT_MEMORY = false;
-
-// Debug output callback
-#ifdef USE_KHR_DEBUG
-#define objectLabel(identifier, name) glObjectLabel(identifier, name, 0, #name)
-
-#include <fstream>
-#include <sstream>
-std::ofstream debugLog("gl_log.txt", std::ios::out | std::ios::binary | std::ios::trunc);
-
-void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
-   GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
-{
-	std::stringstream ss;
-	switch (type)
-	{
-		case GL_DEBUG_TYPE_ERROR: ss << "Error"; break;
-		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: ss << "Decrecated behavior"; break;
-		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: ss << "Undefined behavior"; break;
-		case GL_DEBUG_TYPE_PORTABILITY: ss << "Portability"; break;
-		case GL_DEBUG_TYPE_PERFORMANCE: ss << "Performance"; break;
-		case GL_DEBUG_TYPE_MARKER: ss << "Marker"; break;
-		case GL_DEBUG_TYPE_PUSH_GROUP: ss << "Push group"; break;
-		case GL_DEBUG_TYPE_POP_GROUP: ss << "Pop group"; break;
-		case GL_DEBUG_TYPE_OTHER: ss << "Other"; break;
-	}
-
-	ss << " (";
-
-	switch (severity)
-	{
-		case GL_DEBUG_SEVERITY_HIGH: ss << "high"; break;
-		case GL_DEBUG_SEVERITY_MEDIUM: ss << "medium"; break;
-		case GL_DEBUG_SEVERITY_LOW: ss << "low"; break;
-		case GL_DEBUG_SEVERITY_NOTIFICATION: ss << "notification"; break;
-	}
-
-	ss << "): " << std::string(message) << std::endl;
-
-	debugLog << ss.str();
-}
-#endif
-
 
 void RendererGL::windowHints()
 {
@@ -63,51 +22,30 @@ void RendererGL::windowHints()
 
 struct Vertex
 {
-	glm::vec4 position;
-	glm::vec4 uv;
-	glm::vec4 normal;
-	glm::vec4 tangent;
+	vec4 position;
+	vec4 uv;
+	vec4 normal;
+	vec4 tangent;
 };
 
-struct SceneDynamicUBO
-{
-	glm::mat4 projMat;
-	glm::mat4 viewMat;
-	glm::vec4 viewPos;
-	float ambientColor;
-	float invGamma;
-	float exposure;
-};
+typedef uint32_t Index;
 
-struct PlanetDynamicUBO
+GLenum indexType()
 {
-	glm::mat4 modelMat;
-	glm::mat4 atmoMat;
-	glm::mat4 ringFarMat;
-	glm::mat4 ringNearMat;
-	glm::vec4 planetPos;
-	glm::vec4 lightDir;
-	glm::vec4 K;
-	float albedo;
-	float cloudDisp;
-	float nightTexIntensity;
-	float radius;
-	float atmoHeight;
-};
-
-struct FlareDynamicUBO
-{
-	glm::mat4 modelMat;
-	glm::vec4 color;
-	float brightness;
-};
+	switch (sizeof(Index))
+	{
+		case 2: return GL_UNSIGNED_SHORT;
+		case 1: return GL_UNSIGNED_BYTE;
+		default: return GL_UNSIGNED_INT;
+	}
+}
 
 void generateSphere(
 	const int meridians, 
 	const int rings, 
 	const bool exterior, 
-	std::vector<Vertex> &vertices, 
-	std::vector<uint32_t> &indices)
+	vector<Vertex> &vertices, 
+	vector<Index> &indices)
 {
 	// Vertices
 	vertices.resize((meridians+1)*(rings+1));
@@ -122,14 +60,14 @@ void generateSphere(
 			const float theta = 2*PI*((float)j/(float)meridians);
 			const float ct = cos(theta);
 			const float st = sin(theta);
-			glm::vec3 pos = glm::vec3(cp*ct,cp*st,sp);
-			glm::vec3 normal = glm::normalize(pos);
-			glm::vec3 tangent = glm::cross(normal, glm::vec3(0,0,1));
+			vec3 pos = vec3(cp*ct,cp*st,sp);
+			vec3 normal = normalize(pos);
+			vec3 tangent = cross(normal, vec3(0,0,1));
 			vertices[offset] = {
-				glm::vec4(pos,1), 
-				glm::vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0),
-				glm::vec4(normal,0),
-				glm::vec4(tangent,0)
+				vec4(pos,1), 
+				vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0),
+				vec4(normal,0),
+				vec4(tangent,0)
 			};
 			offset++;
 		}
@@ -142,38 +80,38 @@ void generateSphere(
 	{
 		for (int j=0;j<meridians;++j)
 		{
-			const uint32_t i1 = i+1;
-			const uint32_t j1 = j+1;
-			std::vector<uint32_t> ind = {
-				(uint32_t)(i *(rings+1)+j),
-				(uint32_t)(i1*(rings+1)+j),
-				(uint32_t)(i1*(rings+1)+j1),
-				(uint32_t)(i1*(rings+1)+j1),
-				(uint32_t)(i *(rings+1)+j1),
-				(uint32_t)(i *(rings+1)+j)
+			const Index i1 = i+1;
+			const Index j1 = j+1;
+			vector<Index> ind = {
+				(Index)(i *(rings+1)+j),
+				(Index)(i1*(rings+1)+j),
+				(Index)(i1*(rings+1)+j1),
+				(Index)(i1*(rings+1)+j1),
+				(Index)(i *(rings+1)+j1),
+				(Index)(i *(rings+1)+j)
 			};
 			// Remove back face culling
 			if (!exterior)
-				std::swap(ind[1], ind[4]);
+				swap(ind[1], ind[4]);
 
 			// Copy to indices
-			memcpy(&indices[offset*6], ind.data(), ind.size()*sizeof(uint32_t));
+			memcpy(&indices[offset*6], ind.data(), ind.size()*sizeof(Index));
 			offset++;
 		}
 	}
 }
 
-void generateFullscreenTri(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices)
+void generateFullscreenTri(vector<Vertex> &vertices, vector<Index> &indices)
 {
 	vertices.resize(3);
-	vertices[0].position = glm::vec4(-2,-1,0,1);
-	vertices[1].position = glm::vec4( 2,-1,0,1);
-	vertices[2].position = glm::vec4( 0, 4,0,1);
+	vertices[0].position = vec4(-2,-1,0,1);
+	vertices[1].position = vec4( 2,-1,0,1);
+	vertices[2].position = vec4( 0, 4,0,1);
 
 	indices = {0,1,2};
 }
 
-void generateFlareModel(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices)
+void generateFlareModel(vector<Vertex> &vertices, vector<Index> &indices)
 {
 	const int detail = 32;
 	vertices.resize((detail+1)*2);
@@ -181,9 +119,9 @@ void generateFlareModel(std::vector<Vertex> &vertices, std::vector<uint32_t> &in
 	for (int i=0;i<=detail;++i)
 	{
 		const float f = i/(float)detail;
-		const glm::vec2 pos = glm::vec2(cos(f*2*PI),sin(f*2*PI));
-		vertices[i*2+0] = {glm::vec4(0,0,0,1), glm::vec4(f, 0, 0.5, 0.5)};
-		vertices[i*2+1] = {glm::vec4(pos,0,1), glm::vec4(f, 1, pos*glm::vec2(0.5)+glm::vec2(0.5))};
+		const vec2 pos = vec2(cos(f*2*PI),sin(f*2*PI));
+		vertices[i*2+0] = {vec4(0,0,0,1), vec4(f, 0, 0.5, 0.5)};
+		vertices[i*2+1] = {vec4(pos,0,1), vec4(f, 1, pos*vec2(0.5)+vec2(0.5))};
 	}
 
 	indices.resize(detail*6);
@@ -202,8 +140,8 @@ void generateRingModel(
 	const int meridians,
 	const float near,
 	const float far,
-	std::vector<Vertex> &vertices, 
-	std::vector<uint32_t> &indices)
+	vector<Vertex> &vertices, 
+	vector<Index> &indices)
 {
 	vertices.resize((meridians+1)*2);
 	indices.resize(meridians*6);
@@ -213,16 +151,16 @@ void generateRingModel(
 		for (int i=0;i<=meridians;++i)
 		{
 			float angle = (PI*i)/(float)meridians;
-			glm::vec2 pos = glm::vec2(cos(angle),sin(angle));
-			vertices[offset+0] = {glm::vec4(pos*near, 0.0,1.0), glm::vec4(pos*1.f,0.0,0.0)};
-			vertices[offset+1] = {glm::vec4(pos*far , 0.0,1.0), glm::vec4(pos*2.f,0.0,0.0)};
+			vec2 pos = vec2(cos(angle),sin(angle));
+			vertices[offset+0] = {vec4(pos*near, 0.0,1.0), vec4(pos*1.f,0.0,0.0)};
+			vertices[offset+1] = {vec4(pos*far , 0.0,1.0), vec4(pos*2.f,0.0,0.0)};
 			offset += 2;
 		}
 	}
 
 	{
 		int offset = 0;
-		int vert = 0;
+		Index vert = 0;
 		for (int i=0;i<meridians;++i)
 		{
 			indices[offset+0] = vert+2;
@@ -256,7 +194,7 @@ uint32_t align(const uint32_t offset, const uint32_t minAlign)
 }
 
 void RendererGL::init(
-	const std::vector<PlanetParameters> planetParams,
+	const vector<PlanetParameters> planetParams,
 	const int msaa,
 	const bool ssaa,
 	const int windowWidth,
@@ -270,169 +208,94 @@ void RendererGL::init(
 
 	this->bufferFrames = 3; // triple-buffering
 
-	// Various alignments
-	uint32_t uboMinAlign;
-	uint32_t ssboMinAlign;
-	const uint32_t minAlign = 32;
+	vertexBuffer = Buffer(false);
+	indexBuffer = Buffer(false);
 
-	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, (int*)&uboMinAlign);
-	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, (int*)&ssboMinAlign);
+	createVertexArray();
 
-	std::vector<std::vector<Vertex>> modelsVertices;
-	std::vector<std::vector<uint32_t>> modelsIndices;
-
-	modelsVertices.resize(3);
-	modelsIndices.resize(3);
-
-	const size_t FULLSCREEN_TRI_INDEX = 0;
-	const size_t FLARE_MODEL_INDEX = 1;
-	const size_t SPHERE_INDEX = 2;
+	// Static vertex & index data
+	vector<Vertex> vertices;
+	vector<Index> indices;
 
 	// Fullscreen tri
-	generateFullscreenTri(
-		modelsVertices[FULLSCREEN_TRI_INDEX],
-		modelsIndices[FULLSCREEN_TRI_INDEX]);
+	generateFullscreenTri(vertices, indices);
+	fullscreenTri = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
+		sizeof(Vertex), sizeof(Index),
+		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
+		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
 
 	// Flare
-	generateFlareModel(
-		modelsVertices[FLARE_MODEL_INDEX],
-		modelsIndices[FLARE_MODEL_INDEX]);
+	generateFlareModel(vertices, indices);
+	flareModel = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
+		sizeof(Vertex), sizeof(Index),
+		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
+		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
 
-	// Generate models
+	// Sphere
 	const int planetMeridians = 128;
 	const int planetRings = 128;
 	generateSphere(planetMeridians, planetRings, false, 
-		modelsVertices[SPHERE_INDEX], 
-		modelsIndices[SPHERE_INDEX]);
+		vertices, indices);
+	sphere = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
+		sizeof(Vertex), sizeof(Index),
+		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
+		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
 
-	// Keep track of model number for each planet
-	std::vector<uint32_t> modelNumber(planetCount);
-	std::vector<uint32_t> ringModelNumber(planetCount);
 	// Load custom models
+	ringModels.resize(planetCount);
+	planetModels.resize(planetCount);
 	for (uint32_t i=0;i<planetCount;++i)
 	{
 		const PlanetParameters param = planetParams[i];
 		if (param.assetPaths.modelFilename != "")
 		{
-			throw std::runtime_error("Custom model not supported");
+			throw runtime_error("Custom model not supported");
 		}
 		else
 		{
-			modelNumber[i] = SPHERE_INDEX;
+			planetModels[i] = sphere;
 		}
 		// Rings
 		if (param.ringParam.hasRings)
 		{
-			const int modelNum = modelsVertices.size();
-			modelsVertices.emplace_back();
-			modelsIndices.emplace_back();
-
 			float near = param.ringParam.innerDistance;
 			float far = param.ringParam.outerDistance;
 			const int ringMeridians = 128;
 			generateRingModel(ringMeridians, near, far, 
-				modelsVertices[modelNum], 
-				modelsIndices[modelNum]);
-
-			ringModelNumber[i] = modelNum;
+				vertices, indices);
+			ringModels[i] = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
+				sizeof(Vertex), sizeof(Index),
+				vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
+				indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
 		}
 	}
 
-	// Once we have all the models, find the offsets
-	uint32_t currentOffset = 0;
+	vertexBuffer.write();
+	indexBuffer.write();
 
-	// Offsets in static buffer
-	std::vector<Model> models(modelsVertices.size());
-	// Vertex buffer offsets
-	vertexOffset = currentOffset;
-	for (uint32_t i=0;i<models.size();++i)
+	// Dynamic UBO buffer assigning
+	uboBuffer = Buffer(true);
+	dynamicData.resize(bufferFrames); // multiple buffering
+	for (auto &data : dynamicData)
 	{
-		models[i].vertexOffset = currentOffset;
-		models[i].count = modelsIndices[i].size();
-		currentOffset += modelsVertices[i].size()*sizeof(Vertex);
-	}	
-	// Index buffer offsets
-	indexOffset = currentOffset;
-	for (uint32_t i=0;i<models.size();++i)
-	{
-		models[i].indexOffset = currentOffset;
-		currentOffset += modelsIndices[i].size()*sizeof(uint32_t);
-	}
-
-	fullscreenTri = models[FULLSCREEN_TRI_INDEX];
-	flareModel = models[FLARE_MODEL_INDEX];
-	sphere = models[SPHERE_INDEX];
-
-	staticBufferSize = currentOffset;
-
-	// Offsets in dynamic buffer
-	currentOffset = 0;
-	dynamicOffsets.resize(bufferFrames); // x-buffering
-	for (uint32_t i=0;i<dynamicOffsets.size();++i)
-	{
-		currentOffset = align(currentOffset, uboMinAlign);
-		dynamicOffsets[i].offset = currentOffset;
 		// Scene UBO
-		dynamicOffsets[i].sceneUBO = currentOffset;
-		currentOffset += sizeof(SceneDynamicUBO);
+		data.sceneUBO = uboBuffer.assignUBO(sizeof(SceneDynamicUBO));
 		// Planet UBOs
-		dynamicOffsets[i].planetUBOs.resize(planetCount);
+		data.planetUBOs.resize(planetCount);
 		for (uint32_t j=0;j<planetCount;++j)
 		{
-			currentOffset = align(currentOffset, uboMinAlign);
-			dynamicOffsets[i].planetUBOs[j] = currentOffset;
-			currentOffset += sizeof(PlanetDynamicUBO);
+			data.planetUBOs[j] = uboBuffer.assignUBO(sizeof(PlanetDynamicUBO));
 		}
-		dynamicOffsets[i].flareUBOs.resize(planetCount);
+		// Flare UBOs
+		data.flareUBOs.resize(planetCount);
 		for (uint32_t j=0;j<planetCount;++j)
 		{
-			currentOffset = align(currentOffset, uboMinAlign);
-			dynamicOffsets[i].flareUBOs[j] = currentOffset;
-			currentOffset += sizeof(FlareDynamicUBO);
+			data.flareUBOs[j] = uboBuffer.assignUBO(sizeof(FlareDynamicUBO));
 		}
-		dynamicOffsets[i].size = currentOffset - dynamicOffsets[i].offset;
 	}
 
-	dynamicBufferSize = currentOffset;
+	uboBuffer.write();
 
-	// Assign models to planets
-	planetModels.resize(planetCount);
-	for (uint32_t i=0;i<modelNumber.size();++i)
-	{
-		planetModels[i] = models[modelNumber[i]];
-	}
-
-	ringModels.resize(planetCount);
-	for (uint32_t i=0;i<ringModelNumber.size();++i)
-	{
-		ringModels[i] = models[ringModelNumber[i]];
-	}
-
-	// Create static & dynamic buffers
-	createBuffers();
-
-	// Fill static buffer
-	for (uint32_t i=0;i<models.size();++i) // Vertices
-	{
-		glNamedBufferSubData(
-			staticBuffer, 
-			models[i].vertexOffset, 
-			modelsVertices[i].size()*sizeof(Vertex), 
-			modelsVertices[i].data());
-	}
-	for (uint32_t i=0;i<models.size();++i) // Indices
-	{
-		glNamedBufferSubData(
-			staticBuffer,
-			models[i].indexOffset,
-			modelsIndices[i].size()*sizeof(uint32_t),
-			modelsIndices[i].data());
-	}
-
-	// Dynamic buffer fences
-	fences.resize(dynamicOffsets.size());
-
-	createVertexArray();
 	createShaders();
 	createRendertargets();
 	createTextures();
@@ -443,89 +306,7 @@ void RendererGL::init(
 		glMinSampleShading(1.0);
 	}
 
-#ifdef USE_KHR_DEBUG
-	// Debug output
-	glEnable(GL_DEBUG_OUTPUT);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glDebugMessageCallback(debugCallback, nullptr);
-	glDebugMessageInsert(
-		GL_DEBUG_SOURCE_APPLICATION, 
-		GL_DEBUG_TYPE_OTHER, 0, 
-		GL_DEBUG_SEVERITY_NOTIFICATION, 
-		0, "Debug callback enabled");
-
-	// Object labels
-	objectLabel(GL_BUFFER, staticBuffer);
-	objectLabel(GL_BUFFER, dynamicBuffer);
-	objectLabel(GL_VERTEX_ARRAY, vertexArray);
-	objectLabel(GL_TEXTURE, depthStencilTex);
-	objectLabel(GL_TEXTURE, hdrMSRendertarget);
-	objectLabel(GL_FRAMEBUFFER, hdrFbo);
-	objectLabel(GL_PROGRAM, programPlanet.getId());
-	objectLabel(GL_PROGRAM, programSun.getId());
-	objectLabel(GL_PROGRAM, programTonemap.getId());
-	objectLabel(GL_TEXTURE, diffuseTexDefault);
-	objectLabel(GL_TEXTURE, cloudTexDefault);
-	objectLabel(GL_TEXTURE, nightTexDefault);
-#endif
-
-	// Texture loading thread
-	texLoadThread = std::thread([&,this]()
-	{
-		while (true)
-		{
-			// Wait for kill or queue not empty
-			{
-				std::unique_lock<std::mutex> lk(texWaitMutex);
-				texWaitCondition.wait(lk, [&]{ return killThread || !texWaitQueue.empty();});
-			}
-
-			if (killThread) return;
-
-			// Get info about texture were are going to load
-			TexWait texWait;
-			{
-				std::lock_guard<std::mutex> lk(texWaitMutex);
-				texWait = texWaitQueue.front();
-				texWaitQueue.pop();
-			}
-
-			std::shared_ptr<std::vector<uint8_t>> imageData = std::make_shared<std::vector<uint8_t>>();
-
-			// Load image data
-			size_t imageSize;
-			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, nullptr);
-			imageData->resize(imageSize);
-			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, imageData->data());
-
-			std::vector<TexLoaded> texLoaded(texWait.mipmapCount);
-			size_t offset = 0;
-
-			for (unsigned int i=0;i<texLoaded.size();++i)
-			{
-				auto &tl = texLoaded[i];
-				tl.tex = texWait.tex;
-				tl.mipmap = texWait.mipmap+i;
-				tl.mipmapOffset = offset;
-				tl.format = DDSFormatToGL(texWait.loader.getFormat());
-				tl.width  = texWait.loader.getWidth (tl.mipmap);
-				tl.height = texWait.loader.getHeight(tl.mipmap);
-				tl.data = imageData;
-				// Compute size of current mipmap + offset of next mipmap
-				size_t size0;
-				texWait.loader.getImageData(tl.mipmap, 1, &size0, nullptr);
-				tl.imageSize = size0;
-				offset += size0;
-			}
-			
-			// Push loaded texture into queue
-			{
-				std::lock_guard<std::mutex> lk(texLoadedMutex);
-				for (auto tl : texLoaded)
-					texLoadedQueue.push(tl);
-			}
-		}
-	});
+	initThread();
 }
 
 void RendererGL::createTextures()
@@ -571,7 +352,7 @@ void RendererGL::createTextures()
 
 int mipmapCount(int size)
 {
-	return 1 + floor(log2(size));
+	return 1 +std::floor(std::log2(size));
 }
 
 void RendererGL::createFlare()
@@ -579,7 +360,7 @@ void RendererGL::createFlare()
 	const int flareSize = 512;
 	const int mips = mipmapCount(flareSize);
 	{
-		std::vector<uint16_t> pixelData;
+		vector<uint16_t> pixelData;
 		Renderer::generateFlareIntensityTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareIntensityTex);
 		glTextureStorage1D(flareIntensityTex, mips, GL_R16F, flareSize);
@@ -588,7 +369,7 @@ void RendererGL::createFlare()
 		glGenerateTextureMipmap(flareIntensityTex);
 	}
 	{
-		std::vector<uint8_t> pixelData;
+		vector<uint8_t> pixelData;
 		Renderer::generateFlareLinesTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_2D, 1, &flareLinesTex);
 		glTextureStorage2D(flareLinesTex, mips, GL_R8, flareSize, flareSize);
@@ -597,7 +378,7 @@ void RendererGL::createFlare()
 		glBindTextureUnit(0, flareLinesTex);
 	}
 	{
-		std::vector<uint16_t> pixelData;
+		vector<uint16_t> pixelData;
 		Renderer::generateFlareHaloTex(flareSize, pixelData);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareHaloTex);
 		glTextureStorage1D(flareHaloTex, mips, GL_RGBA16F, flareSize);
@@ -607,37 +388,13 @@ void RendererGL::createFlare()
 	}
 }
 
-void RendererGL::createBuffers()
-{
-	// Create static buffer
-	glCreateBuffers(1, &staticBuffer);
-	glNamedBufferStorage(
-		staticBuffer, staticBufferSize, nullptr,
-		GL_DYNAMIC_STORAGE_BIT);
-
-	// Create dynamic Buffer
-	glCreateBuffers(1, &dynamicBuffer);
-
-	// Storage & map dynamic buffer
-	const GLbitfield storageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | 
-		((USE_COHERENT_MEMORY)?GL_MAP_COHERENT_BIT:0);
-	const GLbitfield mapFlags = storageFlags | 
-	((USE_COHERENT_MEMORY)?0:GL_MAP_FLUSH_EXPLICIT_BIT);
-
-	glNamedBufferStorage(dynamicBuffer, dynamicBufferSize, nullptr, storageFlags);
-	dynamicBufferPtr = glMapNamedBufferRange(
-		dynamicBuffer, 0, dynamicBufferSize, mapFlags);
-
-	if (!dynamicBufferPtr) throw std::runtime_error("Can't map dynamic buffer");
-}
-
 void RendererGL::createVertexArray()
 {
 	// Vertex Array Object creation
 	const int VERTEX_BINDING = 0;
 	glCreateVertexArrays(1, &vertexArray);
-	glVertexArrayVertexBuffer(vertexArray, VERTEX_BINDING, staticBuffer, vertexOffset, sizeof(Vertex));
-	glVertexArrayElementBuffer(vertexArray, staticBuffer);
+	glVertexArrayVertexBuffer(vertexArray, VERTEX_BINDING, vertexBuffer.getId(), 0, sizeof(Vertex));
+	glVertexArrayElementBuffer(vertexArray, indexBuffer.getId());
 
 	const int VERTEX_ATTRIB_POS     = 0;
 	const int VERTEX_ATTRIB_UV      = 1;
@@ -768,16 +525,9 @@ void RendererGL::createShaders()
 
 void RendererGL::destroy()
 {
-	if (glUnmapNamedBuffer(dynamicBuffer) == GL_FALSE)
-	{
-		throw std::runtime_error("Staging buffer memory corruption");
-	}
-	glDeleteBuffers(1, &staticBuffer);
-	glDeleteBuffers(1, &dynamicBuffer);
-
 	// Kill thread
 	{
-		std::lock_guard<std::mutex> lk(texWaitMutex);
+		lock_guard<mutex> lk(texWaitMutex);
 		killThread = true;
 	}
 	texWaitCondition.notify_one();
@@ -814,7 +564,7 @@ void RendererGL::removeStreamTexture(const TexHandle tex)
 }
 
 /// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
-void RGBAToBC(const glm::vec4 color, DDSLoader::Format format, std::vector<uint8_t> &block)
+void RGBAToBC(const vec4 color, DDSLoader::Format format, vector<uint8_t> &block)
 {
 	// RGB8 to 5_6_5
 	uint16_t color0 = 
@@ -852,8 +602,8 @@ void RGBAToBC(const glm::vec4 color, DDSLoader::Format format, std::vector<uint8
 }
 
 RendererGL::TexHandle RendererGL::loadDDSTexture(
-	const std::string filename, 
-	const glm::vec4 defaultColor)
+	const string filename, 
+	const vec4 defaultColor)
 {
 	DDSLoader loader;
 	if (loader.open(filename))
@@ -872,7 +622,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		// Default color at highest mipmap
 		glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)(mipmapCount-1));
-		std::vector<uint8_t> block;
+		vector<uint8_t> block;
 		RGBAToBC(defaultColor, loader.getFormat(), block);
 		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
 			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
@@ -882,7 +632,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		// Create jobs
 		const int groupLoadMipmap = 8; // Number of highest mipmaps to load together
 		int jobCount = std::max(mipmapCount-groupLoadMipmap+1, 1);
-		std::vector<TexWait> texWait(jobCount);
+		vector<TexWait> texWait(jobCount);
 		for (int i=0;i<texWait.size();++i)
 		{
 			texWait[i] = {handle, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
@@ -890,7 +640,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 
 		// Push jobs to queue
 		{
-			std::lock_guard<std::mutex> lk(texWaitMutex);
+			lock_guard<mutex> lk(texWaitMutex);
 			for (auto tw : texWait)
 			{
 				texWaitQueue.push(tw);
@@ -911,47 +661,43 @@ void RendererGL::unloadDDSTexture(TexHandle tex)
 }
 
 void RendererGL::render(
-		const glm::dvec3 viewPos, 
+		const dvec3 viewPos, 
 		const float fovy,
-		const glm::dvec3 viewCenter,
-		const glm::vec3 viewUp,
+		const dvec3 viewCenter,
+		const vec3 viewUp,
 		const float gamma,
 		const float exposure,
 		const float ambientColor,
-		const std::vector<PlanetState> planetStates)
+		const vector<PlanetState> planetStates)
 {
 
-	profiler.begin("Full frame");
-	profiler.begin("Uniform update");
-
 	const float closePlanetMinSizePixels = 1;
-	const float closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
-	const float farPlanetMinDistance = closePlanetMaxDistance*0.35;
-	const float farPlanetOptimalDistance = closePlanetMaxDistance*2.0;
-	const float texLoadDistance = closePlanetMaxDistance*1.4;
-	const float texUnloadDistance = closePlanetMaxDistance*1.6;
+	this->closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
+	this->farPlanetMinDistance = closePlanetMaxDistance*0.35;
+	this->farPlanetOptimalDistance = closePlanetMaxDistance*2.0;
+	this->texLoadDistance = closePlanetMaxDistance*1.4;
+	this->texUnloadDistance = closePlanetMaxDistance*1.6;
 
-	// Triple buffer of dynamic UBO
-	const uint32_t nextFrameId = (frameId+1)%bufferFrames;
-	const auto &currentDynamicOffsets = dynamicOffsets[frameId];
-	const auto &nextDynamicOffsets = dynamicOffsets[nextFrameId]; 
+	profiler.begin("Full frame");
+
+	auto &currentData = dynamicData[frameId];
 
 	// Projection and view matrices
-	const glm::mat4 projMat = glm::perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e10);
-	const glm::mat4 viewMat = glm::lookAt(glm::vec3(0), (glm::vec3)(viewCenter-viewPos), viewUp);
+	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e10);
+	const mat4 viewMat = lookAt(vec3(0), (vec3)(viewCenter-viewPos), viewUp);
 
 	// Planet classification
-	std::vector<uint32_t> closePlanets;
-	std::vector<uint32_t> farPlanets;
-	std::vector<uint32_t> atmoPlanets;
+	vector<uint32_t> closePlanets;
+	vector<uint32_t> farPlanets;
+	vector<uint32_t> atmoPlanets;
 
-	std::vector<uint32_t> texLoadPlanets;
-	std::vector<uint32_t> texUnloadPlanets;
+	vector<uint32_t> texLoadPlanets;
+	vector<uint32_t> texUnloadPlanets;
 
 	for (uint32_t i=0;i<planetStates.size();++i)
 	{
 		const float radius = planetParams[i].bodyParam.radius;
-		const double dist = glm::distance(viewPos, planetStates[i].position)/radius;
+		const double dist = distance(viewPos, planetStates[i].position)/radius;
 		if (dist < texLoadDistance && !planetTexLoaded[i])
 		{
 			// Textures need to be loaded
@@ -964,7 +710,7 @@ void RendererGL::render(
 		}
 
 		// Don't render planets behind the view
-		if ((viewMat*glm::vec4(planetStates[i].position - viewPos,1.0)).z < 0)
+		if ((viewMat*vec4(planetStates[i].position - viewPos,1.0)).z < 0)
 		{
 			if (dist < closePlanetMaxDistance)
 			{
@@ -984,302 +730,68 @@ void RendererGL::render(
 		}
 	}
 
-	const float exp = glm::pow(2, exposure);
+	// Manage stream textures
+	loadTextures(texLoadPlanets);
+	unloadTextures(texUnloadPlanets);
+	uploadLoadedTextures();
+
+	const float exp = pow(2, exposure);
 
 	// Scene uniform update
 	SceneDynamicUBO sceneUBO;
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
-	sceneUBO.viewPos = glm::vec4(0.0,0.0,0.0,1.0);
+	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = ambientColor;
 	sceneUBO.invGamma = 1.f/gamma;
 	sceneUBO.exposure = exp;
 
 	// Planet uniform update
 	// Close planets (detailed model)
-	std::vector<PlanetDynamicUBO> planetUBOs(planetCount);
+	vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
 	{
-		const PlanetState state = planetStates[i];
-		const PlanetParameters params = planetParams[i];
-
-		const glm::vec3 planetPos = state.position - viewPos;
-
-		// Planet rotation
-		const glm::vec3 north = glm::vec3(0,0,1);
-		const glm::vec3 rotAxis = params.bodyParam.rotationAxis;
-		const glm::quat q = glm::rotate(glm::quat(), 
-			(float)acos(glm::dot(north, rotAxis)), 
-			glm::cross(north, rotAxis))*
-			glm::rotate(glm::quat(), state.rotationAngle, north);
-
-		// Model matrix
-		const glm::mat4 modelMat = 
-			glm::translate(glm::mat4(), planetPos)*
-			glm::mat4_cast(q)*
-			glm::scale(glm::mat4(), glm::vec3(params.bodyParam.radius));
-
-		// Atmosphere matrix
-		const glm::mat4 atmoMat = 
-			glm::translate(glm::mat4(), planetPos)*
-			glm::mat4_cast(q)*
-			glm::scale(glm::mat4(), -glm::vec3(params.bodyParam.radius+params.atmoParam.maxHeight));
-
-		// Ring matrices
-		const glm::vec3 towards = normalize(planetPos);
-		const glm::vec3 up = params.ringParam.normal;
-		const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
-		const glm::vec3 right = normalize(glm::cross(towards, up));
-		const glm::vec3 newTowards = glm::cross(right, up);
-
-		const glm::mat4 lookAtFar = glm::mat4(glm::mat3(sideflip*right, -newTowards, up));
-		const glm::mat4 lookAtNear = glm::mat4(glm::mat3(-sideflip*right, newTowards, up));
-
-		const glm::mat4 ringFarMat = 
-			glm::translate(glm::mat4(), planetPos)*
-			lookAtFar;
-
-		const glm::mat4 ringNearMat =
-			glm::translate(glm::mat4(), planetPos)*
-			lookAtNear;
-
-		// Light direction
-		const glm::vec3 lightDir = glm::vec3(glm::normalize(-state.position));
-
-		PlanetDynamicUBO ubo;
-		ubo.modelMat = modelMat;
-		ubo.atmoMat = atmoMat;
-		ubo.ringFarMat = ringFarMat;
-		ubo.ringNearMat = ringNearMat;
-		ubo.planetPos = viewMat*glm::vec4(planetPos, 1.0);
-		ubo.lightDir = viewMat*glm::vec4(lightDir,0.0);
-		ubo.K = params.atmoParam.K;
-		ubo.cloudDisp = state.cloudDisp;
-		ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
-		ubo.albedo = params.bodyParam.albedo;
-		ubo.radius = params.bodyParam.radius;
-		ubo.atmoHeight = params.atmoParam.maxHeight;
-
-		planetUBOs[i] = ubo;
+		planetUBOs[i] = getPlanetUBO(viewPos, viewMat, 
+			planetStates[i], planetParams[i]);
 	}
 	// Far away planets (flare)
-	std::vector<FlareDynamicUBO> flareUBOs(planetCount);
+	vector<FlareDynamicUBO> flareUBOs(planetCount);
 	for (uint32_t i : farPlanets)
 	{
-		const PlanetState state = planetStates[i];
-		const PlanetParameters params = planetParams[i];
-
-		const glm::vec3 planetPos = glm::vec3(state.position - viewPos);
-		const glm::vec4 clip = projMat*viewMat*glm::vec4(planetPos,1.0);
-		const glm::vec2 screen = glm::vec2(clip)/clip.w;
-		const float FLARE_SIZE_DEGREES = 20.0;
-		const glm::mat4 modelMat = 
-			glm::translate(glm::mat4(), glm::vec3(screen, 0.999))*
-			glm::scale(glm::mat4(), 
-				glm::vec3(windowHeight/(float)windowWidth,1.0,0.0)*
-				FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
-
-		const float phaseAngle = glm::acos(glm::dot(
-			(glm::vec3)glm::normalize(state.position), 
-			glm::normalize(planetPos)));
-		const float phase = (1-phaseAngle/PI)*cos(phaseAngle)+(1/PI)*sin(phaseAngle);
-		const bool isStar = params.bodyParam.isStar;
-		const float radius = params.bodyParam.radius;
-		const double dist = glm::distance(viewPos, state.position)/radius;
-		const float fade = glm::clamp(isStar?
-			(float)   dist/10:
-			(float) ((dist-farPlanetMinDistance)/
-							(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
-		const glm::vec3 cutDist = planetPos*0.005f;
-		
-		const float brightness = std::min(4.0f,
-			exp*
-			radius*radius*
-			(isStar?100.f:
-			params.bodyParam.albedo*0.2f*phase)
-			/glm::dot(cutDist,cutDist))
-			*fade;
-
-		FlareDynamicUBO ubo;
-		ubo.modelMat = modelMat;
-		ubo.color = glm::vec4(params.bodyParam.meanColor,1.0);
-		ubo.brightness = brightness;
-
-		flareUBOs[i] = ubo;
+		flareUBOs[i] = getFlareUBO(viewPos, projMat, viewMat, fovy, exp,
+			planetStates[i], planetParams[i]);
 	}
 
 	// Dynamic data upload
-	fences[nextFrameId].wait();
-
-	memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.sceneUBO, 
-		&sceneUBO, sizeof(SceneDynamicUBO));
-	for (uint32_t i=0;i<planetUBOs.size();++i)
-	{
-		memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.planetUBOs[i], 
-			&planetUBOs[i], sizeof(PlanetDynamicUBO));
-	}
-	for (uint32_t i=0;i<planetUBOs.size();++i)
-	{
-		memcpy((char*)dynamicBufferPtr+nextDynamicOffsets.flareUBOs[i],
-			&flareUBOs[i], sizeof(FlareDynamicUBO));
-	}
-
-	if (!USE_COHERENT_MEMORY)
-		glFlushMappedNamedBufferRange(dynamicBuffer, nextDynamicOffsets.offset, nextDynamicOffsets.size);
-
-	fences[nextFrameId].lock();
-
+	profiler.begin("Sync wait");
+	currentData.fence.wait();
 	profiler.end();
 
-	// Texture loading
-	for (uint32_t i : texLoadPlanets)
+	uboBuffer.update(currentData.sceneUBO, &sceneUBO);
+	for (uint32_t i=0;i<planetUBOs.size();++i)
 	{
-		const PlanetParameters param = planetParams[i];
-		// Diffuse texture
-		planetDiffuseTextures[i] = loadDDSTexture(param.assetPaths.diffuseFilename, glm::vec4(1,1,1,1));
-		planetCloudTextures[i]   = loadDDSTexture(param.assetPaths.cloudFilename  , glm::vec4(0,0,0,0));
-		planetNightTextures[i]   = loadDDSTexture(param.assetPaths.nightFilename  , glm::vec4(0,0,0,0));
-
-		// Generate atmospheric scattering lookup texture
-		if (param.atmoParam.hasAtmosphere)
-		{
-			const int size = 128;
-			std::vector<float> table;
-			planetParams[i].atmoParam.generateLookupTable(table, size, param.bodyParam.radius);
-
-			GLuint &tex = atmoLookupTables[i];
-
-			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
-			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
-			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
-			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
-			glGenerateTextureMipmap(tex);
-		}
-
-		// Load ring textures
-		if (param.ringParam.hasRings)
-		{
-			// Load files
-			std::vector<float> backscat, forwardscat, unlit, transparency, color;
-			const RingParameters ringParam = param.ringParam;
-			const AssetPaths assetPaths = param.assetPaths;
-			ringParam.loadFile(assetPaths.backscatFilename, backscat);
-			ringParam.loadFile(assetPaths.forwardscatFilename, forwardscat);
-			ringParam.loadFile(assetPaths.unlitFilename, unlit);
-			ringParam.loadFile(assetPaths.transparencyFilename, transparency);
-			ringParam.loadFile(assetPaths.colorFilename, color);
-
-			size_t size = backscat.size();
-
-			// Check sizes
-			if (size != forwardscat.size() &&
-				size != unlit.size() &&
-				size != transparency.size() &&
-				size*3 != color.size())
-			{
-				throw std::runtime_error("Ring texture sizes don't match");
-			}
-
-			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
-			std::vector<float> t1(size*3);
-			std::vector<float> t2(size*4);
-			for (int i=0;i<size;++i)
-			{
-				t1[i*3+0] = backscat[i];
-				t1[i*3+1] = forwardscat[i];
-				t1[i*3+2] = unlit[i];
-				t2[i*4+0] = color[i*3+0];
-				t2[i*4+1] = color[i*3+1];
-				t2[i*4+2] = color[i*3+2];
-				t2[i*4+3] = transparency[i];
-			}
-
-			GLuint &tex1 = ringTextures1[i];
-			GLuint &tex2 = ringTextures2[i];
-
-			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
-			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
-			glTextureParameteri(tex1, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex1, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex1, GL_TEXTURE_WRAP_S, GL_CLAMP);
-			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
-			glGenerateTextureMipmap(tex1);
-
-			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
-			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
-			glTextureParameteri(tex2, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex2, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex2, GL_TEXTURE_WRAP_S, GL_CLAMP);
-			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
-			glGenerateTextureMipmap(tex2);
-		}
-
-		planetTexLoaded[i] = true;
+		uboBuffer.update(currentData.planetUBOs[i], &planetUBOs[i]);
+	}
+	for (uint32_t i=0;i<flareUBOs.size();++i)
+	{
+		uboBuffer.update(currentData.flareUBOs[i], &flareUBOs[i]);
 	}
 
-	// Texture unloading
-	for (uint32_t i : texUnloadPlanets)
-	{
-		unloadDDSTexture(planetDiffuseTextures[i]);
-		unloadDDSTexture(planetCloudTextures[i]);
-		unloadDDSTexture(planetNightTextures[i]);
-
-		planetDiffuseTextures[i] = -1;
-		planetCloudTextures[i] = -1;
-		planetNightTextures[i] = -1;
-
-		if (planetParams[i].atmoParam.hasAtmosphere)
-		{
-			glDeleteTextures(1, &atmoLookupTables[i]);
-		}
-
-		if (planetParams[i].ringParam.hasRings)
-		{
-			glDeleteTextures(1, &ringTextures1[i]);
-			glDeleteTextures(2, &ringTextures2[i]);
-		}
-
-		planetTexLoaded[i] = false;
-	}
-
-	// Texture uploading
-	{
-		std::lock_guard<std::mutex> lk(texLoadedMutex);
-		while (!texLoadedQueue.empty())
-		{
-			TexLoaded texLoaded = texLoadedQueue.front();
-			texLoadedQueue.pop();
-			GLuint id;
-			if (getStreamTexture(texLoaded.tex, id))
-			{
-				glCompressedTextureSubImage2D(
-					id,
-					texLoaded.mipmap, 
-					0, 0, 
-					texLoaded.width, texLoaded.height, 
-					texLoaded.format,
-					texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
-				glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.mipmap);
-			}
-		}
-	}
+	uboBuffer.write();
 
 	// Planet sorting from front to back
-	std::sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
+	sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
 	{
-		const float distI = glm::distance(planetStates[i].position, viewPos);
-		const float distJ = glm::distance(planetStates[j].position, viewPos);
+		const float distI = distance(planetStates[i].position, viewPos);
+		const float distJ = distance(planetStates[j].position, viewPos);
 		return distI < distJ;
 	});
 
 	// Atmosphere sorting from back to front
-	std::sort(atmoPlanets.begin(), atmoPlanets.end(), [&](int i, int j)
+	sort(atmoPlanets.begin(), atmoPlanets.end(), [&](int i, int j)
 	{
-		const float distI = glm::distance(planetStates[i].position, viewPos);
-		const float distJ = glm::distance(planetStates[j].position, viewPos);
+		const float distI = distance(planetStates[i].position, viewPos);
+		const float distJ = distance(planetStates[j].position, viewPos);
 		return distI > distJ;
 	});
 
@@ -1289,32 +801,31 @@ void RendererGL::render(
 	glCullFace(GL_BACK);
 
 	profiler.begin("Planets");
-	renderHdr(previousFrameClosePlanets, currentDynamicOffsets);
+	renderHdr(closePlanets, currentData);
 	profiler.end();
 	profiler.begin("Atmospheres");
-	renderAtmo(previousFrameAtmoPlanets, currentDynamicOffsets);
+	renderAtmo(atmoPlanets, currentData);
 	profiler.end();
 	profiler.begin("Bloom");
 	renderBloom();
 	profiler.end();
 	profiler.begin("Flares");
-	renderFlares(previousFrameFarPlanets, currentDynamicOffsets);
+	renderFlares(farPlanets, currentData);
 	profiler.end();
 	profiler.begin("Tonemapping");
-	renderTonemap(currentDynamicOffsets);
+	renderTonemap(currentData);
 	profiler.end();
 
 	profiler.end();
+
+	currentData.fence.lock();
 
 	frameId = (frameId+1)%bufferFrames;
-	previousFrameClosePlanets = closePlanets;
-	previousFrameFarPlanets = farPlanets;
-	previousFrameAtmoPlanets = atmoPlanets;
 }
 
 void RendererGL::renderHdr(
-	const std::vector<uint32_t> closePlanets,
-	const DynamicOffsets currentDynamicOffsets)
+	const vector<uint32_t> closePlanets,
+	const DynamicData data)
 {
 	// Depth test/write
 	glEnable(GL_DEPTH_TEST);
@@ -1333,9 +844,9 @@ void RendererGL::renderHdr(
 	glClearNamedFramebufferfv(hdrFbo, GL_DEPTH, 0, clearDepth);
 
 	// Chose default or custom textures
-	std::vector<GLuint> diffuseTextures(planetCount);
-	std::vector<GLuint> cloudTextures(planetCount);
-	std::vector<GLuint> nightTextures(planetCount);
+	vector<GLuint> diffuseTextures(planetCount);
+	vector<GLuint> cloudTextures(planetCount);
+	vector<GLuint> nightTextures(planetCount);
 
 	for (uint32_t i : closePlanets)
 	{
@@ -1356,13 +867,13 @@ void RendererGL::renderHdr(
 			(hasAtmo?programPlanetAtmo:programPlanet)).getId());
 
 		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
-			currentDynamicOffsets.sceneUBO,
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
 
 		// Bind planet UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-			currentDynamicOffsets.planetUBOs[i],
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
+			data.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
@@ -1378,13 +889,13 @@ void RendererGL::renderHdr(
 			glBindTextureUnit(5, atmoLookupTables[i]);
 		}
 
-		render(vertexArray, planetModels[i]);
+		planetModels[i].draw();
 	}
 }
 
 void RendererGL::renderAtmo(
-	const std::vector<uint32_t> atmoPlanets,
-	const DynamicOffsets currentDynamicOffsets)
+	const vector<uint32_t> atmoPlanets,
+	const DynamicData data)
 {
 	// Only depth test
 	glEnable(GL_DEPTH_TEST);
@@ -1401,11 +912,11 @@ void RendererGL::renderAtmo(
 
 	for (uint32_t i : atmoPlanets)
 	{
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
-			currentDynamicOffsets.sceneUBO,
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-			currentDynamicOffsets.planetUBOs[i],
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
+			data.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
 		bool hasRings = planetParams[i].ringParam.hasRings;
@@ -1416,14 +927,14 @@ void RendererGL::renderAtmo(
 			glUseProgram(programRingFar.getId());
 			glBindTextureUnit(2, ringTextures1[i]);
 			glBindTextureUnit(3, ringTextures2[i]);
-			render(vertexArray, ringModels[i]);
+			ringModels[i].draw();
 		}
 
 		// Atmosphere
 		glUseProgram(programAtmo.getId());
 		
 		glBindTextureUnit(2, atmoLookupTables[i]);
-		render(vertexArray, planetModels[i]);
+		planetModels[i].draw();
 
 		// Near rings
 		if (hasRings)
@@ -1431,7 +942,7 @@ void RendererGL::renderAtmo(
 			glUseProgram(programRingNear.getId());
 			glBindTextureUnit(2, ringTextures1[i]);
 			glBindTextureUnit(3, ringTextures2[i]);
-			render(vertexArray, ringModels[i]);
+			ringModels[i].draw();
 		}
 	}
 }
@@ -1513,8 +1024,8 @@ void RendererGL::renderBloom()
 }
 
 void RendererGL::renderFlares(
-	const std::vector<uint32_t> farPlanets, 
-	const DynamicOffsets currentDynamicOffsets)
+	const vector<uint32_t> farPlanets, 
+	const DynamicData data)
 {
 	// Only depth test
 	glEnable(GL_DEPTH_TEST);
@@ -1535,13 +1046,13 @@ void RendererGL::renderFlares(
 	for (uint32_t i : farPlanets)
 	{
 		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
-			currentDynamicOffsets.sceneUBO,
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
 
 		// Bind planet UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, dynamicBuffer,
-			currentDynamicOffsets.flareUBOs[i],
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
+			data.flareUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
@@ -1549,11 +1060,11 @@ void RendererGL::renderFlares(
 		glBindTextureUnit(3, flareLinesTex);
 		glBindTextureUnit(4, flareHaloTex);
 
-		render(vertexArray, flareModel);
+		flareModel.draw();
 	}
 }
 
-void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
+void RendererGL::renderTonemap(const DynamicData data)
 {
 	// No stencil test/write
 	glStencilFunc(GL_ALWAYS, 0, 0xFF);
@@ -1569,25 +1080,328 @@ void RendererGL::renderTonemap(const DynamicOffsets currentDynamicOffsets)
 	glUseProgram(programTonemap.getId());
 
 	// Bind Scene UBO
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, dynamicBuffer,
-			currentDynamicOffsets.sceneUBO,
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
 
 	// Bind image after bloom is done
 	glBindTextureUnit(1, hdrMSRendertarget);
 	glBindTextureUnit(2, bloomRendertargets[0]);
 
-	render(vertexArray, fullscreenTri);
+	fullscreenTri.draw();
 }
 
-void RendererGL::render(GLuint vertexArray, const Model m)
+void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 {
-	glBindVertexArray(vertexArray);
-	glDrawElementsBaseVertex(GL_TRIANGLES, m.count, GL_UNSIGNED_INT,
-		(void*)(intptr_t)m.indexOffset, m.vertexOffset/sizeof(Vertex));
+	// Texture loading
+	for (uint32_t i : texLoadPlanets)
+	{
+		const PlanetParameters param = planetParams[i];
+		// Diffuse texture
+		planetDiffuseTextures[i] = loadDDSTexture(param.assetPaths.diffuseFilename, vec4(1,1,1,1));
+		planetCloudTextures[i]   = loadDDSTexture(param.assetPaths.cloudFilename  , vec4(0,0,0,0));
+		planetNightTextures[i]   = loadDDSTexture(param.assetPaths.nightFilename  , vec4(0,0,0,0));
+
+		// Generate atmospheric scattering lookup texture
+		if (param.atmoParam.hasAtmosphere)
+		{
+			const int size = 128;
+			vector<float> table;
+			planetParams[i].atmoParam.generateLookupTable(table, size, param.bodyParam.radius);
+
+			GLuint &tex = atmoLookupTables[i];
+
+			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
+			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
+			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
+			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
+			glGenerateTextureMipmap(tex);
+		}
+
+		// Load ring textures
+		if (param.ringParam.hasRings)
+		{
+			// Load files
+			vector<float> backscat, forwardscat, unlit, transparency, color;
+			const RingParameters ringParam = param.ringParam;
+			const AssetPaths assetPaths = param.assetPaths;
+			ringParam.loadFile(assetPaths.backscatFilename, backscat);
+			ringParam.loadFile(assetPaths.forwardscatFilename, forwardscat);
+			ringParam.loadFile(assetPaths.unlitFilename, unlit);
+			ringParam.loadFile(assetPaths.transparencyFilename, transparency);
+			ringParam.loadFile(assetPaths.colorFilename, color);
+
+			size_t size = backscat.size();
+
+			// Check sizes
+			if (size != forwardscat.size() &&
+				size != unlit.size() &&
+				size != transparency.size() &&
+				size*3 != color.size())
+			{
+				throw runtime_error("Ring texture sizes don't match");
+			}
+
+			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
+			vector<float> t1(size*3);
+			vector<float> t2(size*4);
+			for (int i=0;i<size;++i)
+			{
+				t1[i*3+0] = backscat[i];
+				t1[i*3+1] = forwardscat[i];
+				t1[i*3+2] = unlit[i];
+				t2[i*4+0] = color[i*3+0];
+				t2[i*4+1] = color[i*3+1];
+				t2[i*4+2] = color[i*3+2];
+				t2[i*4+3] = transparency[i];
+			}
+
+			GLuint &tex1 = ringTextures1[i];
+			GLuint &tex2 = ringTextures2[i];
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
+			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
+			glTextureParameteri(tex1, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex1, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex1, GL_TEXTURE_WRAP_S, GL_CLAMP);
+			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
+			glGenerateTextureMipmap(tex1);
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
+			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
+			glTextureParameteri(tex2, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(tex2, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(tex2, GL_TEXTURE_WRAP_S, GL_CLAMP);
+			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
+			glGenerateTextureMipmap(tex2);
+		}
+
+		planetTexLoaded[i] = true;
+	}
 }
 
-void GPUProfilerGL::begin(const std::string name)
+void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
+{
+	// Texture unloading
+	for (uint32_t i : texUnloadPlanets)
+	{
+		unloadDDSTexture(planetDiffuseTextures[i]);
+		unloadDDSTexture(planetCloudTextures[i]);
+		unloadDDSTexture(planetNightTextures[i]);
+
+		planetDiffuseTextures[i] = -1;
+		planetCloudTextures[i] = -1;
+		planetNightTextures[i] = -1;
+
+		if (planetParams[i].atmoParam.hasAtmosphere)
+		{
+			glDeleteTextures(1, &atmoLookupTables[i]);
+		}
+
+		if (planetParams[i].ringParam.hasRings)
+		{
+			glDeleteTextures(1, &ringTextures1[i]);
+			glDeleteTextures(2, &ringTextures2[i]);
+		}
+
+		planetTexLoaded[i] = false;
+	}
+}
+
+void RendererGL::uploadLoadedTextures()
+{
+	// Texture uploading
+	lock_guard<mutex> lk(texLoadedMutex);
+	while (!texLoadedQueue.empty())
+	{
+		TexLoaded texLoaded = texLoadedQueue.front();
+		texLoadedQueue.pop();
+		GLuint id;
+		if (getStreamTexture(texLoaded.tex, id))
+		{
+			glCompressedTextureSubImage2D(
+				id,
+				texLoaded.mipmap, 
+				0, 0, 
+				texLoaded.width, texLoaded.height, 
+				texLoaded.format,
+				texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
+			glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.mipmap);
+		}
+	}
+}
+
+RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
+	const dvec3 viewPos, const mat4 viewMat,
+	const PlanetState state, const PlanetParameters params)
+{
+	const vec3 planetPos = state.position - viewPos;
+
+	// Planet rotation
+	const vec3 north = vec3(0,0,1);
+	const vec3 rotAxis = params.bodyParam.rotationAxis;
+	const quat q = rotate(quat(), 
+		(float)acos(dot(north, rotAxis)), 
+		cross(north, rotAxis))*
+		rotate(quat(), state.rotationAngle, north);
+
+	// Model matrix
+	const mat4 modelMat = 
+		translate(mat4(), planetPos)*
+		mat4_cast(q)*
+		scale(mat4(), vec3(params.bodyParam.radius));
+
+	// Atmosphere matrix
+	const mat4 atmoMat = 
+		translate(mat4(), planetPos)*
+		mat4_cast(q)*
+		scale(mat4(), -vec3(params.bodyParam.radius+params.atmoParam.maxHeight));
+
+	// Ring matrices
+	const vec3 towards = normalize(planetPos);
+	const vec3 up = params.ringParam.normal;
+	const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
+	const vec3 right = normalize(cross(towards, up));
+	const vec3 newTowards = cross(right, up);
+
+	const mat4 lookAtFar = mat4(mat3(sideflip*right, -newTowards, up));
+	const mat4 lookAtNear = mat4(mat3(-sideflip*right, newTowards, up));
+
+	const mat4 ringFarMat = 
+		translate(mat4(), planetPos)*
+		lookAtFar;
+
+	const mat4 ringNearMat =
+		translate(mat4(), planetPos)*
+		lookAtNear;
+
+	// Light direction
+	const vec3 lightDir = vec3(normalize(-state.position));
+
+	PlanetDynamicUBO ubo;
+	ubo.modelMat = modelMat;
+	ubo.atmoMat = atmoMat;
+	ubo.ringFarMat = ringFarMat;
+	ubo.ringNearMat = ringNearMat;
+	ubo.planetPos = viewMat*vec4(planetPos, 1.0);
+	ubo.lightDir = viewMat*vec4(lightDir,0.0);
+	ubo.K = params.atmoParam.K;
+	ubo.cloudDisp = state.cloudDisp;
+	ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
+	ubo.albedo = params.bodyParam.albedo;
+	ubo.radius = params.bodyParam.radius;
+	ubo.atmoHeight = params.atmoParam.maxHeight;
+
+	return ubo;
+}
+
+RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
+	const dvec3 viewPos, const mat4 projMat,
+	const mat4 viewMat, const float fovy, const float exp, 
+	const PlanetState state, const PlanetParameters params)
+{
+	const vec3 planetPos = vec3(state.position - viewPos);
+	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
+	const vec2 screen = vec2(clip)/clip.w;
+	const float FLARE_SIZE_DEGREES = 20.0;
+	const mat4 modelMat = 
+		translate(mat4(), vec3(screen, 0.999))*
+		scale(mat4(), 
+			vec3(windowHeight/(float)windowWidth,1.0,0.0)*
+			FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
+
+	const float phaseAngle = acos(dot(
+		(vec3)normalize(state.position), 
+		normalize(planetPos)));
+	const float phase = (1-phaseAngle/PI)*cos(phaseAngle)+(1/PI)*sin(phaseAngle);
+	const bool isStar = params.bodyParam.isStar;
+	const float radius = params.bodyParam.radius;
+	const double dist = distance(viewPos, state.position)/radius;
+	const float fade = clamp(isStar?
+		(float)   dist/10:
+		(float) ((dist-farPlanetMinDistance)/
+						(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
+	const vec3 cutDist = planetPos*0.005f;
+	
+	const float brightness = std::min(4.0f,
+		exp*
+		radius*radius*
+		(isStar?100.f:
+		params.bodyParam.albedo*0.2f*phase)
+		/dot(cutDist,cutDist))
+		*fade;
+
+	FlareDynamicUBO ubo;
+	ubo.modelMat = modelMat;
+	ubo.color = vec4(params.bodyParam.meanColor,1.0);
+	ubo.brightness = brightness;
+
+	return ubo;
+}
+
+void RendererGL::initThread() {
+	texLoadThread = thread([&,this]()
+	{
+		while (true)
+		{
+			// Wait for kill or queue not empty
+			{
+				unique_lock<mutex> lk(texWaitMutex);
+				texWaitCondition.wait(lk, [&]{ return killThread || !texWaitQueue.empty();});
+			}
+
+			if (killThread) return;
+
+			// Get info about texture were are going to load
+			TexWait texWait;
+			{
+				lock_guard<mutex> lk(texWaitMutex);
+				texWait = texWaitQueue.front();
+				texWaitQueue.pop();
+			}
+
+			shared_ptr<vector<uint8_t>> imageData = make_shared<vector<uint8_t>>();
+
+			// Load image data
+			size_t imageSize;
+			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, nullptr);
+			imageData->resize(imageSize);
+			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, imageData->data());
+
+			vector<TexLoaded> texLoaded(texWait.mipmapCount);
+			size_t offset = 0;
+
+			for (unsigned int i=0;i<texLoaded.size();++i)
+			{
+				auto &tl = texLoaded[i];
+				tl.tex = texWait.tex;
+				tl.mipmap = texWait.mipmap+i;
+				tl.mipmapOffset = offset;
+				tl.format = DDSFormatToGL(texWait.loader.getFormat());
+				tl.width  = texWait.loader.getWidth (tl.mipmap);
+				tl.height = texWait.loader.getHeight(tl.mipmap);
+				tl.data = imageData;
+				// Compute size of current mipmap + offset of next mipmap
+				size_t size0;
+				texWait.loader.getImageData(tl.mipmap, 1, &size0, nullptr);
+				tl.imageSize = size0;
+				offset += size0;
+			}
+			
+			// Push loaded texture into queue
+			{
+				lock_guard<mutex> lk(texLoadedMutex);
+				for (auto tl : texLoaded)
+					texLoadedQueue.push(tl);
+			}
+		}
+	});
+}
+
+void GPUProfilerGL::begin(const string name)
 {
 	int id = (bufferId+1)%2;
 	auto &val = queries[id][name].first;
@@ -1602,7 +1416,7 @@ void GPUProfilerGL::begin(const std::string name)
 
 void GPUProfilerGL::end()
 {
-	std::string name = names.top();
+	string name = names.top();
 	names.pop();
 	int id = (bufferId+1)%2;
 	auto &val = queries[id][name].second;
@@ -1614,11 +1428,11 @@ void GPUProfilerGL::end()
 	lastQuery = val;
 }
 
-std::vector<std::pair<std::string,uint64_t>> GPUProfilerGL::get()
+vector<pair<string,uint64_t>> GPUProfilerGL::get()
 {
-	std::vector<std::pair<std::string,uint64_t>> result;
+	vector<pair<string,uint64_t>> result;
 	auto &m = queries[bufferId];
-	for (const std::string name : orderedNames[bufferId])
+	for (const string name : orderedNames[bufferId])
 	{
 		auto val = m.find(name);
 		GLuint q1 = val->second.first;
@@ -1628,7 +1442,7 @@ std::vector<std::pair<std::string,uint64_t>> GPUProfilerGL::get()
 			uint64_t start, end;
 			glGetQueryObjectui64v(q1, GL_QUERY_RESULT, &start);
 			glGetQueryObjectui64v(q2, GL_QUERY_RESULT, &end);
-			result.push_back(std::make_pair(name, end-start));
+			result.push_back(make_pair(name, end-start));
 		}
 		if (q1) glDeleteQueries(1, &q1);
 		if (q2) glDeleteQueries(1, &q2);
@@ -1640,7 +1454,7 @@ std::vector<std::pair<std::string,uint64_t>> GPUProfilerGL::get()
 	return result;
 }
 
-std::vector<std::pair<std::string,uint64_t>> RendererGL::getProfilerTimes()
+vector<pair<string,uint64_t>> RendererGL::getProfilerTimes()
 {
 	return profiler.get();
 }

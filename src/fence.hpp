@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
+#include "graphics_api.hpp"
 
 class Fence
 {

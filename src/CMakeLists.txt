@@ -15,6 +15,7 @@ set(SOURCE
 	renderer_gl.cpp
 	shader.cpp
 	fence.cpp
+	gl_util.cpp
 	thirdparty/lodepng.cpp
 	thirdparty/shaun/shaun.cpp
 	thirdparty/shaun/sweeper.cpp)
@@ -23,9 +24,9 @@ project (roche)
 
 add_executable(roche ${SOURCE})
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-	message("KHR_Debug enabled")
-	set(COMPILE_DEFS ${COMPILE_DEFS} -DUSE_KHR_DEBUG)
+if (CMAKE_BUILD_TYPE MATCHES Release)
+	message("Coherent mapping enabled - Not supported by apitrace!")
+	set(COMPILE_DEFS ${COMPILE_DEFS} -DUSE_COHERENT_MAPPING)
 endif()
 
 target_compile_definitions(roche PRIVATE ${COMPILE_DEFS})

@@ -1,12 +1,11 @@
 #pragma once
 
 #include "renderer.hpp"
+#include "graphics_api.hpp"
 #include "shader.hpp"
 #include "fence.hpp"
 #include "ddsloader.hpp"
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "gl_util.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -53,44 +52,67 @@ public:
 
 	std::vector<std::pair<std::string,uint64_t>> getProfilerTimes();
 private:
-	struct Model
+	struct DynamicData
 	{
-		uint32_t vertexOffset;
-		uint32_t indexOffset;
-		uint32_t count;
+		Fence fence;
+		BufferSection sceneUBO;
+
+		std::vector<BufferSection> planetUBOs;
+		std::vector<BufferSection> flareUBOs;
 	};
 
-	struct DynamicOffsets
+	struct SceneDynamicUBO
 	{
-		uint32_t offset;
-		uint32_t size;
+		glm::mat4 projMat;
+		glm::mat4 viewMat;
+		glm::vec4 viewPos;
+		float ambientColor;
+		float invGamma;
+		float exposure;
+	};
 
-		uint32_t sceneUBO;
-		std::vector<uint32_t> planetUBOs;
-		std::vector<uint32_t> flareUBOs;
+	struct PlanetDynamicUBO
+	{
+		glm::mat4 modelMat;
+		glm::mat4 atmoMat;
+		glm::mat4 ringFarMat;
+		glm::mat4 ringNearMat;
+		glm::vec4 planetPos;
+		glm::vec4 lightDir;
+		glm::vec4 K;
+		float albedo;
+		float cloudDisp;
+		float nightTexIntensity;
+		float radius;
+		float atmoHeight;
+	};
+
+	struct FlareDynamicUBO
+	{
+		glm::mat4 modelMat;
+		glm::vec4 color;
+		float brightness;
 	};
 
 	typedef int32_t TexHandle;
 
 	void createTextures();
 	void createFlare();
-	void createBuffers();
 	void createVertexArray();
 	void createRendertargets();
 	void createShaders();
 
-	void render(GLuint vertexArray, Model m);
 	void renderHdr(
 		std::vector<uint32_t> closePlanets, 
-		DynamicOffsets currentDynamicOffsets);
+		DynamicData data);
 	void renderAtmo(
 		std::vector<uint32_t> atmoPlanets,
-		DynamicOffsets currentDynamicOffsets);
+		DynamicData data);
 	void renderBloom();
 	void renderFlares(
 		std::vector<uint32_t> farPlanets, 
-		DynamicOffsets currentDynamicOffsets);
-	void renderTonemap(DynamicOffsets currentDynamicOffsets);
+		DynamicData data);
+	void renderTonemap(DynamicData data);
 
 	TexHandle createStreamTexture(GLuint tex);
 	bool getStreamTexture(TexHandle tex, GLuint &id);
@@ -99,6 +121,18 @@ private:
 	TexHandle loadDDSTexture(std::string filename, glm::vec4 defaultColor);
 	void unloadDDSTexture(TexHandle texId);
 
+	void loadTextures(std::vector<uint32_t> planets);
+	void unloadTextures(std::vector<uint32_t> planets);
+	void uploadLoadedTextures();
+
+	PlanetDynamicUBO getPlanetUBO(glm::dvec3 viewPos, glm::mat4 viewMat,
+	PlanetState state, PlanetParameters params);
+	FlareDynamicUBO getFlareUBO(glm::dvec3 viewPos, glm::mat4 projMat,
+	glm::mat4 viewMat, float fovy, float exp, 
+	PlanetState state, PlanetParameters params);
+
+	void initThread();
+
 	GPUProfilerGL profiler;
 
 	uint32_t planetCount;
@@ -106,20 +140,20 @@ private:
 	int windowWidth;
 	int windowHeight;
 
-	// Buffer holding static data (uploaded once at init)
-	GLuint staticBuffer;
-	uint32_t staticBufferSize;
-	uint32_t vertexOffset;
-	uint32_t indexOffset;
+	// Constants for distance based loading
+	float closePlanetMaxDistance;
+	float farPlanetMinDistance;
+	float farPlanetOptimalDistance;
+	float texLoadDistance;
+	float texUnloadDistance;
 
-	// Buffer holding dynamic data (replaced each frame)
-	GLuint dynamicBuffer;
-	uint32_t dynamicBufferSize;
-	void *dynamicBufferPtr;
+	Buffer vertexBuffer;
+	Buffer indexBuffer;
+
+	Buffer uboBuffer;
 	
 	// Offsets in dynamic buffer
-	std::vector<DynamicOffsets> dynamicOffsets;
-	std::vector<Fence> fences;
+	std::vector<DynamicData> dynamicData;
 
 	// VAO
 	GLuint vertexArray;
@@ -151,16 +185,13 @@ private:
 	ShaderProgram programFlare;
 	ShaderProgram programTonemap;
 
-	// Current frame % 3 for triple buffering
+	// Multiple buffering
 	uint32_t frameId;
 	uint32_t bufferFrames;
 
 	std::vector<PlanetParameters> planetParams; // Static parameters
-	std::vector<uint32_t> previousFrameClosePlanets;
-	std::vector<uint32_t> previousFrameFarPlanets;
-	std::vector<uint32_t> previousFrameAtmoPlanets;
-	std::vector<Model> planetModels; // Offsets and count in buffer
-	std::vector<Model> ringModels;
+	std::vector<DrawCommand> planetModels; // Offsets and count in buffer
+	std::vector<DrawCommand> ringModels;
 	std::vector<bool> planetTexLoaded; // indicates if the texture are loaded for a planet
 
 	// Contains all streamed textures
@@ -186,9 +217,9 @@ private:
 	float textureAnisotropy;
 
 	// Models
-	Model sphere;
-	Model flareModel;
-	Model fullscreenTri;
+	DrawCommand sphere;
+	DrawCommand flareModel;
+	DrawCommand fullscreenTri;
 
 	// Texture load threading
 	struct TexWait // Texture waiting to be loaded
