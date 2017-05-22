@@ -190,20 +190,35 @@ private:
 	uint32_t bufferFrames;
 
 	std::vector<PlanetParameters> planetParams; // Static parameters
-	std::vector<DrawCommand> planetModels; // Offsets and count in buffer
-	std::vector<DrawCommand> ringModels;
-	std::vector<bool> planetTexLoaded; // indicates if the texture are loaded for a planet
+
+	struct PlanetData
+	{
+		DrawCommand planetModel;
+		DrawCommand ringModel;
+		bool texLoaded;
+		TexHandle diffuse;
+		TexHandle cloud;
+		TexHandle night;
+		GLuint atmoLookupTable;
+		GLuint ringTex1;
+		GLuint ringTex2;
+		PlanetData()
+		{
+			texLoaded = false;
+			diffuse = -1;
+			cloud = -1;
+			night = -1;
+			atmoLookupTable = 0;
+			ringTex1 = 0;
+			ringTex2 = 0;
+		}
+	};
+
+	std::vector<PlanetData> planetData;
 
 	// Contains all streamed textures
 	TexHandle nextHandle;
 	std::map<TexHandle, GLuint> streamTextures;
-
-	std::vector<TexHandle> planetDiffuseTextures; // Diffuse texture for each planet
-	std::vector<TexHandle> planetCloudTextures;
-	std::vector<TexHandle> planetNightTextures;
-	std::vector<GLuint> atmoLookupTables;
-	std::vector<GLuint> ringTextures1;
-	std::vector<GLuint> ringTextures2;
 
 	// Textures
 	GLuint diffuseTexDefault;

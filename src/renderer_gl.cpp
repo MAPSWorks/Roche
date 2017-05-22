@@ -208,6 +208,8 @@ void RendererGL::init(
 
 	this->bufferFrames = 3; // triple-buffering
 
+	this->planetData.resize(planetCount);
+
 	vertexBuffer = Buffer(false);
 	indexBuffer = Buffer(false);
 
@@ -242,10 +244,9 @@ void RendererGL::init(
 		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
 
 	// Load custom models
-	ringModels.resize(planetCount);
-	planetModels.resize(planetCount);
 	for (uint32_t i=0;i<planetCount;++i)
 	{
+		auto &data = planetData[i];
 		const PlanetParameters param = planetParams[i];
 		if (param.assetPaths.modelFilename != "")
 		{
@@ -253,7 +254,7 @@ void RendererGL::init(
 		}
 		else
 		{
-			planetModels[i] = sphere;
+			data.planetModel = sphere;
 		}
 		// Rings
 		if (param.ringParam.hasRings)
@@ -263,7 +264,7 @@ void RendererGL::init(
 			const int ringMeridians = 128;
 			generateRingModel(ringMeridians, near, far, 
 				vertices, indices);
-			ringModels[i] = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
+			data.ringModel = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
 				sizeof(Vertex), sizeof(Index),
 				vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
 				indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
@@ -318,22 +319,11 @@ void RendererGL::createTextures()
 	const float requestedAnisotropy = 16.f;
 	textureAnisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
 
-	// Texture init
-	planetTexLoaded.resize(planetCount);
-
-	// All default textures
-	planetDiffuseTextures.resize(planetCount, -1);
-	planetCloudTextures.resize(planetCount, -1);
-	planetNightTextures.resize(planetCount, -1);
-	atmoLookupTables.resize(planetCount, -1);
-	ringTextures1.resize(planetCount, -1);
-	ringTextures2.resize(planetCount, -1);
-
 	// Default diffuse tex
 	const uint8_t diffuseData[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
 	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &diffuseData);
+	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, diffuseData);
 	
 	// Default cloud tex
 	const uint8_t cloudData[] = {255, 255, 255, 0};
@@ -345,7 +335,7 @@ void RendererGL::createTextures()
 	const uint8_t nightData[] = {0, 0, 0};
 	glCreateTextures(GL_TEXTURE_2D, 1, &nightTexDefault);
 	glTextureStorage2D(nightTexDefault, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &nightData);
+	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, nightData);
 
 	createFlare();
 }
@@ -696,21 +686,23 @@ void RendererGL::render(
 
 	for (uint32_t i=0;i<planetStates.size();++i)
 	{
+		auto &data = planetData[i];
 		const float radius = planetParams[i].bodyParam.radius;
-		const double dist = distance(viewPos, planetStates[i].position)/radius;
-		if (dist < texLoadDistance && !planetTexLoaded[i])
+		const dvec3 pos = planetStates[i].position;
+		const double dist = distance(viewPos, pos)/radius;
+		if (dist < texLoadDistance && !data.texLoaded)
 		{
 			// Textures need to be loaded
 			texLoadPlanets.push_back(i);
 		}
-		else if (dist > texUnloadDistance && planetTexLoaded[i])
+		else if (dist > texUnloadDistance && data.texLoaded)
 		{
 			// Textures need to be unloaded
 			texUnloadPlanets.push_back(i);
 		}
 
 		// Don't render planets behind the view
-		if ((viewMat*vec4(planetStates[i].position - viewPos,1.0)).z < 0)
+		if ((viewMat*vec4(pos - viewPos,1.0)).z < 0)
 		{
 			if (dist < closePlanetMaxDistance)
 			{
@@ -825,7 +817,7 @@ void RendererGL::render(
 
 void RendererGL::renderHdr(
 	const vector<uint32_t> closePlanets,
-	const DynamicData data)
+	const DynamicData ddata)
 {
 	// Depth test/write
 	glEnable(GL_DEPTH_TEST);
@@ -848,17 +840,10 @@ void RendererGL::renderHdr(
 	vector<GLuint> cloudTextures(planetCount);
 	vector<GLuint> nightTextures(planetCount);
 
-	for (uint32_t i : closePlanets)
-	{
-		GLuint id;
-		diffuseTextures[i] = getStreamTexture(planetDiffuseTextures[i], id)?id:diffuseTexDefault;
-		cloudTextures[i]   = getStreamTexture(planetCloudTextures[i]  , id)?id:cloudTexDefault;
-		nightTextures[i]   = getStreamTexture(planetNightTextures[i]  , id)?id:nightTexDefault;
-	}
-
 	// Planet rendering
 	for (uint32_t i : closePlanets)
 	{
+		auto &data = planetData[i];
 		const bool star = planetParams[i].bodyParam.isStar;
 		const bool hasAtmo = planetParams[i].atmoParam.hasAtmosphere;
 		glUseProgram(
@@ -868,28 +853,29 @@ void RendererGL::renderHdr(
 
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-			data.sceneUBO.getOffset(),
+			ddata.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
 
 		// Bind planet UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			data.planetUBOs[i].getOffset(),
+			ddata.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
-		glBindTextureUnit(2, diffuseTextures[i]);
+		GLuint id;
+		glBindTextureUnit(2, getStreamTexture(data.diffuse, id)?id:diffuseTexDefault);
 		if (!star)
 		{
-			glBindTextureUnit(3, cloudTextures[i]);
-			glBindTextureUnit(4, nightTextures[i]);
+			glBindTextureUnit(3, getStreamTexture(data.cloud  , id)?id:cloudTexDefault);
+			glBindTextureUnit(4, getStreamTexture(data.night  , id)?id:nightTexDefault);
 		}
 
 		if (hasAtmo)
 		{
-			glBindTextureUnit(5, atmoLookupTables[i]);
+			glBindTextureUnit(5, data.atmoLookupTable);
 		}
 
-		planetModels[i].draw();
+		data.planetModel.draw();
 	}
 }
 
@@ -921,28 +907,31 @@ void RendererGL::renderAtmo(
 
 		bool hasRings = planetParams[i].ringParam.hasRings;
 
+		auto &data = planetData[i];
+		DrawCommand ringModel = data.ringModel;
+
 		// Far rings
 		if (hasRings)
 		{
 			glUseProgram(programRingFar.getId());
-			glBindTextureUnit(2, ringTextures1[i]);
-			glBindTextureUnit(3, ringTextures2[i]);
-			ringModels[i].draw();
+			glBindTextureUnit(2, data.ringTex1);
+			glBindTextureUnit(3, data.ringTex2);
+			ringModel.draw();
 		}
 
 		// Atmosphere
 		glUseProgram(programAtmo.getId());
 		
-		glBindTextureUnit(2, atmoLookupTables[i]);
-		planetModels[i].draw();
+		glBindTextureUnit(2, data.atmoLookupTable);
+		data.planetModel.draw();
 
 		// Near rings
 		if (hasRings)
 		{
 			glUseProgram(programRingNear.getId());
-			glBindTextureUnit(2, ringTextures1[i]);
-			glBindTextureUnit(3, ringTextures2[i]);
-			ringModels[i].draw();
+			glBindTextureUnit(2, data.ringTex1);
+			glBindTextureUnit(3, data.ringTex2);
+			ringModel.draw();
 		}
 	}
 }
@@ -1097,10 +1086,11 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 	for (uint32_t i : texLoadPlanets)
 	{
 		const PlanetParameters param = planetParams[i];
+		auto &data = planetData[i];
 		// Diffuse texture
-		planetDiffuseTextures[i] = loadDDSTexture(param.assetPaths.diffuseFilename, vec4(1,1,1,1));
-		planetCloudTextures[i]   = loadDDSTexture(param.assetPaths.cloudFilename  , vec4(0,0,0,0));
-		planetNightTextures[i]   = loadDDSTexture(param.assetPaths.nightFilename  , vec4(0,0,0,0));
+		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, vec4(1,1,1,1));
+		data.cloud   = loadDDSTexture(param.assetPaths.cloudFilename  , vec4(0,0,0,0));
+		data.night   = loadDDSTexture(param.assetPaths.nightFilename  , vec4(0,0,0,0));
 
 		// Generate atmospheric scattering lookup texture
 		if (param.atmoParam.hasAtmosphere)
@@ -1109,7 +1099,7 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 			vector<float> table;
 			planetParams[i].atmoParam.generateLookupTable(table, size, param.bodyParam.radius);
 
-			GLuint &tex = atmoLookupTables[i];
+			GLuint &tex = data.atmoLookupTable;
 
 			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
 			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
@@ -1159,8 +1149,8 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 				t2[i*4+3] = transparency[i];
 			}
 
-			GLuint &tex1 = ringTextures1[i];
-			GLuint &tex2 = ringTextures2[i];
+			GLuint &tex1 = data.ringTex1;
+			GLuint &tex2 = data.ringTex2;
 
 			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
 			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
@@ -1179,7 +1169,7 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 			glGenerateTextureMipmap(tex2);
 		}
 
-		planetTexLoaded[i] = true;
+		data.texLoaded = true;
 	}
 }
 
@@ -1188,26 +1178,28 @@ void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
 	// Texture unloading
 	for (uint32_t i : texUnloadPlanets)
 	{
-		unloadDDSTexture(planetDiffuseTextures[i]);
-		unloadDDSTexture(planetCloudTextures[i]);
-		unloadDDSTexture(planetNightTextures[i]);
+		auto &data = planetData[i];
+		const auto param = planetParams[i];
+		unloadDDSTexture(data.diffuse);
+		unloadDDSTexture(data.cloud);
+		unloadDDSTexture(data.night);
 
-		planetDiffuseTextures[i] = -1;
-		planetCloudTextures[i] = -1;
-		planetNightTextures[i] = -1;
+		data.diffuse = -1;
+		data.cloud = -1;
+		data.night = -1;
 
-		if (planetParams[i].atmoParam.hasAtmosphere)
+		if (param.atmoParam.hasAtmosphere)
 		{
-			glDeleteTextures(1, &atmoLookupTables[i]);
+			glDeleteTextures(1, &data.atmoLookupTable);
 		}
 
-		if (planetParams[i].ringParam.hasRings)
+		if (param.ringParam.hasRings)
 		{
-			glDeleteTextures(1, &ringTextures1[i]);
-			glDeleteTextures(2, &ringTextures2[i]);
+			glDeleteTextures(1, &data.ringTex1);
+			glDeleteTextures(2, &data.ringTex2);
 		}
 
-		planetTexLoaded[i] = false;
+		data.texLoaded = false;
 	}
 }
 
