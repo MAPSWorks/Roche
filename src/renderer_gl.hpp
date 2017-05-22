@@ -14,6 +14,7 @@
 #include <queue>
 #include <map>
 #include <stack>
+#include <utility>
 
 class GPUProfilerGL
 {
@@ -112,18 +113,9 @@ private:
 		DynamicData data);
 	void renderTonemap(DynamicData data);
 
-	GLuint loadDDSTexture(std::string filename, int planetId, glm::vec4 defaultColor);
-	void unloadDDSTexture(GLuint tex);
-
 	void loadTextures(std::vector<uint32_t> planets);
 	void unloadTextures(std::vector<uint32_t> planets);
 	void uploadLoadedTextures();
-
-	PlanetDynamicUBO getPlanetUBO(glm::dvec3 viewPos, glm::mat4 viewMat,
-	PlanetState state, PlanetParameters params);
-	FlareDynamicUBO getFlareUBO(glm::dvec3 viewPos, glm::mat4 projMat,
-	glm::mat4 viewMat, float fovy, float exp, 
-	PlanetState state, PlanetParameters params);
 
 	void initThread();
 
@@ -162,6 +154,9 @@ private:
 	GLuint highpassRendertargets[5];
 	GLuint bloomRendertargets[4];
 
+	// Rendertarget sampler
+	GLuint rendertargetSampler;
+
 	GLuint hdrFbo;
 
 	// Shaders
@@ -190,23 +185,48 @@ private:
 		DrawCommand planetModel;
 		DrawCommand ringModel;
 		bool texLoaded;
-		GLuint diffuse;
-		GLuint cloud;
-		GLuint night;
+
+		struct StreamTex
+		{
+			GLuint id;
+			GLuint sampler;
+			int lodMin;
+			float smoothLodMin;
+			StreamTex() { id = 0; sampler = 0;}
+			StreamTex(GLuint id, GLuint sampler, GLuint lodMin, float smoothLodMin)
+			{
+				this->id = id;
+				this->sampler = sampler;
+				this->lodMin = lodMin;
+				this->smoothLodMin = smoothLodMin;
+			}
+		};
+
+		StreamTex diffuse;
+		StreamTex cloud;
+		StreamTex night;
+
 		GLuint atmoLookupTable;
 		GLuint ringTex1;
 		GLuint ringTex2;
 		PlanetData()
 		{
 			texLoaded = false;
-			diffuse = 0;
-			cloud = 0;
-			night = 0;
 			atmoLookupTable = 0;
 			ringTex1 = 0;
 			ringTex2 = 0;
 		}
 	};
+
+	PlanetData::StreamTex loadDDSTexture(std::string filename, int *lodMin, glm::vec4 defaultColor);
+	void unloadDDSTexture(PlanetData::StreamTex tex);
+
+	PlanetDynamicUBO getPlanetUBO(glm::dvec3 viewPos, glm::mat4 viewMat,
+	PlanetState state, PlanetParameters params, PlanetData data);
+
+	FlareDynamicUBO getFlareUBO(glm::dvec3 viewPos, glm::mat4 projMat,
+	glm::mat4 viewMat, float fovy, float exp, 
+	PlanetState state, PlanetParameters params);
 
 	std::vector<PlanetData> planetData;
 
@@ -219,6 +239,11 @@ private:
 	GLuint flareLinesTex;
 	GLuint flareHaloTex;
 
+	// Samplers
+	GLuint planetTexSampler;
+	GLuint atmoSampler;
+	GLuint ringSampler;
+
 	float textureAnisotropy;
 
 	// Models
@@ -230,7 +255,8 @@ private:
 	struct TexWait // Texture waiting to be loaded
 	{
 		GLuint id;
-		int planetId;
+		GLuint sampler;
+		int *lodMin;
 		int mipmap;
 		int mipmapCount;
 		DDSLoader loader;
@@ -239,7 +265,8 @@ private:
 	struct TexLoaded // Texture that have finished loading
 	{
 		GLuint id;
-		int planetId;
+		GLuint sampler;
+		int *lodMin;
 		GLenum format;
 		int mipmap;
 		int mipmapOffset;

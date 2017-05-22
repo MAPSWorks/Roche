@@ -338,6 +338,25 @@ void RendererGL::createTextures()
 	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, nightData);
 
 	createFlare();
+
+	// Samplers
+	glCreateSamplers(1, &planetTexSampler);
+	glSamplerParameterf(planetTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
+	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glCreateSamplers(1, &atmoSampler);
+	glSamplerParameteri(atmoSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(atmoSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(atmoSampler, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glSamplerParameteri(atmoSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+	glCreateSamplers(1, &ringSampler);
+	glSamplerParameteri(ringSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(ringSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(ringSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
 }
 
 int mipmapCount(int size)
@@ -365,7 +384,6 @@ void RendererGL::createFlare()
 		glTextureStorage2D(flareLinesTex, mips, GL_R8, flareSize, flareSize);
 		glTextureSubImage2D(flareLinesTex, 0, 0, 0, flareSize, flareSize, GL_RED, GL_UNSIGNED_BYTE, pixelData.data());
 		glGenerateTextureMipmap(flareLinesTex);
-		glBindTextureUnit(0, flareLinesTex);
 	}
 	{
 		vector<uint16_t> pixelData;
@@ -428,25 +446,25 @@ void RendererGL::createRendertargets()
 	glCreateTextures(GL_TEXTURE_2D, 5, highpassRendertargets);
 	for (int i=0;i<5;++i)
 	{
-		const GLuint tex = highpassRendertargets[i];
-		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
-		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureStorage2D(highpassRendertargets[i], 
+			1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
 	}
 
 	// Bloom rendertargets
 	glCreateTextures(GL_TEXTURE_2D, 4, bloomRendertargets);
 	for (int i=0;i<4;++i)
 	{
-		const GLuint tex = bloomRendertargets[i];
-		glTextureStorage2D(tex, 1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
-		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureStorage2D(bloomRendertargets[i], 
+			1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
+
 	}
+
+	// Sampler
+	glCreateSamplers(1, &rendertargetSampler);
+	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	// Framebuffers
 	glCreateFramebuffers(1, &hdrFbo);
@@ -561,9 +579,9 @@ void RGBAToBC(const vec4 color, DDSLoader::Format format, vector<uint8_t> &block
 	for (int i=4;i<8;++i) block[i] = codes;
 }
 
-GLuint RendererGL::loadDDSTexture(
+RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 	const string filename,
-	const int planetId,
+	int *lodMin,
 	const vec4 defaultColor)
 {
 	DDSLoader loader;
@@ -576,17 +594,22 @@ GLuint RendererGL::loadDDSTexture(
 		glTextureStorage2D(id, 
 			mipmapCount, DDSFormatToGL(loader.getFormat()), 
 			loader.getWidth(0), loader.getHeight(0));
-		glTextureParameterf(id, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
-		glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		// Default color at highest mipmap
-		glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)(mipmapCount-1));
+		*lodMin = mipmapCount-1;
 		vector<uint8_t> block;
 		RGBAToBC(defaultColor, loader.getFormat(), block);
-		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
+		glCompressedTextureSubImage2D(id, *lodMin, 0, 0, 1, 1, 
 			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
+
+		// Create sampler
+		GLuint sampler;
+		glCreateSamplers(1, &sampler);
+		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
+		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameteri(sampler, GL_TEXTURE_MIN_LOD, *lodMin);
 
 		// Create jobs
 		const int groupLoadMipmap = 8; // Number of highest mipmaps to load together
@@ -594,7 +617,7 @@ GLuint RendererGL::loadDDSTexture(
 		vector<TexWait> texWait(jobCount);
 		for (int i=0;i<texWait.size();++i)
 		{
-			texWait[i] = {id, planetId, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
+			texWait[i] = {id, sampler, lodMin, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
 		}
 
 		// Push jobs to queue
@@ -607,15 +630,17 @@ GLuint RendererGL::loadDDSTexture(
 		}
 		// Wake up loading thread
 		texWaitCondition.notify_one();
-		return id;
+		return PlanetData::StreamTex(id, sampler, *lodMin, *lodMin);
 	}
-	return 0;
+	return PlanetData::StreamTex(0,0,0,0);
 }
 
-void RendererGL::unloadDDSTexture(GLuint id)
+void RendererGL::unloadDDSTexture(PlanetData::StreamTex tex)
 {
-	if (id)
-		glDeleteTextures(1, &id);
+	if (tex.id)
+		glDeleteTextures(1, &tex.id);
+	if (tex.sampler)
+		glDeleteSamplers(1, &tex.sampler);
 }
 
 void RendererGL::render(
@@ -712,7 +737,7 @@ void RendererGL::render(
 	for (uint32_t i : closePlanets)
 	{
 		planetUBOs[i] = getPlanetUBO(viewPos, viewMat, 
-			planetStates[i], planetParams[i]);
+			planetStates[i], planetParams[i], planetData[i]);
 	}
 	// Far away planets (flare)
 	vector<FlareDynamicUBO> flareUBOs(planetCount);
@@ -830,16 +855,32 @@ void RendererGL::renderHdr(
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
-		GLuint id;
-		glBindTextureUnit(2, data.diffuse?data.diffuse:diffuseTexDefault);
-		if (!star)
+		bool hasDiffuse = data.diffuse.id;
+		bool hasCloud = data.cloud.id;
+		bool hasNight = data.night.id;
+		GLuint samplers[] = {
+			hasDiffuse?data.diffuse.sampler:planetTexSampler,
+			hasCloud?data.cloud.sampler:planetTexSampler,
+			hasNight?data.night.sampler:planetTexSampler};
+		GLuint texs[] = {
+			hasDiffuse?data.diffuse.id:diffuseTexDefault,
+			hasCloud?data.cloud.id:cloudTexDefault,
+			hasNight?data.night.id:nightTexDefault};
+		glBindSamplers(2, 3, samplers);
+		glBindTextures(2, 3, texs);
+
+		// Min LOD smoothing
+		for (auto tex : {&data.diffuse, &data.cloud, &data.night})
 		{
-			glBindTextureUnit(3, data.cloud?data.cloud:cloudTexDefault);
-			glBindTextureUnit(4, data.night?data.night:nightTexDefault);
+			if (tex->smoothLodMin > tex->lodMin)
+				tex->smoothLodMin = std::max((float)tex->lodMin, 
+					tex->smoothLodMin - 0.1f*ceil(tex->smoothLodMin - tex->lodMin));
+			glSamplerParameterf(tex->sampler, GL_TEXTURE_MIN_LOD, tex->smoothLodMin);
 		}
 
 		if (hasAtmo)
 		{
+			glBindSampler(5, atmoSampler);
 			glBindTextureUnit(5, data.atmoLookupTable);
 		}
 
@@ -882,7 +923,9 @@ void RendererGL::renderAtmo(
 		if (hasRings)
 		{
 			glUseProgram(programRingFar.getId());
+			glBindSampler(2, ringSampler);
 			glBindTextureUnit(2, data.ringTex1);
+			glBindSampler(3, ringSampler);
 			glBindTextureUnit(3, data.ringTex2);
 			ringModel.draw();
 		}
@@ -890,6 +933,7 @@ void RendererGL::renderAtmo(
 		// Atmosphere
 		glUseProgram(programAtmo.getId());
 		
+		glBindSampler(2, atmoSampler);
 		glBindTextureUnit(2, data.atmoLookupTable);
 		data.planetModel.draw();
 
@@ -897,7 +941,9 @@ void RendererGL::renderAtmo(
 		if (hasRings)
 		{
 			glUseProgram(programRingNear.getId());
+			glBindSampler(2, ringSampler);
 			glBindTextureUnit(2, data.ringTex1);
+			glBindSampler(3, ringSampler);
 			glBindTextureUnit(3, data.ringTex2);
 			ringModel.draw();
 		}
@@ -970,6 +1016,7 @@ void RendererGL::renderBloom()
 			glUseProgram(programBloomAdd.getId());
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+			glBindSampler(0, rendertargetSampler);
 			glBindTextureUnit(0, bloomImages[i*3+0]);
 			glBindImageTexture(1, bloomImages[i*3+2], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
 			glBindImageTexture(2, bloomImages[i*3+3], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
@@ -1013,6 +1060,8 @@ void RendererGL::renderFlares(
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
+		GLuint samplers[] = {0,0,0};
+		glBindSamplers(2, 3, samplers);
 		glBindTextureUnit(2, flareIntensityTex);
 		glBindTextureUnit(3, flareLinesTex);
 		glBindTextureUnit(4, flareHaloTex);
@@ -1042,7 +1091,9 @@ void RendererGL::renderTonemap(const DynamicData data)
 			sizeof(SceneDynamicUBO));
 
 	// Bind image after bloom is done
+	glBindSampler(1, rendertargetSampler);
 	glBindTextureUnit(1, hdrMSRendertarget);
+	glBindSampler(2, rendertargetSampler);
 	glBindTextureUnit(2, bloomRendertargets[0]);
 
 	fullscreenTri.draw();
@@ -1055,10 +1106,10 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 	{
 		const PlanetParameters param = planetParams[i];
 		auto &data = planetData[i];
-		// Diffuse texture
-		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, i, vec4(1,1,1,1));
-		data.cloud   = loadDDSTexture(param.assetPaths.cloudFilename  , i, vec4(0,0,0,0));
-		data.night   = loadDDSTexture(param.assetPaths.nightFilename  , i, vec4(0,0,0,0));
+		// Textures & samplers
+		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, &data.diffuse.lodMin, vec4(1,1,1,1));
+		data.cloud = loadDDSTexture(param.assetPaths.cloudFilename, &data.cloud.lodMin  , vec4(0,0,0,0));
+		data.night = loadDDSTexture(param.assetPaths.nightFilename, &data.night.lodMin  , vec4(0,0,0,0));
 
 		// Generate atmospheric scattering lookup texture
 		if (param.atmoParam.hasAtmosphere)
@@ -1071,10 +1122,6 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 
 			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
 			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
-			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP);
 			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
 			glGenerateTextureMipmap(tex);
 		}
@@ -1122,17 +1169,11 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 
 			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
 			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
-			glTextureParameteri(tex1, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex1, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex1, GL_TEXTURE_WRAP_S, GL_CLAMP);
 			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
 			glGenerateTextureMipmap(tex1);
 
 			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
 			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
-			glTextureParameteri(tex2, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameteri(tex2, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(tex2, GL_TEXTURE_WRAP_S, GL_CLAMP);
 			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
 			glGenerateTextureMipmap(tex2);
 		}
@@ -1152,9 +1193,9 @@ void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
 		unloadDDSTexture(data.cloud);
 		unloadDDSTexture(data.night);
 
-		data.diffuse = -1;
-		data.cloud = -1;
-		data.night = -1;
+		data.diffuse = PlanetData::StreamTex();
+		data.cloud = PlanetData::StreamTex();
+		data.night = PlanetData::StreamTex();
 
 		if (param.atmoParam.hasAtmosphere)
 		{
@@ -1186,14 +1227,14 @@ void RendererGL::uploadLoadedTextures()
 			texLoaded.width, texLoaded.height, 
 			texLoaded.format,
 			texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
-		glTextureParameterf(texLoaded.id, GL_TEXTURE_MIN_LOD, 
-			(float)texLoaded.mipmap);
+		*texLoaded.lodMin = std::min(*texLoaded.lodMin, texLoaded.mipmap);
 	}
 }
 
 RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	const dvec3 viewPos, const mat4 viewMat,
-	const PlanetState state, const PlanetParameters params)
+	const PlanetState state, const PlanetParameters params,
+	const PlanetData data)
 {
 	const vec3 planetPos = state.position - viewPos;
 
@@ -1335,7 +1376,8 @@ void RendererGL::initThread() {
 			{
 				auto &tl = texLoaded[i];
 				tl.id = texWait.id;
-				tl.planetId = texWait.planetId;
+				tl.sampler = texWait.sampler;
+				tl.lodMin = texWait.lodMin;
 				tl.mipmap = texWait.mipmap+i;
 				tl.mipmapOffset = offset;
 				tl.format = DDSFormatToGL(texWait.loader.getFormat());
@@ -1348,6 +1390,9 @@ void RendererGL::initThread() {
 				tl.imageSize = size0;
 				offset += size0;
 			}
+
+			// Emulate slow loading times with this
+			//this_thread::sleep_for(chrono::milliseconds(1000));
 			
 			// Push loaded texture into queue
 			{
