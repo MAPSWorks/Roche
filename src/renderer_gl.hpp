@@ -94,8 +94,6 @@ private:
 		float brightness;
 	};
 
-	typedef int32_t TexHandle;
-
 	void createTextures();
 	void createFlare();
 	void createVertexArray();
@@ -114,12 +112,8 @@ private:
 		DynamicData data);
 	void renderTonemap(DynamicData data);
 
-	TexHandle createStreamTexture(GLuint tex);
-	bool getStreamTexture(TexHandle tex, GLuint &id);
-	void removeStreamTexture(TexHandle tex);
-
-	TexHandle loadDDSTexture(std::string filename, glm::vec4 defaultColor);
-	void unloadDDSTexture(TexHandle texId);
+	GLuint loadDDSTexture(std::string filename, int planetId, glm::vec4 defaultColor);
+	void unloadDDSTexture(GLuint tex);
 
 	void loadTextures(std::vector<uint32_t> planets);
 	void unloadTextures(std::vector<uint32_t> planets);
@@ -196,18 +190,18 @@ private:
 		DrawCommand planetModel;
 		DrawCommand ringModel;
 		bool texLoaded;
-		TexHandle diffuse;
-		TexHandle cloud;
-		TexHandle night;
+		GLuint diffuse;
+		GLuint cloud;
+		GLuint night;
 		GLuint atmoLookupTable;
 		GLuint ringTex1;
 		GLuint ringTex2;
 		PlanetData()
 		{
 			texLoaded = false;
-			diffuse = -1;
-			cloud = -1;
-			night = -1;
+			diffuse = 0;
+			cloud = 0;
+			night = 0;
 			atmoLookupTable = 0;
 			ringTex1 = 0;
 			ringTex2 = 0;
@@ -215,10 +209,6 @@ private:
 	};
 
 	std::vector<PlanetData> planetData;
-
-	// Contains all streamed textures
-	TexHandle nextHandle;
-	std::map<TexHandle, GLuint> streamTextures;
 
 	// Textures
 	GLuint diffuseTexDefault;
@@ -239,7 +229,8 @@ private:
 	// Texture load threading
 	struct TexWait // Texture waiting to be loaded
 	{
-		TexHandle tex;
+		GLuint id;
+		int planetId;
 		int mipmap;
 		int mipmapCount;
 		DDSLoader loader;
@@ -247,7 +238,8 @@ private:
 
 	struct TexLoaded // Texture that have finished loading
 	{
-		TexHandle tex;
+		GLuint id;
+		int planetId;
 		GLenum format;
 		int mipmap;
 		int mipmapOffset;

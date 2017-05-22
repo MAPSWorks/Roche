@@ -523,36 +523,6 @@ void RendererGL::destroy()
 	texWaitCondition.notify_one();
 }
 
-RendererGL::TexHandle RendererGL::createStreamTexture(const GLuint id)
-{
-	TexHandle handle = nextHandle;
-	streamTextures[handle] = id;
-	nextHandle++;
-	if (nextHandle == -1) nextHandle = 0;
-	return handle;
-}
-
-bool RendererGL::getStreamTexture(const TexHandle tex, GLuint &id)
-{
-	auto it = streamTextures.find(tex);
-	if (it != streamTextures.end())
-	{
-		id = it->second;
-		return true;
-	}
-	return false;
-}
-
-void RendererGL::removeStreamTexture(const TexHandle tex)
-{
-	auto it = streamTextures.find(tex);
-	if (it != streamTextures.end())
-	{
-		glDeleteTextures(1, &(it->second));
-		streamTextures.erase(it);
-	}
-}
-
 /// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
 void RGBAToBC(const vec4 color, DDSLoader::Format format, vector<uint8_t> &block)
 {
@@ -591,8 +561,9 @@ void RGBAToBC(const vec4 color, DDSLoader::Format format, vector<uint8_t> &block
 	for (int i=4;i<8;++i) block[i] = codes;
 }
 
-RendererGL::TexHandle RendererGL::loadDDSTexture(
-	const string filename, 
+GLuint RendererGL::loadDDSTexture(
+	const string filename,
+	const int planetId,
 	const vec4 defaultColor)
 {
 	DDSLoader loader;
@@ -616,8 +587,6 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		RGBAToBC(defaultColor, loader.getFormat(), block);
 		glCompressedTextureSubImage2D(id, mipmapCount-1, 0, 0, 1, 1, 
 			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
-		// Create texture handle
-		TexHandle handle = createStreamTexture(id);
 
 		// Create jobs
 		const int groupLoadMipmap = 8; // Number of highest mipmaps to load together
@@ -625,7 +594,7 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		vector<TexWait> texWait(jobCount);
 		for (int i=0;i<texWait.size();++i)
 		{
-			texWait[i] = {handle, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
+			texWait[i] = {id, planetId, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
 		}
 
 		// Push jobs to queue
@@ -638,15 +607,14 @@ RendererGL::TexHandle RendererGL::loadDDSTexture(
 		}
 		// Wake up loading thread
 		texWaitCondition.notify_one();
-		return handle;
+		return id;
 	}
-	return -1;
+	return 0;
 }
 
-void RendererGL::unloadDDSTexture(TexHandle tex)
+void RendererGL::unloadDDSTexture(GLuint id)
 {
-	GLuint id;
-	if (getStreamTexture(tex, id))
+	if (id)
 		glDeleteTextures(1, &id);
 }
 
@@ -863,11 +831,11 @@ void RendererGL::renderHdr(
 
 		// Bind textures
 		GLuint id;
-		glBindTextureUnit(2, getStreamTexture(data.diffuse, id)?id:diffuseTexDefault);
+		glBindTextureUnit(2, data.diffuse?data.diffuse:diffuseTexDefault);
 		if (!star)
 		{
-			glBindTextureUnit(3, getStreamTexture(data.cloud  , id)?id:cloudTexDefault);
-			glBindTextureUnit(4, getStreamTexture(data.night  , id)?id:nightTexDefault);
+			glBindTextureUnit(3, data.cloud?data.cloud:cloudTexDefault);
+			glBindTextureUnit(4, data.night?data.night:nightTexDefault);
 		}
 
 		if (hasAtmo)
@@ -1088,9 +1056,9 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 		const PlanetParameters param = planetParams[i];
 		auto &data = planetData[i];
 		// Diffuse texture
-		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, vec4(1,1,1,1));
-		data.cloud   = loadDDSTexture(param.assetPaths.cloudFilename  , vec4(0,0,0,0));
-		data.night   = loadDDSTexture(param.assetPaths.nightFilename  , vec4(0,0,0,0));
+		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, i, vec4(1,1,1,1));
+		data.cloud   = loadDDSTexture(param.assetPaths.cloudFilename  , i, vec4(0,0,0,0));
+		data.night   = loadDDSTexture(param.assetPaths.nightFilename  , i, vec4(0,0,0,0));
 
 		// Generate atmospheric scattering lookup texture
 		if (param.atmoParam.hasAtmosphere)
@@ -1211,18 +1179,15 @@ void RendererGL::uploadLoadedTextures()
 	{
 		TexLoaded texLoaded = texLoadedQueue.front();
 		texLoadedQueue.pop();
-		GLuint id;
-		if (getStreamTexture(texLoaded.tex, id))
-		{
-			glCompressedTextureSubImage2D(
-				id,
-				texLoaded.mipmap, 
-				0, 0, 
-				texLoaded.width, texLoaded.height, 
-				texLoaded.format,
-				texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
-			glTextureParameterf(id, GL_TEXTURE_MIN_LOD, (float)texLoaded.mipmap);
-		}
+		glCompressedTextureSubImage2D(
+			texLoaded.id,
+			texLoaded.mipmap,
+			0, 0, 
+			texLoaded.width, texLoaded.height, 
+			texLoaded.format,
+			texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
+		glTextureParameterf(texLoaded.id, GL_TEXTURE_MIN_LOD, 
+			(float)texLoaded.mipmap);
 	}
 }
 
@@ -1369,7 +1334,8 @@ void RendererGL::initThread() {
 			for (unsigned int i=0;i<texLoaded.size();++i)
 			{
 				auto &tl = texLoaded[i];
-				tl.tex = texWait.tex;
+				tl.id = texWait.id;
+				tl.planetId = texWait.planetId;
 				tl.mipmap = texWait.mipmap+i;
 				tl.mipmapOffset = offset;
 				tl.format = DDSFormatToGL(texWait.loader.getFormat());
