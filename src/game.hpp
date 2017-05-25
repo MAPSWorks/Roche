@@ -12,8 +12,6 @@
 #include <atomic>
 #include <thread>
 
-#include <nanogui/screen.h>
-
 #define PI        3.14159265358979323846264338327950288 
 
 class Game
@@ -26,17 +24,10 @@ public:
 	bool isRunning();
 
 private:
-	void initGUI();
 	bool isPressedOnce(int key);
 
 	void loadPlanetFiles();
 	void loadSettingsFile();
-
-	void createSettingsWindow();
-	void createProfilerWindow();
-
-	// GUI
-	nanogui::Screen *guiScreen;
 
 	std::unique_ptr<Renderer> renderer;
 	float gamma;
@@ -55,8 +46,7 @@ private:
 	std::vector<double> timeWarpValues;
 
 	// THREADING RELATED STUFF
-	std::thread textureLoadThread; // Texture loading Thread
-	std::thread screenshotThread;
+	std::thread screenshotThread; // Writes screenshots to files
 	std::atomic<bool> save; // Indicates if the screenshot thread has to save the framebuffer to a file now
 	std::atomic<bool> quit; // boolean for killing threads
 
@@ -65,8 +55,7 @@ private:
 	// INTERACTION RELATED STUFF
 	double preMousePosX, preMousePosY; // previous cursor position
 	bool dragging; // Indicates if we are currently trying to drag the view
-	bool canDrag; // Indicate if we can drag the view (not over gui,...)
-	glm::vec3 viewSpeed;
+	glm::vec3 viewSpeed; // Polar coordinate view speed (yaw, pitch, zoom)
 	float maxViewSpeed, viewSmoothness;
 
 	bool isSwitching; // Indicates if the view is switching from a planet to another

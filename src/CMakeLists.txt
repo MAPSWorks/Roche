@@ -2,8 +2,6 @@ find_package(GLM REQUIRED)
 find_package(GLFW REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(NANOGUI REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 set(SOURCE
 	game.cpp
@@ -37,12 +35,9 @@ target_include_directories(roche PRIVATE
 	${GLM_INCLUDE_DIRS}
 	${GLFW_INCLUDE_DIR}
 	${GLEW_INCLUDE_DIR}
-	${OPENGL_INCLUDE_DIR}
-	${NANOGUI_INCLUDE_DIR}
-	${EIGEN3_INCLUDE_DIRS})
+	${OPENGL_INCLUDE_DIR})
 
 target_link_libraries(roche 
 	${GLFW_LIBRARIES} 
 	${GLEW_LIBRARY} 
-	${OPENGL_gl_LIBRARY}
-	${NANOGUI_LIBRARY})
+	${OPENGL_gl_LIBRARY})
