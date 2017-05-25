@@ -6,12 +6,11 @@
 #include <algorithm>
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 using namespace glm;
 using namespace std;
-
-#define PI 3.14159265358979323846264338327950288
 
 void RendererGL::windowHints()
 {
@@ -52,12 +51,12 @@ void generateSphere(
 	size_t offset = 0;
 	for (int i=0;i<=rings;++i)
 	{
-		const float phi = PI*((float)i/(float)rings-0.5);
+		const float phi = glm::pi<float>()*((float)i/(float)rings-0.5);
 		const float cp = cos(phi);
 		const float sp = sin(phi);
 		for (int j=0;j<=meridians;++j)
 		{
-			const float theta = 2*PI*((float)j/(float)meridians);
+			const float theta = 2*glm::pi<float>()*((float)j/(float)meridians);
 			const float ct = cos(theta);
 			const float st = sin(theta);
 			vec3 pos = vec3(cp*ct,cp*st,sp);
@@ -119,7 +118,7 @@ void generateFlareModel(vector<Vertex> &vertices, vector<Index> &indices)
 	for (int i=0;i<=detail;++i)
 	{
 		const float f = i/(float)detail;
-		const vec2 pos = vec2(cos(f*2*PI),sin(f*2*PI));
+		const vec2 pos = vec2(cos(f*2*glm::pi<float>()),sin(f*2*glm::pi<float>()));
 		vertices[i*2+0] = {vec4(0,0,0,1), vec4(f, 0, 0.5, 0.5)};
 		vertices[i*2+1] = {vec4(pos,0,1), vec4(f, 1, pos*vec2(0.5)+vec2(0.5))};
 	}
@@ -150,7 +149,7 @@ void generateRingModel(
 		int offset = 0;
 		for (int i=0;i<=meridians;++i)
 		{
-			float angle = (PI*i)/(float)meridians;
+			float angle = (glm::pi<float>()*i)/(float)meridians;
 			vec2 pos = vec2(cos(angle),sin(angle));
 			vertices[offset+0] = {vec4(pos*near, 0.0,1.0), vec4(pos*1.f,0.0,0.0)};
 			vertices[offset+1] = {vec4(pos*far , 0.0,1.0), vec4(pos*2.f,0.0,0.0)};
@@ -1309,12 +1308,14 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 		translate(mat4(), vec3(screen, 0.999))*
 		scale(mat4(), 
 			vec3(windowHeight/(float)windowWidth,1.0,0.0)*
-			FLARE_SIZE_DEGREES*(float)PI/(fovy*180.0f));
+			FLARE_SIZE_DEGREES*(float)glm::pi<float>()/(fovy*180.0f));
 
 	const float phaseAngle = acos(dot(
 		(vec3)normalize(state.position), 
 		normalize(planetPos)));
-	const float phase = (1-phaseAngle/PI)*cos(phaseAngle)+(1/PI)*sin(phaseAngle);
+	const float phase = 
+		(1-phaseAngle/glm::pi<float>())*cos(phaseAngle)+
+		(1/glm::pi<float>())*sin(phaseAngle);
 	const bool isStar = params.bodyParam.isStar;
 	const float radius = params.bodyParam.radius;
 	const double dist = distance(viewPos, state.position)/radius;

@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <string>
+#include <algorithm>
 
 typedef std::chrono::high_resolution_clock waitClock;
 

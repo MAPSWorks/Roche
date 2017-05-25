@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <cstring>
+#include <algorithm>
 
 typedef uint32_t DWORD;
 

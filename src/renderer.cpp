@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/packing.hpp>
 #include <random>
+#include <algorithm>
 
 #define PI 3.14159265358979323846264338327950288
 

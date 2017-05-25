@@ -1,20 +1,17 @@
 #include "planet.hpp"
 
-#include <cstdlib>
-#include <random>
-#include <iostream>
 #include <fstream>
 #include <string>
+#include <algorithm>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "thirdparty/shaun/sweeper.hpp"
 #include <glm/ext.hpp>
-
-#define PI 3.14159265358979323846264338327950288 
 
 void RingParameters::loadFile(
 	const std::string filename,
@@ -61,12 +58,12 @@ glm::dvec3 OrbitalParameters::computePosition(const double epoch, const double p
 	else
 	{
 		// Mean Anomaly compute
-		const double orbital_period = 2*PI*sqrt((sma*sma*sma)/parentGM);
-		const double mean_motion = 2*PI/orbital_period;
-		const double meanAnomaly = fmod(epoch*mean_motion + m0, 2*PI);
+		const double orbital_period = 2*glm::pi<float>()*sqrt((sma*sma*sma)/parentGM);
+		const double mean_motion = 2*glm::pi<float>()/orbital_period;
+		const double meanAnomaly = fmod(epoch*mean_motion + m0, 2*glm::pi<float>());
 		// Newton to find eccentric anomaly (En)
 		const int it = 20; // Number of iterations
-		double En = (ecc<0.8)?meanAnomaly:PI; // Starting value of En
+		double En = (ecc<0.8)?meanAnomaly:glm::pi<float>(); // Starting value of En
 		for (int i=0;i<it;++i)
 			En -= (En - ecc*sin(En)-meanAnomaly)/(1-ecc*cos(En));
 		// Eccentric anomaly to True anomaly
@@ -96,7 +93,7 @@ float scatOptic(const glm::vec2 a, const glm::vec2 b,
 	const float radius, const float scaleHeight, const float maxHeight, const int samples)
 {
 	const glm::vec2 step = (b-a)/(float)samples;
-	glm::vec2 v = a+step*0.5;
+	glm::vec2 v = a+step*0.5f;
 
 	float sum = 0.f;
 	for (int i=0;i<samples;++i)
