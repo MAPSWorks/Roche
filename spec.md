@@ -80,7 +80,4 @@ Each downscaled highpass rendertarget is blurred with a fixed kernel size and th
 ### Flares
 Far planets are rendered as flares, with corona and halo effects to simulate the human eye.
 ### Tonemapping, resolve and presentation
-Tonemap each sample, average them and present.
-
-
-
+Tonemap each sample, average them, add the bloom rendertarget on top and present.
