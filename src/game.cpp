@@ -23,9 +23,12 @@
 
 #include "thirdparty/shaun/sweeper.hpp"
 #include "thirdparty/shaun/parser.hpp"
-#include "thirdparty/lodepng.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "thirdparty/stb_image_write.h"
 
 #include <glm/ext.hpp>
+
+using namespace std;
 
 const float CAMERA_FOVY = 40.0;
 
@@ -67,17 +70,18 @@ Game::~Game()
 }
 
 void ssThread(
-	const std::atomic<bool> &quit, std::vector<uint8_t> &buffer,
-	std::atomic<bool> &save, const int width, const int height)
+	const atomic<bool> &quit, vector<uint8_t> &buffer,
+	atomic<bool> &save, const int width, const int height)
 {
 	while (!quit)
 	{
 		if (save)
 		{
+			// Filename building
 			time_t t = time(0);
 			struct tm *now = localtime(&t);
-			std::stringstream filename;
-			filename << 
+			stringstream filenameBuilder;
+			filenameBuilder << 
 				"./screenshots/screenshot_" << 
 				(now->tm_year+1900) << "-" << 
 				(now->tm_mon+1) << "-" << 
@@ -85,32 +89,42 @@ void ssThread(
 				(now->tm_hour) << "-" << 
 				(now->tm_min) << "-" << 
 				(now->tm_sec) << ".png";
+			std::string filename = filenameBuilder.str();
 
-			unsigned int error = lodepng::encode(filename.str(), buffer.data(), width, height);
-			if (error)
+			// Flip upside down
+			vector<uint8_t> upsideDownBuf(buffer.size());
+			for (int i=0;i<height;++i)
 			{
-				std::cout << "Can't save screenshot: " << lodepng_error_text(error) << std::endl;
+				memcpy(upsideDownBuf.data()+i*width*4, buffer.data()+(height-i-1)*width*4, width*4);
 			}
+
+			// Save screenshot
+			if (!stbi_write_png(filename.c_str(), width, height, 4,
+				upsideDownBuf.data(), width*4))
+			{
+				cout << "WARNING : Can't save screenshot " << filename << endl;
+			}
+
 			save = false;
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		this_thread::sleep_for(chrono::milliseconds(1));
 	}
 }
 
-std::string readFile(const std::string filename)
+string readFile(const string filename)
 {
-	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+	ifstream in(filename.c_str(), ios::in | ios::binary);
 	if (in)
 	{
-		std::string contents;
-		in.seekg(0, std::ios::end);
+		string contents;
+		in.seekg(0, ios::end);
 		contents.resize(in.tellg());
-		in.seekg(0, std::ios::beg);
+		in.seekg(0, ios::beg);
 		in.read(&contents[0], contents.size());
 		in.close();
 		return(contents);
 	}
-	throw std::runtime_error("Can't open" + filename);
+	throw runtime_error("Can't open" + filename);
 	return "";
 }
 
@@ -145,7 +159,7 @@ void Game::loadSettingsFile()
 	} 
 	catch (parse_error e)
 	{
-		std::cout << e << std::endl;
+		cout << e << endl;
 	}
 }
 
@@ -186,12 +200,12 @@ void Game::init()
 	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
-		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
+		throw runtime_error("Can't initialize GLEW : " + string((const char*)glewGetErrorString(err)));
 	}
 	// Screenshot
 	screenshotBuffer.resize(width*height*4);
-	screenshotThread = std::thread(
-		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
+	screenshotThread = thread(
+		ssThread, ref(quit), ref(screenshotBuffer), ref(save), width, height);
 
 	renderer->init(planetParams, msaaSamples, ssaa, width, height);
 }
@@ -259,7 +273,7 @@ void Game::loadPlanetFiles()
 		{
 			PlanetParameters planet;
 			sweeper pl(planetsSweeper[i]);
-			planet.name = std::string(pl("name").value<string>());
+			planet.name = std::string(pl("name").value<shaun::string>());
 			planet.parentName = get<std::string>(pl("parent"));
 
 			auto & orbitParam = planet.orbitParam;
@@ -352,7 +366,7 @@ void Game::loadPlanetFiles()
 	} 
 	catch (parse_error e)
 	{
-		std::cout << e << std::endl;
+		cout << e << endl;
 	}
 }
 
@@ -373,7 +387,7 @@ void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
 
-	std::vector<glm::dvec3> relativePositions(planetCount);
+	vector<glm::dvec3> relativePositions(planetCount);
 	// Planet state update
 	for (uint32_t i=0;i<planetCount;++i)
 	{
@@ -391,7 +405,7 @@ void Game::update(const double dt)
 		// Cloud rotation
 		const float period = planetParams[i].bodyParam.cloudDispPeriod;
 		planetStates[i].cloudDisp = (period)?
-			std::fmod(-epoch/period, 1.f):
+			fmod(-epoch/period, 1.f):
 			0.f;
 	}
 
@@ -549,14 +563,14 @@ void Game::update(const double dt)
 		}
 		for (auto p : a)
 		{
-			std::cout.width(largestName);
-			std::cout << std::left << p.first;
+			cout.width(largestName);
+			cout << left << p.first;
 			uint64_t nano = (double)p.second;
 			double percent = 100*nano/(double)full;
 			double micro = nano/1E6;
-			std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl; 
+			cout << "  " << micro << "ms (" << percent << "%)" << endl; 
 		}
-		std::cout << "-------------------------" << std::endl;
+		cout << "-------------------------" << endl;
 	}
 
 	glfwSwapBuffers(win);

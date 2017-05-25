@@ -14,7 +14,6 @@ set(SOURCE
 	shader.cpp
 	fence.cpp
 	gl_util.cpp
-	thirdparty/lodepng.cpp
 	thirdparty/shaun/shaun.cpp
 	thirdparty/shaun/sweeper.cpp)
 
