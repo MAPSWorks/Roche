@@ -11,7 +11,6 @@ public:
 	virtual void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
-		bool ssaa,
 		int windowWidth,
 		int windowHeight) = 0;
 	virtual void render(

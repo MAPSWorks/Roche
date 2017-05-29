@@ -53,7 +53,6 @@ Game::Game()
 	quit = false;
 
 	msaaSamples = 1;
-	ssaa = 0.0;
 	exposure = 0;
 
 	renderer.reset(new RendererGL());
@@ -151,8 +150,7 @@ void Game::loadSettingsFile()
 		sweeper graphics(swp("graphics"));
 		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<number>());
 		msaaSamples = graphics("msaaSamples").value<number>();
-		ssaa = graphics("ssaa").value<boolean>();
-		
+
 		sweeper controls(swp("controls"));
 		sensitivity = controls("sensitivity").value<number>();
 	} 
@@ -207,7 +205,7 @@ void Game::init()
 	screenshotThread = std::thread(
 		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
 
-	renderer->init(planetParams, msaaSamples, ssaa, width, height);
+	renderer->init(planetParams, msaaSamples, width, height);
 }
 
 template<class T>

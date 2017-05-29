@@ -37,7 +37,6 @@ public:
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
-		bool ssaa,
 		int windowWidth,
 		int windowHeight) override;
 	void render(

@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Remove SSAA option
 - [ ] Change gl_util to avoid memory copying (write/read directly)
 - [ ] Correct flares
 - [ ] PBOs
@@ -8,4 +7,5 @@
 
 ## Done
 - [x] Tell GL to do gamma correction itself
-- [ ] Override wherever possible
+- [x] Override wherever possible
+- [x] Remove SSAA option

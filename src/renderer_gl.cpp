@@ -195,7 +195,6 @@ uint32_t align(const uint32_t offset, const uint32_t minAlign)
 void RendererGL::init(
 	const vector<PlanetParameters> planetParams,
 	const int msaa,
-	const bool ssaa,
 	const int windowWidth,
 	const int windowHeight)
 {
@@ -299,12 +298,6 @@ void RendererGL::init(
 	createShaders();
 	createRendertargets();
 	createTextures();
-
-	if (ssaa)
-	{
-		glEnable(GL_SAMPLE_SHADING);
-		glMinSampleShading(1.0);
-	}
 
 	initThread();
 }
