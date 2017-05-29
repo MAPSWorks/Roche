@@ -33,13 +33,13 @@ private:
 class RendererGL : public Renderer
 {
 public:
-	void windowHints();
+	void windowHints() override;
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
 		bool ssaa,
 		int windowWidth,
-		int windowHeight);
+		int windowHeight) override;
 	void render(
 		glm::dvec3 viewPos, 
 		float fovy,
@@ -47,10 +47,10 @@ public:
 		glm::vec3 viewUp,
 		float exposure,
 		float ambientColor,
-		std::vector<PlanetState> planetStates);
-	void destroy();
+		std::vector<PlanetState> planetStates) override;
+	void destroy() override;
 
-	std::vector<std::pair<std::string,uint64_t>> getProfilerTimes();
+	std::vector<std::pair<std::string,uint64_t>> getProfilerTimes() override;
 private:
 	struct DynamicData
 	{
