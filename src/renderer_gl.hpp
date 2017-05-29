@@ -54,10 +54,10 @@ private:
 	struct DynamicData
 	{
 		Fence fence;
-		BufferSection sceneUBO;
+		BufferRange sceneUBO;
 
-		std::vector<BufferSection> planetUBOs;
-		std::vector<BufferSection> flareUBOs;
+		std::vector<BufferRange> planetUBOs;
+		std::vector<BufferRange> flareUBOs;
 	};
 
 	struct SceneDynamicUBO

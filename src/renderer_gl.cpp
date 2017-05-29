@@ -185,11 +185,39 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 	return 0;
 }
 
-uint32_t align(const uint32_t offset, const uint32_t minAlign)
+template <class V, class I>
+vector<DrawCommand> getCommands(
+	GLuint vao, GLenum mode, GLenum indexType,
+	Buffer &vertexBuffer,
+	Buffer &indexBuffer,
+	const vector<vector<V>> vertices, 
+	const vector<vector<I>> indices)
 {
-	const uint32_t remainder = offset%minAlign;
-	if (remainder) return offset + (minAlign-remainder);
-	return offset;
+	vector<DrawCommand> commands(vertices.size());
+	vector<pair<BufferRange, BufferRange>> ranges(vertices.size());
+
+	for (int i=0;i<vertices.size();++i)
+	{
+		ranges[i] = make_pair(
+			vertexBuffer.assignVertices(vertices[i].size(), sizeof(V)),
+			indexBuffer.assignIndices(indices[i].size(), sizeof(I)));
+		commands[i] = DrawCommand(
+			vao, mode, indexType,
+			sizeof(V), sizeof(I),
+			ranges[i].first,
+			ranges[i].second);
+	}
+
+	vertexBuffer.validate();
+	indexBuffer.validate();
+
+	for (int i=0;i<vertices.size();++i)
+	{
+		vertexBuffer.write(ranges[i].first, vertices[i].data());
+		indexBuffer.write(ranges[i].second, indices[i].data());
+	}
+
+	return commands;
 }
 
 void RendererGL::init(
@@ -214,63 +242,62 @@ void RendererGL::init(
 	createVertexArray();
 
 	// Static vertex & index data
-	vector<Vertex> vertices;
-	vector<Index> indices;
+	vector<vector<Vertex>> vertices(3);
+	vector<vector<Index>> indices(3);
 
 	// Fullscreen tri
-	generateFullscreenTri(vertices, indices);
-	fullscreenTri = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
-		sizeof(Vertex), sizeof(Index),
-		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
-		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
+	generateFullscreenTri(vertices[0], indices[0]);
 
 	// Flare
-	generateFlareModel(vertices, indices);
-	flareModel = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
-		sizeof(Vertex), sizeof(Index),
-		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
-		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
+	generateFlareModel(vertices[1], indices[1]);
 
 	// Sphere
 	const int planetMeridians = 128;
 	const int planetRings = 128;
 	generateSphere(planetMeridians, planetRings, false, 
-		vertices, indices);
-	sphere = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
-		sizeof(Vertex), sizeof(Index),
-		vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
-		indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
+		vertices[2], indices[2]);
 
 	// Load custom models
+	vector<int> planetModelId(planetCount, 2);
+	vector<int> ringModelId(planetCount, -1);
 	for (uint32_t i=0;i<planetCount;++i)
 	{
-		auto &data = planetData[i];
 		const PlanetParameters param = planetParams[i];
 		if (param.assetPaths.modelFilename != "")
 		{
 			throw runtime_error("Custom model not supported");
 		}
-		else
-		{
-			data.planetModel = sphere;
-		}
 		// Rings
 		if (param.ringParam.hasRings)
 		{
+			ringModelId[i] = vertices.size();
+			vertices.emplace_back();
+			indices.emplace_back();
 			float near = param.ringParam.innerDistance;
 			float far = param.ringParam.outerDistance;
 			const int ringMeridians = 128;
 			generateRingModel(ringMeridians, near, far, 
-				vertices, indices);
-			data.ringModel = DrawCommand(vertexArray, GL_TRIANGLES, indexType(),
-				sizeof(Vertex), sizeof(Index),
-				vertexBuffer.assignVertices(vertices.size(), sizeof(Vertex), vertices.data()),
-				indexBuffer.assignIndices(indices.size(), sizeof(Index), indices.data()));
+				vertices.back(), indices.back());
 		}
 	}
 
-	vertexBuffer.write();
-	indexBuffer.write();
+	vector<DrawCommand> commands = getCommands(
+		vertexArray, GL_TRIANGLES, indexType(),
+		vertexBuffer,
+		indexBuffer,
+		vertices,
+		indices);
+
+	fullscreenTri = commands[0];
+	flareModel    = commands[1];
+	sphere        = commands[2];
+
+	for (uint32_t i=0;i<planetCount;++i)
+	{
+		auto &data = planetData[i];
+		data.planetModel = commands[planetModelId[i]];
+		data.ringModel   = commands[ringModelId[i]];
+	}
 
 	// Dynamic UBO buffer assigning
 	uboBuffer = Buffer(true);
@@ -293,7 +320,7 @@ void RendererGL::init(
 		}
 	}
 
-	uboBuffer.write();
+	uboBuffer.validate();
 
 	createShaders();
 	createRendertargets();
@@ -745,17 +772,15 @@ void RendererGL::render(
 	currentData.fence.wait();
 	profiler.end();
 
-	uboBuffer.update(currentData.sceneUBO, &sceneUBO);
+	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
 	for (uint32_t i=0;i<planetUBOs.size();++i)
 	{
-		uboBuffer.update(currentData.planetUBOs[i], &planetUBOs[i]);
+		uboBuffer.write(currentData.planetUBOs[i], &planetUBOs[i]);
 	}
 	for (uint32_t i=0;i<flareUBOs.size();++i)
 	{
-		uboBuffer.update(currentData.flareUBOs[i], &flareUBOs[i]);
+		uboBuffer.write(currentData.flareUBOs[i], &flareUBOs[i]);
 	}
-
-	uboBuffer.write();
 
 	// Planet sorting from front to back
 	sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)

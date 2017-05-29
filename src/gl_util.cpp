@@ -14,8 +14,9 @@ Buffer::Buffer()
 {
 	_id = 0;
 	_size = 0;
-	_built = false;
+	_validated = false;
 	_lastOffset = 0;
+	_mapPtr = nullptr;
 }
 
 Buffer::Buffer(bool dynamic, bool write, bool read) : Buffer()
@@ -45,56 +46,40 @@ uint32_t Buffer::align(const uint32_t offset, const uint32_t align)
 	else return offset;
 }
 
-void Buffer::update(const BufferSection section, const void *data)
-{
-	if (data)
-	{
-		size_t size = section.getSize();
-		uint8_t *copy = (uint8_t*)malloc(size);
-		memcpy(copy, data, size);
-		_dataToUpload.insert(make_pair(section.getOffset(), 
-			make_pair(section.getSize(), shared_ptr<uint8_t>(copy))));
-	}
-}
-
-BufferSection Buffer::assign(
+BufferRange Buffer::assign(
 	const uint32_t size, 
-	const uint32_t stride,
-	const void *data)
+	const uint32_t stride)
 {
-	if (_built) 
+	if (_validated) 
 		throw runtime_error("Can't assign memory after structure is set");
 
 	_lastOffset = align(_lastOffset, stride);
-	const BufferSection section = {_lastOffset, size};
+	const BufferRange range = {_lastOffset, size};
 	_lastOffset += size;
 
-	update(section, data);
-	return section;
+	return range;
 }
 
-BufferSection Buffer::assignVertices(uint32_t count, uint32_t stride, 
-	const void *data)
+BufferRange Buffer::assignVertices(uint32_t count, uint32_t stride)
 {
-	return assign(count*stride, stride, data);
+	return assign(count*stride, stride);
 }
 
-BufferSection Buffer::assignIndices(uint32_t count, uint32_t stride, 
-	const void *data)
+BufferRange Buffer::assignIndices(uint32_t count, uint32_t stride)
 {
-	return assign(count*stride, stride, data);
+	return assign(count*stride, stride);
 }
 
-BufferSection Buffer::assignUBO(const uint32_t size, const void *data)
+BufferRange Buffer::assignUBO(const uint32_t size)
 {
 	getLimits();
-	return assign(size, _alignUBO, data);
+	return assign(size, _alignUBO);
 }
 
-BufferSection Buffer::assignSSBO(const uint32_t size, const void *data)
+BufferRange Buffer::assignSSBO(const uint32_t size)
 {
 	getLimits();
-	return assign(size, _alignSSBO, data);
+	return assign(size, _alignSSBO);
 }
 
 void Buffer::storageStatic()
@@ -112,72 +97,89 @@ void Buffer::storageDynamic()
 	(_write?GL_MAP_WRITE_BIT:0) | 
 	(_read ?GL_MAP_READ_BIT :0) ;
 
-	const GLbitfield mapFlags = storageFlags
-#ifndef USE_COHERENT_MAPPING
-	| GL_MAP_FLUSH_EXPLICIT_BIT
-#endif
-	;
-
 	glNamedBufferStorage(_id, _size, nullptr, storageFlags);
-	_mapPtr = glMapNamedBufferRange(_id, 0, _size, mapFlags);
+	if (_write || _read)
+	{
+		const GLbitfield mapFlags = storageFlags
+#ifndef USE_COHERENT_MAPPING
+		| GL_MAP_FLUSH_EXPLICIT_BIT
+#endif
+		;
+		_mapPtr = glMapNamedBufferRange(_id, 0, _size, mapFlags);
 
-	if (!_mapPtr) throw runtime_error("Can't map dynamic buffer");
+		if (!_mapPtr) throw runtime_error("Can't map dynamic buffer");
+	}
 }
 
-void Buffer::lockAssigning()
+void Buffer::validate()
 {
-	if (!_built)
+	if (!_validated)
 	{
 		_size = _lastOffset;
 		// Create storage
 		if (_dynamic) storageDynamic();
 		else storageStatic();
 	}
-	_built = true;
+	_validated = true;
 }
 
-void Buffer::write()
+void Buffer::write(const BufferRange range, const void *data)
 {
-	if (!_write) throw runtime_error("Can't write to a non write buffer");
+	if (!_write)
+		throw runtime_error("Can't write to a buffer that does not support writes");
 
-	lockAssigning();
+	if (!_validated)
+		throw runtime_error("Can't write to a non-validated buffer");
 
-	for (auto m : _dataToUpload)
+	// Dynamic data : memcpy to persistent mapped buffer
+	if (_dynamic)
 	{
-		// Dynamic data : map memcpy
-		if (_dynamic)
-		{
-			memcpy((uint8_t*)_mapPtr+m.first, m.second.second.get(), m.second.first);
+		memcpy((uint8_t*)_mapPtr+range.getOffset(), data, range.getSize());
 #ifndef USE_COHERENT_MAPPING
-			glFlushMappedNamedBufferRange(_id, m.first, m.second.first);
+		glFlushMappedNamedBufferRange(_id, range.getOffset(), range.getSize());
 #endif
-		}
-		// Static data : BufferSubData
-		else
-			glNamedBufferSubData(_id, 
-				m.first, m.second.first, m.second.second.get());
 	}
-
-	_dataToUpload.clear();
+	// Static data : BufferSubData
+	else
+	{
+		glNamedBufferSubData(_id, range.getOffset(), range.getSize(), data);
+	}
 }
 
-void Buffer::read(const BufferSection section, void *data)
+void Buffer::read(const BufferRange range, void *data)
 {
-	if (!_read) throw runtime_error("Can't read from a non read buffer");
+	if (!_read)
+		throw runtime_error("Can't read from a buffer that does not support reads");
+
+	if (!_validated) 
+		throw runtime_error("Can't read from a non-validated buffer");
 
 	if (_dynamic)
 	{
-		memcpy(data, (uint8_t*)_mapPtr+section.getOffset(), section.getSize());
+		memcpy(data, (uint8_t*)_mapPtr+range.getOffset(), range.getSize());
 	}
 	else
 	{
-		glGetNamedBufferSubData(_id, section.getOffset(), section.getSize(), data);
+		glGetNamedBufferSubData(_id, range.getOffset(), range.getSize(), data);
 	}
 }
 
 GLuint Buffer::getId() const
 {
 	return _id;
+}
+
+void *Buffer::getPtr() const
+{
+	if (!_dynamic) 
+		throw runtime_error("Can't get pointer on static buffer");
+	if (!_validated) 
+		throw runtime_error("Can't get pointer before validation");
+	if (!_read && !_write) 
+		throw runtime_error("Can't get pointer of buffer that does not support writes or reads");
+	if (!_mapPtr)
+		throw runtime_error("Can't get pointer : pointer is null");
+	return _mapPtr;
 }
 
 DrawCommand::DrawCommand()
@@ -203,7 +205,7 @@ DrawCommand::DrawCommand(
 
 DrawCommand::DrawCommand(GLuint vao, GLenum mode, GLenum type,
 	size_t vertexSize, size_t indexSize,
-	BufferSection vertices, BufferSection indices)
+	BufferRange vertices, BufferRange indices)
 {
 	_vao = vao;
 	_mode = mode;
@@ -221,24 +223,24 @@ void DrawCommand::draw() const
 	glDrawElementsBaseVertex(_mode, _count, _type, _indices, _baseVertex);
 }
 
-BufferSection::BufferSection()
+BufferRange::BufferRange()
 {
 	_offset = 0;
 	_size = 0;
 }
 
-BufferSection::BufferSection(uint32_t offset, uint32_t size)
+BufferRange::BufferRange(uint32_t offset, uint32_t size)
 {
 	_offset = offset;
 	_size = size;
 }
 
-uint32_t BufferSection::getOffset() const
+uint32_t BufferRange::getOffset() const
 {
 	return _offset;
 }
 
-uint32_t BufferSection::getSize() const
+uint32_t BufferRange::getSize() const
 {
 	return _size;
 }
