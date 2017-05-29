@@ -272,7 +272,7 @@ void Game::loadPlanetFiles()
 
 		for (uint32_t i=0;i<planetCount;++i)
 		{
-			PlanetParameters planet;
+			PlanetParameters planet = {};
 			sweeper pl(planetsSweeper[i]);
 			planet.name = std::string(pl("name").value<string>());
 			planet.parentName = get<std::string>(pl("parent"));
