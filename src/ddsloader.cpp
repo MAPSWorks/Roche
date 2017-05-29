@@ -5,6 +5,8 @@
 #include <cstring>
 #include <algorithm>
 
+using namespace std;
+
 typedef uint32_t DWORD;
 
 struct DDS_PIXELFORMAT {
@@ -39,7 +41,7 @@ int DDSLoader::skipMipmap = 0;
 
 void DDSLoader::setSkipMipmap(const int skipMipmap)
 {
-	DDSLoader::skipMipmap = std::max(0, skipMipmap);
+	DDSLoader::skipMipmap = max(0, skipMipmap);
 }
 
 DDSLoader::Format DDSLoader::getFormat()
@@ -59,7 +61,7 @@ int getFormatBytesPerBlock(DDSLoader::Format format)
 
 int getImageSize(const int width, const int height, DDSLoader::Format format)
 {
-	return std::max(1, (width+3)/4)*std::max(1, (height+3)/4)*getFormatBytesPerBlock(format);
+	return max(1, (width+3)/4)*max(1, (height+3)/4)*getFormatBytesPerBlock(format);
 }
 
 DDSLoader::Format getFourCCFormat(char* fourCC)
@@ -79,14 +81,14 @@ DDSLoader::Format getFourCCFormat(char* fourCC)
 	return DDSLoader::Format::Undefined;
 }
 
-bool DDSLoader::open(const std::string filename)
+bool DDSLoader::open(const string filename)
 {
 	this->filename = filename;
-	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+	ifstream in(filename.c_str(), ios::in | ios::binary);
 	if (!in) return false;
 
 	// Magic number
-	in.seekg(0, std::ios::beg);
+	in.seekg(0, ios::beg);
 	char buf[4];
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
@@ -133,12 +135,12 @@ int DDSLoader::getMipmapCount()
 
 int DDSLoader::getWidth(const int mipmapLevel)
 {
-	return std::max(1, width>>mipmapLevel);
+	return max(1, width>>mipmapLevel);
 }
 
 int DDSLoader::getHeight(const int mipmapLevel)
 {
-	return std::max(1, height>>mipmapLevel);
+	return max(1, height>>mipmapLevel);
 }
 
 void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, size_t *imageSize, uint8_t *data)
@@ -153,10 +155,10 @@ void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, size_t *imageSize
 
 	if (data)
 	{
-		std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+		ifstream in(filename.c_str(), ios::in | ios::binary);
 		if (!in) return;
 		const int offset = offsets[mipmapLevel];
-		in.seekg(offset, std::ios::beg);
+		in.seekg(offset, ios::beg);
 		in.read((char*)data, size);
 	}
 }
