@@ -54,7 +54,6 @@ Game::Game()
 
 	msaaSamples = 1;
 	ssaa = 0.0;
-	gamma = 2.2;
 	exposure = 0;
 
 	renderer.reset(new RendererGL());
@@ -153,8 +152,7 @@ void Game::loadSettingsFile()
 		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<number>());
 		msaaSamples = graphics("msaaSamples").value<number>();
 		ssaa = graphics("ssaa").value<boolean>();
-		gamma = graphics("gamma").value<number>();
-
+		
 		sweeper controls(swp("controls"));
 		sensitivity = controls("sensitivity").value<number>();
 	} 
@@ -181,6 +179,7 @@ void Game::init()
 	glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 	renderer->windowHints();
 
 	if (fullscreen)
@@ -548,7 +547,7 @@ void Game::update(const double dt)
 	// Scene rendering
 	renderer->render(
 		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1),
-		gamma, exposure, ambientColor,
+		exposure, ambientColor,
 		planetStates);
 
 	auto a = renderer->getProfilerTimes();

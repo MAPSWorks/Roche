@@ -469,6 +469,9 @@ void RendererGL::createRendertargets()
 	glCreateFramebuffers(1, &hdrFbo);
 	glNamedFramebufferTexture(hdrFbo, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
 	glNamedFramebufferTexture(hdrFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+
+	// Enable SRGB output
+	glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
 void RendererGL::createShaders()
@@ -647,7 +650,6 @@ void RendererGL::render(
 		const float fovy,
 		const dvec3 viewCenter,
 		const vec3 viewUp,
-		const float gamma,
 		const float exposure,
 		const float ambientColor,
 		const vector<PlanetState> planetStates)
@@ -727,7 +729,6 @@ void RendererGL::render(
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = ambientColor;
-	sceneUBO.invGamma = 1.f/gamma;
 	sceneUBO.exposure = exp;
 
 	// Planet uniform update

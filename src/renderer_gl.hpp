@@ -45,7 +45,6 @@ public:
 		float fovy,
 		glm::dvec3 viewCenter,
 		glm::vec3 viewUp,
-		float gamma,
 		float exposure,
 		float ambientColor,
 		std::vector<PlanetState> planetStates);
@@ -68,7 +67,6 @@ private:
 		glm::mat4 viewMat;
 		glm::vec4 viewPos;
 		float ambientColor;
-		float invGamma;
 		float exposure;
 	};
 

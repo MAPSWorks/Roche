@@ -13,7 +13,6 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 	mat4 viewMat;
 	vec4 viewPos;
 	float ambientColor;
-	float invGamma;
 	float exposure;
 };
 

@@ -6,7 +6,6 @@ layout (binding = 0, std140) uniform sceneDynamicUBO
 	mat4 viewMat;
 	vec4 viewPos;
 	float ambientColor;
-	float invGamma;
 	float exposure;
 };
 
@@ -31,6 +30,5 @@ void main()
 		sum += color/(color+vec3(1));
 	}
 	vec3 finalColor = sum*SAMPLES_MUL+texture(bloom, texCoord).rgb;
-	// Gamma correction
-	outColor = vec4(pow(finalColor, vec3(invGamma)), 1.0);
+	outColor = vec4(finalColor, 1.0);
 }
