@@ -1,7 +1,7 @@
 ## To Do
 - [ ] Move profiler to own file
 - [ ] Correct flares
-- [ ] Smaller sun flare
+- [ ] Better texture streaming management
 - [ ] PBOs
 - [ ] Use BC7 for textures
 - [ ] Sparse textures?
