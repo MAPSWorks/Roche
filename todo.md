@@ -1,6 +1,8 @@
 ## To Do
+- [ ] Move profiler to own file
 - [ ] Correct flares
 - [ ] PBOs
+- [ ] Use BC7 for textures
 - [ ] Sparse textures?
 - [ ] Vulkan implementation, one day
 
