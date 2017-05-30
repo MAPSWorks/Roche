@@ -1,6 +1,7 @@
 ## To Do
 - [ ] Move profiler to own file
 - [ ] Correct flares
+- [ ] Smaller sun flare
 - [ ] PBOs
 - [ ] Use BC7 for textures
 - [ ] Sparse textures?
