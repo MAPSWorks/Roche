@@ -1,4 +1,6 @@
 ## To Do
+- [ ] Proper move semantics & const ref params
+- [ ] Proper CMake compile features
 - [ ] Move profiler to own file
 - [ ] Correct flares
 - [ ] Better texture streaming management
