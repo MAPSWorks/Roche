@@ -10,15 +10,6 @@ uint32_t Buffer::_alignUBO = 256;
 uint32_t Buffer::_alignSSBO = 32;
 bool Buffer::_limitsDefined = false;
 
-Buffer::Buffer()
-{
-	_id = 0;
-	_size = 0;
-	_validated = false;
-	_lastOffset = 0;
-	_mapPtr = nullptr;
-}
-
 Buffer::Buffer(bool dynamic, bool write, bool read) : Buffer()
 {
 	_dynamic = dynamic;
@@ -38,7 +29,7 @@ void Buffer::getLimits()
 	}
 }
 
-uint32_t Buffer::align(const uint32_t offset, const uint32_t align)
+uint32_t align(const uint32_t offset, const uint32_t align)
 {
 	const uint32_t remainder = offset%align;
 
@@ -164,7 +155,7 @@ void Buffer::read(const BufferRange range, void *data)
 	}
 }
 
-GLuint Buffer::getId() const
+const GLuint &Buffer::getId() const
 {
 	return _id;
 }
@@ -182,38 +173,35 @@ void *Buffer::getPtr() const
 	return _mapPtr;
 }
 
-DrawCommand::DrawCommand()
-{
-
-}
-
 DrawCommand::DrawCommand(
 	GLuint vao,
 	GLenum mode,
 	uint32_t count,
 	GLenum type,
 	uint32_t indexOffset, 
-	uint32_t baseVertex)
+	uint32_t baseVertex) :
+	
+	_vao(vao),
+	_mode(mode),
+	_count(count),
+	_type(type),
+	_indices((void*)(intptr_t)indexOffset),
+	_baseVertex(baseVertex)
 {
-	_vao = vao;
-	_mode = mode;
-	_count = count;
-	_type = type;
-	_indices = (void*)(intptr_t)indexOffset;
-	_baseVertex = baseVertex;
+
 }
 
 DrawCommand::DrawCommand(GLuint vao, GLenum mode, GLenum type,
 	size_t vertexSize, size_t indexSize,
-	BufferRange vertices, BufferRange indices)
+	BufferRange vertices, BufferRange indices) :
+	
+	_vao(vao),
+	_mode(mode),
+	_type(type),
+	_count(indices.getSize()/indexSize),
+	_indices((void*)(intptr_t)indices.getOffset()),
+	_baseVertex(vertices.getOffset()/vertexSize)
 {
-	_vao = vao;
-	_mode = mode;
-	_type = type;
-
-	_count = indices.getSize()/indexSize;
-	_indices = (void*)(intptr_t)indices.getOffset();
-	_baseVertex = vertices.getOffset()/vertexSize;
 
 }
 
@@ -223,16 +211,10 @@ void DrawCommand::draw() const
 	glDrawElementsBaseVertex(_mode, _count, _type, _indices, _baseVertex);
 }
 
-BufferRange::BufferRange()
+BufferRange::BufferRange(uint32_t offset, uint32_t size) :
+	_offset(offset),
+	_size(size)
 {
-	_offset = 0;
-	_size = 0;
-}
-
-BufferRange::BufferRange(uint32_t offset, uint32_t size)
-{
-	_offset = offset;
-	_size = size;
 }
 
 uint32_t BufferRange::getOffset() const

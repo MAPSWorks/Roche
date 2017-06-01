@@ -1,5 +1,6 @@
 #include "renderer_gl.hpp"
 #include "ddsloader.hpp"
+#include "flare.hpp"
 
 #include <stdexcept>
 #include <cstring>
@@ -223,18 +224,21 @@ vector<DrawCommand> getCommands(
 void RendererGL::init(
 	const vector<PlanetParameters> planetParams,
 	const int msaa,
+	const int maxTexSize,
 	const int windowWidth,
 	const int windowHeight)
 {
 	this->planetParams = planetParams;
 	this->planetCount = planetParams.size();
 	this->msaaSamples = msaa;
+	this->maxTexSize = maxTexSize;
 	this->windowWidth = windowWidth;
 	this->windowHeight = windowHeight;
 
 	this->bufferFrames = 3; // triple-buffering
 
 	this->planetData.resize(planetCount);
+	this->fences.resize(bufferFrames);
 
 	vertexBuffer = Buffer(false);
 	indexBuffer = Buffer(false);
@@ -388,8 +392,7 @@ void RendererGL::createFlare()
 	const int flareSize = 512;
 	const int mips = mipmapCount(flareSize);
 	{
-		vector<uint16_t> pixelData;
-		Renderer::generateFlareIntensityTex(flareSize, pixelData);
+		vector<uint16_t> pixelData = generateFlareIntensityTex(flareSize);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareIntensityTex);
 		glTextureStorage1D(flareIntensityTex, mips, GL_R16F, flareSize);
 		glTextureSubImage1D(flareIntensityTex, 0, 0, flareSize, GL_RED, GL_HALF_FLOAT, pixelData.data());
@@ -397,16 +400,14 @@ void RendererGL::createFlare()
 		glGenerateTextureMipmap(flareIntensityTex);
 	}
 	{
-		vector<uint8_t> pixelData;
-		Renderer::generateFlareLinesTex(flareSize, pixelData);
+		vector<uint8_t> pixelData = generateFlareLinesTex(flareSize);
 		glCreateTextures(GL_TEXTURE_2D, 1, &flareLinesTex);
 		glTextureStorage2D(flareLinesTex, mips, GL_R8, flareSize, flareSize);
 		glTextureSubImage2D(flareLinesTex, 0, 0, 0, flareSize, flareSize, GL_RED, GL_UNSIGNED_BYTE, pixelData.data());
 		glGenerateTextureMipmap(flareLinesTex);
 	}
 	{
-		vector<uint16_t> pixelData;
-		Renderer::generateFlareHaloTex(flareSize, pixelData);
+		vector<uint16_t> pixelData = generateFlareHaloTex(flareSize);
 		glCreateTextures(GL_TEXTURE_1D, 1, &flareHaloTex);
 		glTextureStorage1D(flareHaloTex, mips, GL_RGBA16F, flareSize);
 		glTextureSubImage1D(flareHaloTex, 0, 0, flareSize, GL_RGBA, GL_HALF_FLOAT, pixelData.data());
@@ -515,41 +516,41 @@ void RendererGL::createShaders()
 	programPlanetAtmo.compileAndLink();
 
 	programAtmo.addShader(planetVert);
-	programAtmo.addShader(GL_FRAGMENT_SHADER, "shaders/atmo.frag");
+	programAtmo.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/atmo.frag"));
 	programAtmo.setConstant("IS_ATMO", "");
 	programAtmo.compileAndLink();
 
 	programRingFar.addShader(planetVert);
-	programRingFar.addShader(GL_FRAGMENT_SHADER, "shaders/ring.frag");
+	programRingFar.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/ring.frag"));
 	programRingFar.setConstant("IS_FAR_RING", "");
 	programRingFar.compileAndLink();
 
 	programRingNear.addShader(planetVert);
-	programRingNear.addShader(GL_FRAGMENT_SHADER, "shaders/ring.frag");
+	programRingNear.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/ring.frag"));
 	programRingNear.setConstant("IS_NEAR_RING", "");
 	programRingNear.compileAndLink();
 
-	programHighpass.addShader(GL_COMPUTE_SHADER, "shaders/highpass.comp");
+	programHighpass.addShader(Shader(GL_COMPUTE_SHADER, "shaders/highpass.comp"));
 	programHighpass.compileAndLink();
 
-	programDownsample.addShader(GL_COMPUTE_SHADER, "shaders/downsample.comp");
+	programDownsample.addShader(Shader(GL_COMPUTE_SHADER, "shaders/downsample.comp"));
 	programDownsample.compileAndLink();
 
-	programBlurW.addShader(GL_COMPUTE_SHADER, "shaders/blur_w.comp");
+	programBlurW.addShader(Shader(GL_COMPUTE_SHADER, "shaders/blur_w.comp"));
 	programBlurW.compileAndLink();
 
-	programBlurH.addShader(GL_COMPUTE_SHADER, "shaders/blur_h.comp");
+	programBlurH.addShader(Shader(GL_COMPUTE_SHADER, "shaders/blur_h.comp"));
 	programBlurH.compileAndLink();
 
-	programBloomAdd.addShader(GL_COMPUTE_SHADER, "shaders/bloom_add.comp");
+	programBloomAdd.addShader(Shader(GL_COMPUTE_SHADER, "shaders/bloom_add.comp"));
 	programBloomAdd.compileAndLink();
 
-	programFlare.addShader(GL_VERTEX_SHADER, "shaders/flare.vert");
-	programFlare.addShader(GL_FRAGMENT_SHADER, "shaders/flare.frag");
+	programFlare.addShader(Shader(GL_VERTEX_SHADER, "shaders/flare.vert"));
+	programFlare.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/flare.frag"));
 	programFlare.compileAndLink();
 
 	programTonemap.addShader(deferredVert);
-	programTonemap.addShader(GL_FRAGMENT_SHADER, "shaders/tonemap.frag");
+	programTonemap.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/tonemap.frag"));
 	programTonemap.compileAndLink();
 }
 
@@ -561,6 +562,7 @@ void RendererGL::destroy()
 		killThread = true;
 	}
 	texWaitCondition.notify_one();
+	texLoadThread.join();
 }
 
 /// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
@@ -606,7 +608,7 @@ RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 	int *lodMin,
 	const vec4 defaultColor)
 {
-	DDSLoader loader;
+	DDSLoader loader(maxTexSize);
 	if (loader.open(filename))
 	{
 		const int mipmapCount = loader.getMipmapCount();
@@ -769,7 +771,7 @@ void RendererGL::render(
 
 	// Dynamic data upload
 	profiler.begin("Sync wait");
-	currentData.fence.wait();
+	fences[frameId].wait();
 	profiler.end();
 
 	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
@@ -821,7 +823,7 @@ void RendererGL::render(
 
 	profiler.end();
 
-	currentData.fence.lock();
+	fences[frameId].lock();
 
 	frameId = (frameId+1)%bufferFrames;
 }
@@ -1422,59 +1424,6 @@ void RendererGL::initThread() {
 			}
 		}
 	});
-}
-
-void GPUProfilerGL::begin(const string name)
-{
-	int id = (bufferId+1)%2;
-	auto &val = queries[id][name].first;
-	if (val == 0)
-	{
-		glGenQueries(1, &val);
-	}
-	glQueryCounter(val, GL_TIMESTAMP);
-	names.push(name);
-	orderedNames[id].push_back(name);
-}
-
-void GPUProfilerGL::end()
-{
-	string name = names.top();
-	names.pop();
-	int id = (bufferId+1)%2;
-	auto &val = queries[id][name].second;
-	if (val == 0)
-	{
-		glCreateQueries(GL_TIMESTAMP, 1, &val);
-	}
-	glQueryCounter(val, GL_TIMESTAMP);
-	lastQuery = val;
-}
-
-vector<pair<string,uint64_t>> GPUProfilerGL::get()
-{
-	vector<pair<string,uint64_t>> result;
-	auto &m = queries[bufferId];
-	for (const string name : orderedNames[bufferId])
-	{
-		auto val = m.find(name);
-		GLuint q1 = val->second.first;
-		GLuint q2 = val->second.second;
-		if (q1 && q2)
-		{
-			uint64_t start, end;
-			glGetQueryObjectui64v(q1, GL_QUERY_RESULT, &start);
-			glGetQueryObjectui64v(q2, GL_QUERY_RESULT, &end);
-			result.push_back(make_pair(name, end-start));
-		}
-		if (q1) glDeleteQueries(1, &q1);
-		if (q2) glDeleteQueries(1, &q2);
-	}
-
-	m.clear();
-	orderedNames[bufferId].clear();
-	bufferId = (bufferId+1)%2;
-	return result;
 }
 
 vector<pair<string,uint64_t>> RendererGL::getProfilerTimes()

@@ -37,16 +37,9 @@ struct DDS_HEADER {
 	DWORD           dwReserved2;
 };
 
-int DDSLoader::skipMipmap = 0;
-
-void DDSLoader::setSkipMipmap(const int skipMipmap)
+DDSLoader::DDSLoader(int maxSize_) : maxSize(maxSize_)
 {
-	DDSLoader::skipMipmap = max(0, skipMipmap);
-}
 
-DDSLoader::Format DDSLoader::getFormat()
-{
-	return format;
 }
 
 int getFormatBytesPerBlock(DDSLoader::Format format)
@@ -81,7 +74,7 @@ DDSLoader::Format getFourCCFormat(char* fourCC)
 	return DDSLoader::Format::Undefined;
 }
 
-bool DDSLoader::open(const string filename)
+bool DDSLoader::open(const string &filename)
 {
 	this->filename = filename;
 	ifstream in(filename.c_str(), ios::in | ios::binary);
@@ -107,12 +100,23 @@ bool DDSLoader::open(const string filename)
 	width = header.dwWidth;
 	height = header.dwHeight;
 
+	// Compute which mipmaps to skip
+	int maxDim = max(width, height);
+	int skipMipmap = 0;
+	if (maxSize != -1)
+	{
+		for (int i=maxDim;i>maxSize;i=i/2)
+			skipMipmap++;
+	}
+
+	// Skip mipmaps
 	size_t offset = 128;
 	for (int i=0;i<skipMipmap;++i)
 	{
 		offset += getImageSize(getWidth(i), getHeight(i), format);
 	}
 
+	// Compute mipmap offsets & sizes
 	for (int i=skipMipmap;i<mipmapCount;++i)
 	{
 		int size = getImageSize(getWidth(i), getHeight(i), format);
@@ -128,22 +132,28 @@ bool DDSLoader::open(const string filename)
 	return true;
 }
 
-int DDSLoader::getMipmapCount()
+DDSLoader::Format DDSLoader::getFormat() const
+{
+	return format;
+}
+
+int DDSLoader::getMipmapCount() const
 {
 	return mipmapCount;
 }
 
-int DDSLoader::getWidth(const int mipmapLevel)
+int DDSLoader::getWidth(const int mipmapLevel) const
 {
 	return max(1, width>>mipmapLevel);
 }
 
-int DDSLoader::getHeight(const int mipmapLevel)
+int DDSLoader::getHeight(const int mipmapLevel) const
 {
 	return max(1, height>>mipmapLevel);
 }
 
-void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, size_t *imageSize, uint8_t *data)
+void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, 
+	size_t *imageSize, uint8_t *data) const
 {
 	if (mipmapLevel+mipmapCount-1 >= getMipmapCount()) return;
 	else if (mipmapLevel < 0) mipmapLevel = 0;

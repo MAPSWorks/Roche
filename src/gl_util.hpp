@@ -14,20 +14,21 @@ class BufferRange
 {
 public:
 	// Constructors
-	BufferRange();
+	BufferRange() = default;
 	BufferRange(uint32_t offset, uint32_t size);
 	// Getters
 	uint32_t getOffset() const;
 	uint32_t getSize() const;
 private:
-	uint32_t _offset, _size;
+	uint32_t _offset = 0;
+	uint32_t _size = 0;
 };
 
 class DrawCommand
 {
 
 public:
-	DrawCommand();
+	DrawCommand() = default;
 	DrawCommand(
 		GLuint vao,
 		GLenum mode,
@@ -68,7 +69,7 @@ public:
 	/**
 	 * Creates an empty buffer without OpenGL context attached.
 	 */
-	Buffer();
+	Buffer() = default;
 
 	// Modifiers
 
@@ -80,7 +81,7 @@ public:
 	 * @param write application can write to the buffer
 	 * @param read application can read from the buffer
 	 */
-	Buffer(bool dynamic, bool write = true, bool read = false);
+	explicit Buffer(bool dynamic, bool write = true, bool read = false);
 
 	/**
 	 * Reserves a range in the buffer
@@ -140,27 +141,26 @@ public:
 	void read(BufferRange range, void *data);
 	// Getters
 	/// Returns the OpenGL buffer handle
-	GLuint getId() const;
+	const GLuint &getId() const;
 	/// Returns the mapped pointer (for off-thread copy)
 	void* getPtr() const;
 private:
 	// Gets alignment requirements from the GL
 	void getLimits();
-	// Aligns an offset
-	uint32_t align(uint32_t offset, uint32_t align);
 	// Creates static storage for the buffer
 	void storageStatic();
 	// Creates dynamic storage for the buffer
 	void storageDynamic();
 
-	GLuint _id; // OpenGL buffer name
-	uint32_t _size; // Buffer size in bytes
-	bool _validated;
-	uint32_t _lastOffset; // Offset+size of last assigned element
-	void *_mapPtr; // Persistent map for dynamic buffers
+	GLuint _id = 0; // OpenGL buffer name
+	uint32_t _size = 0; // Buffer size in bytes
+	bool _validated = false;
+	uint32_t _lastOffset = 0; // Offset+size of last assigned element
+	void *_mapPtr = nullptr; // Persistent map for dynamic buffers
 
-	bool _dynamic; // 'dynamic' (updates every frame) or 'static' (rare updates)
-	bool _write, _read; // write and read operations possible or not
+	bool _dynamic = false; // 'dynamic' (updates every frame) or 'static' (rare updates)
+	bool _write = false;
+	bool _read = false; // write and read operations possible or not
 
 	static uint32_t _alignUBO; // minimum alignment between UBOs
 	static uint32_t _alignSSBO; // minimum alignment between SSBOs

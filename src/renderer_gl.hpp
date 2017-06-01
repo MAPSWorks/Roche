@@ -6,6 +6,7 @@
 #include "fence.hpp"
 #include "ddsloader.hpp"
 #include "gl_util.hpp"
+#include "gl_profiler.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -16,27 +17,15 @@
 #include <stack>
 #include <utility>
 
-class GPUProfilerGL
-{
-public:
-	void begin(std::string name);
-	void end();
-	std::vector<std::pair<std::string,uint64_t>> get();
-private:
-	std::map<std::string, std::pair<GLuint, GLuint>> queries[2];
-	std::stack<std::string> names;
-	std::vector<std::string> orderedNames[2];
-	int bufferId;
-	GLuint lastQuery;
-};
-
 class RendererGL : public Renderer
 {
 public:
+	RendererGL() = default;
 	void windowHints() override;
 	void init(
 		std::vector<PlanetParameters> planetParams, 
 		int msaa,
+		int maxTexSize,
 		int windowWidth,
 		int windowHeight) override;
 	void render(
@@ -53,7 +42,6 @@ public:
 private:
 	struct DynamicData
 	{
-		Fence fence;
 		BufferRange sceneUBO;
 
 		std::vector<BufferRange> planetUBOs;
@@ -118,10 +106,11 @@ private:
 
 	GPUProfilerGL profiler;
 
-	uint32_t planetCount;
-	int msaaSamples;
-	int windowWidth;
-	int windowHeight;
+	uint32_t planetCount = 0;
+	int msaaSamples = 1;
+	int maxTexSize = -1;
+	int windowWidth = 0;
+	int windowHeight = 0;
 
 	// Constants for distance based loading
 	float closePlanetMaxDistance;
@@ -137,6 +126,7 @@ private:
 	
 	// Offsets in dynamic buffer
 	std::vector<DynamicData> dynamicData;
+	std::vector<Fence> fences;
 
 	// VAO
 	GLuint vertexArray;
@@ -189,7 +179,7 @@ private:
 			GLuint sampler;
 			int lodMin;
 			float smoothLodMin;
-			StreamTex() { id = 0; sampler = 0;}
+			StreamTex() { id = 0; sampler = 0; lodMin = 0; smoothLodMin = 0.f;}
 			StreamTex(GLuint id, GLuint sampler, GLuint lodMin, float smoothLodMin)
 			{
 				this->id = id;

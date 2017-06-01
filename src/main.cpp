@@ -14,7 +14,6 @@ int main(int argc, char **argv)
 	Game game;
 	game.init();
 
-
 	std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 	std::chrono::duration<double, std::nano> elapsed;
 

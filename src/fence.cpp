@@ -9,6 +9,23 @@ typedef std::chrono::high_resolution_clock waitClock;
 
 const double timeWarningNano = 2000000;
 
+Fence::Fence(Fence&& fence) : sync(fence.sync)
+{
+	fence.sync = 0;
+}
+
+Fence &Fence::operator=(Fence && fence)
+{
+	if (sync) glDeleteSync(sync);
+	sync = fence.sync;
+	fence.sync = 0;
+}
+
+Fence::~Fence()
+{
+	if (sync) glDeleteSync(sync);
+}
+
 void Fence::wait()
 {
 	if (!sync) return;
@@ -16,7 +33,7 @@ void Fence::wait()
 	auto t1 = waitClock::now();
 	GLenum ret = glClientWaitSync(sync, 0, 0);
 
-	if (ret == GL_ALREADY_SIGNALED |
+	if (ret == GL_ALREADY_SIGNALED ||
 		  ret == GL_CONDITION_SATISFIED)
 	{
 		auto t2 = waitClock::now();
@@ -33,6 +50,6 @@ void Fence::wait()
 
 void Fence::lock()
 {
-	glDeleteSync(sync);
+	if (sync) glDeleteSync(sync);
 	sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }

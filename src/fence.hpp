@@ -5,9 +5,15 @@
 class Fence
 {
 public:
+	Fence() = default;
+	Fence(const Fence &) = delete;
+	Fence(Fence &&);
+	Fence& operator=(const Fence &) = delete;
+	Fence& operator=(Fence &&);
+	~Fence();
 	void wait();
 	void lock();
 
 private:
-	GLsync sync;
+	GLsync sync = 0;
 };

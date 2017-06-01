@@ -1,10 +1,8 @@
-#include "renderer.hpp"
+#include "flare.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/packing.hpp>
 #include <random>
 #include <algorithm>
-
-#define PI 3.14159265358979323846264338327950288
 
 // Flare radial components
 // r is the radius in degrees
@@ -68,9 +66,9 @@ std::mt19937 rng;
 std::uniform_real_distribution<> dis(0, 1);
 
 
-void Renderer::generateFlareIntensityTex(int dimensions, std::vector<uint16_t> &pixelData)
+std::vector<uint16_t> generateFlareIntensityTex(int dimensions)
 {
-	pixelData.resize(dimensions);
+	std::vector<uint16_t> pixelData(dimensions);
 	const float SIZE_DEGREES = 60.0;
 	for (int i=0;i<dimensions;++i)
 	{
@@ -78,9 +76,10 @@ void Renderer::generateFlareIntensityTex(int dimensions, std::vector<uint16_t> &
 		float intensity = 0.282*f0(r)+0.478*f1(r)+0.207*f2(r);
 		pixelData[i] = glm::packHalf1x16(std::min(1000.f,intensity));
 	}
+	return pixelData;
 }
 
-void Renderer::generateFlareLinesTex(int dimensions, std::vector<uint8_t> &pixelData)
+std::vector<uint8_t> generateFlareLinesTex(int dimensions)
 {
 	// Generate 1D array first
 	int size = 60;
@@ -90,7 +89,7 @@ void Renderer::generateFlareLinesTex(int dimensions, std::vector<uint8_t> &pixel
 		lines[i] = dis(rng);
 	}
 
-	pixelData.resize(dimensions*dimensions*4);
+	std::vector<uint8_t> pixelData(dimensions*dimensions*4);
 	for (int i=0;i<dimensions;++i)
 	{
 		for (int j=0;j<dimensions;++j)
@@ -105,7 +104,7 @@ void Renderer::generateFlareLinesTex(int dimensions, std::vector<uint8_t> &pixel
 			{
 				float x = xs[k]/(float)(dimensions-1) - 0.5;
 				float y = ys[k]/(float)(dimensions-1) - 0.5;
-				float angle = (atan2(y,x)+PI)/2*PI;
+				float angle = (atan2(y,x)+glm::pi<float>())/2*glm::pi<float>();
 				minAngle = std::min(angle, minAngle);
 				maxAngle = std::max(angle, maxAngle);
 			}
@@ -127,11 +126,12 @@ void Renderer::generateFlareLinesTex(int dimensions, std::vector<uint8_t> &pixel
 			pixelData[i*dimensions+j] = (avg/(float)(maxAccess-minAccess+1))*255;
 		}
 	}
+	return pixelData;
 }
 
-void Renderer::generateFlareHaloTex(int dimensions, std::vector<uint16_t> &pixelData)
+std::vector<uint16_t> generateFlareHaloTex(int dimensions)
 {
-	pixelData.resize(dimensions*4);
+	std::vector<uint16_t> pixelData(dimensions*4);
 	// Color integration
 	int colorSteps = 50;
 	glm::vec3 totalSum(0.0);
@@ -158,4 +158,5 @@ void Renderer::generateFlareHaloTex(int dimensions, std::vector<uint16_t> &pixel
 			pixelData[i*4+j] = glm::packHalf1x16(finalColor[j]);
 		}
 	}
+	return pixelData;
 }

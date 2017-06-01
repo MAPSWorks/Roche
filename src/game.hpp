@@ -1,7 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "graphics_api.hpp"
 
 #include "planet.hpp"
 #include "renderer.hpp"
@@ -11,8 +10,6 @@
 #include <vector>
 #include <atomic>
 #include <thread>
-
-#define PI        3.14159265358979323846264338327950288 
 
 class Game
 {
@@ -28,53 +25,57 @@ private:
 
 	void loadPlanetFiles();
 	void loadSettingsFile();
+	void initScreenshotThread();
 
 	std::unique_ptr<Renderer> renderer;
-	float gamma;
-	float exposure;
-	float ambientColor;
+	float exposure = 0.0;
+	float ambientColor = 0.0;
+	int maxTexSize = -1;
 	
 	// Main planet collection
-	uint32_t planetCount;
+	uint32_t planetCount = 0;
 	std::vector<PlanetParameters> planetParams; // Immutable parameters
 	std::vector<PlanetState> planetStates; // Mutable state
 	std::vector<int> planetParents;
 
-	size_t focusedPlanetId; // Index of planet the view follows
-	double epoch; // Seconds since January 1st 1950 00:00
-	size_t timeWarpIndex;
-	std::vector<double> timeWarpValues;
+	size_t focusedPlanetId = 0; // Index of planet the view follows
+	double epoch = 0.0; // Seconds since January 1st 1950 00:00
+	size_t timeWarpIndex = 0;
+	std::vector<double> timeWarpValues 
+		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};;
 
 	// THREADING RELATED STUFF
 	std::thread screenshotThread; // Writes screenshots to files
 	std::atomic<bool> save; // Indicates if the screenshot thread has to save the framebuffer to a file now
 	std::atomic<bool> quit; // boolean for killing threads
 
-	std::vector<uint8_t> screenshotBuffer; // pixel array
+	std::vector<uint8_t> screenshotBuffer;
 
 	// INTERACTION RELATED STUFF
-	double preMousePosX, preMousePosY; // previous cursor position
-	bool dragging; // Indicates if we are currently trying to drag the view
-	glm::vec3 viewSpeed; // Polar coordinate view speed (yaw, pitch, zoom)
-	float maxViewSpeed, viewSmoothness;
+	double preMousePosX = 0.0;
+	double preMousePosY = 0.0; // previous cursor position
+	bool dragging = false; // Indicates if we are currently trying to drag the view
+	glm::vec3 viewSpeed = glm::vec3(0,0,0); // Polar coordinate view speed (yaw, pitch, zoom)
+	float maxViewSpeed = 0.2;
+	float viewSmoothness = 0.85;
 
-	bool isSwitching; // Indicates if the view is switching from a planet to another
-	int switchFrames; // Number of frames for a switch
-	int switchFrameCurrent; // Current frame of switching
-	float switchPreviousDist; // Zoom transition amount
-	int switchPreviousPlanet; // index of previous planet
+	bool isSwitching = false; // Indicates if the view is switching from a planet to another
+	int switchFrames = 100; // Number of frames for a switch
+	int switchFrameCurrent = 0; // Current frame of switching
+	float switchPreviousDist = 0; // Zoom transition amount
+	int switchPreviousPlanet = -1; // index of previous planet
 
-	float sensitivity; // Mouse sensitivity
+	float sensitivity = 0.0004; // Mouse sensitivity
 
 	// camera
 	glm::vec3 cameraPolar; // polar coordinates (theta, phi, distance)
 	glm::dvec3 cameraCenter; // where the camera is looking at
 	glm::dvec3 cameraPos; // actual cartesian coordinates
 
-	GLFWwindow *win;
+	GLFWwindow *win = nullptr;
 	std::bitset<512> keysHeld;
-	uint32_t width, height;
-	bool fullscreen;
-	int msaaSamples;
-	bool ssaa;
+	uint32_t width = 0;
+	uint32_t height = 0;
+	bool fullscreen = false;
+	int msaaSamples = 1;
 };

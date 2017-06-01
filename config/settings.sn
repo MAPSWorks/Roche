@@ -11,7 +11,7 @@ video:{
 */
 
 graphics:{
-  skipMipmap:0
+  maxTexSize:8192
   msaaSamples:8
 }
 

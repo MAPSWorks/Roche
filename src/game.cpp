@@ -35,26 +35,6 @@ const float CAMERA_FOVY = 40.0;
 
 Game::Game()
 {
-	sensitivity = 0.0004;
-	viewSpeed = glm::vec3(0,0,0);
-	maxViewSpeed = 0.2;
-	viewSmoothness = 0.85;
-	switchPreviousPlanet = -1;
-	save = false;
-
-	timeWarpValues = {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};
-	timeWarpIndex = 0;
-
-	switchFrames = 100;
-	switchFrameCurrent = 0;
-	isSwitching = false;
-	focusedPlanetId = 0;
-	epoch = 0.0;
-	quit = false;
-
-	msaaSamples = 1;
-	exposure = 0;
-
 	renderer.reset(new RendererGL());
 }
 
@@ -68,49 +48,7 @@ Game::~Game()
 	screenshotThread.join();
 }
 
-void ssThread(
-	const std::atomic<bool> &quit, std::vector<uint8_t> &buffer,
-	std::atomic<bool> &save, const int width, const int height)
-{
-	while (!quit)
-	{
-		if (save)
-		{
-			// Filename building
-			time_t t = time(0);
-			struct tm *now = localtime(&t);
-			std::stringstream filenameBuilder;
-			filenameBuilder << 
-				"./screenshots/screenshot_" << 
-				(now->tm_year+1900) << "-" << 
-				(now->tm_mon+1) << "-" << 
-				(now->tm_mday) << "_" << 
-				(now->tm_hour) << "-" << 
-				(now->tm_min) << "-" << 
-				(now->tm_sec) << ".png";
-			std::string filename = filenameBuilder.str();
-
-			// Flip upside down
-			std::vector<uint8_t> upsideDownBuf(buffer.size());
-			for (int i=0;i<height;++i)
-			{
-				memcpy(upsideDownBuf.data()+i*width*4, buffer.data()+(height-i-1)*width*4, width*4);
-			}
-
-			// Save screenshot
-			if (!stbi_write_png(filename.c_str(), width, height, 4,
-				upsideDownBuf.data(), width*4))
-			{
-				std::cout << "WARNING : Can't save screenshot " << filename << std::endl;
-			}
-
-			save = false;
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
-}
-
-std::string readFile(const std::string filename)
+std::string readFile(const std::string &filename)
 {
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
 	if (in)
@@ -148,13 +86,13 @@ void Game::loadSettingsFile()
 		}
 
 		sweeper graphics(swp("graphics"));
-		DDSLoader::setSkipMipmap(graphics("skipMipmap").value<number>());
+		maxTexSize = graphics("maxTexSize").value<number>();
 		msaaSamples = graphics("msaaSamples").value<number>();
 
 		sweeper controls(swp("controls"));
 		sensitivity = controls("sensitivity").value<number>();
 	} 
-	catch (parse_error e)
+	catch (parse_error &e)
 	{
 		std::cout << e << std::endl;
 	}
@@ -200,12 +138,11 @@ void Game::init()
 	{
 		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
-	// Screenshot
-	screenshotBuffer.resize(width*height*4);
-	screenshotThread = std::thread(
-		ssThread, std::ref(quit), std::ref(screenshotBuffer), std::ref(save), width, height);
+	// Screenshot thread
+	initScreenshotThread();
 
-	renderer->init(planetParams, msaaSamples, width, height);
+	// Renderer init
+	renderer->init(planetParams, msaaSamples, maxTexSize, width, height);
 }
 
 template<class T>
@@ -362,7 +299,7 @@ void Game::loadPlanetFiles()
 			}
 		}	
 	} 
-	catch (parse_error e)
+	catch (parse_error &e)
 	{
 		std::cout << e << std::endl;
 	}
@@ -399,7 +336,7 @@ void Game::update(const double dt)
 					epoch, planetParams[planetParents[i]].bodyParam.GM);
 		}
 		// Rotation
-		planetStates[i].rotationAngle = (2.0*PI*epoch)/planetParams[i].bodyParam.rotationPeriod + glm::pi<float>();
+		planetStates[i].rotationAngle = (2.0*glm::pi<float>()*epoch)/planetParams[i].bodyParam.rotationPeriod + glm::pi<float>();
 		// Cloud rotation
 		const float period = planetParams[i].bodyParam.cloudDispPeriod;
 		planetStates[i].cloudDisp = (period)?
@@ -578,4 +515,48 @@ void Game::update(const double dt)
 bool Game::isRunning()
 {
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
+}
+
+void Game::initScreenshotThread()
+{
+	screenshotBuffer.resize(width*height*4);
+	screenshotThread = std::thread([this]
+	{
+		while (!quit)
+		{
+			if (save)
+			{
+				// Filename building
+				time_t t = time(0);
+				struct tm *now = localtime(&t);
+				std::stringstream filenameBuilder;
+				filenameBuilder << 
+					"./screenshots/screenshot_" << 
+					(now->tm_year+1900) << "-" << 
+					(now->tm_mon+1) << "-" << 
+					(now->tm_mday) << "_" << 
+					(now->tm_hour) << "-" << 
+					(now->tm_min) << "-" << 
+					(now->tm_sec) << ".png";
+				std::string filename = filenameBuilder.str();
+
+				// Flip upside down
+				std::vector<uint8_t> upsideDownBuf(screenshotBuffer.size());
+				for (int i=0;i<height;++i)
+				{
+					memcpy(upsideDownBuf.data()+i*width*4, screenshotBuffer.data()+(height-i-1)*width*4, width*4);
+				}
+
+				// Save screenshot
+				if (!stbi_write_png(filename.c_str(), width, height, 4,
+					upsideDownBuf.data(), width*4))
+				{
+					std::cout << "WARNING : Can't save screenshot " << filename << std::endl;
+				}
+
+				save = false;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	});
 }

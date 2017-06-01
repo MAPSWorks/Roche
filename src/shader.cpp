@@ -7,53 +7,30 @@
 #include <utility>
 #include <vector>
 
-Shader::Shader(const GLenum type, const std::string filename)
-{
-	create(type);
-	addSource(filename);
-}
-
-Shader::Shader(const GLenum type)
-{
-	create(type);
-}
-
-Shader::Shader()
-{
-
-}
-
-void Shader::create(GLenum type)
+Shader::Shader(const GLenum type, const std::string &filename)
 {
 	if (type != GL_COMPUTE_SHADER &&
-			type != GL_VERTEX_SHADER &&
-			type != GL_TESS_CONTROL_SHADER &&
-			type != GL_TESS_EVALUATION_SHADER &&
-			type != GL_GEOMETRY_SHADER &&
-			type != GL_FRAGMENT_SHADER)
+	    type != GL_VERTEX_SHADER &&
+	    type != GL_TESS_CONTROL_SHADER &&
+	    type != GL_TESS_EVALUATION_SHADER &&
+	    type != GL_GEOMETRY_SHADER &&
+	    type != GL_FRAGMENT_SHADER)
 	{
 		throw std::runtime_error("Invalid shader type");
 	}
 	this->type = type;
-}
-
-void Shader::addSource(const std::string filename)
-{
-	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-	if (in)
+	if (filename != "")
 	{
+		std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+		if (!in) throw std::runtime_error("Can't open " + filename);
+
 		std::string contents;
 		in.seekg(0, std::ios::end);
 		contents.resize(in.tellg());
 		in.seekg(0, std::ios::beg);
 		in.read(&contents[0], contents.size());
-		in.close();
 		this->source = contents;
 		this->filename = filename;
-	}
-	else
-	{
-		throw std::runtime_error("Can't open " + filename);
 	}
 }
 
@@ -72,9 +49,48 @@ std::string Shader::getFilename() const
 	return filename;
 }
 
-ShaderProgram::ShaderProgram() : id(-1) {}
+ShaderProgram::ShaderProgram(const ShaderProgram &p) :
+	constants(p.constants),
+	shadersByType(p.shadersByType)
+{
+	if (p.id)
+		compileAndLink();
+}
 
-void ShaderProgram::addShader(const Shader shader)
+ShaderProgram::ShaderProgram(ShaderProgram &&p) :
+	constants(std::move(p.constants)),
+	shadersByType(std::move(p.shadersByType)),
+	id(std::move(p.id))
+{
+	p.id = 0;
+}
+
+ShaderProgram &ShaderProgram::operator=(const ShaderProgram &p)
+{
+	if (id)
+		glDeleteProgram(id);
+	auto tmp = p;
+	std::swap(*this, tmp);
+	return *this;
+}
+
+ShaderProgram &ShaderProgram::operator=(ShaderProgram &&p)
+{
+	if (id)
+		glDeleteProgram(id);
+	auto tmp = p;
+	std::swap(*this, tmp);
+	return *this;
+}
+
+ShaderProgram::~ShaderProgram()
+{
+	if (id)
+		glDeleteProgram(id);
+}
+
+
+void ShaderProgram::addShader(const Shader &shader)
 {
 	auto it = shadersByType.find(shader.getType());
 	if (it == shadersByType.end())
@@ -87,18 +103,14 @@ void ShaderProgram::addShader(const Shader shader)
 	}
 }
 
-void ShaderProgram::addShader(const GLenum type, const std::string filename)
-{
-	addShader(Shader(type, filename));
-}
-
-void ShaderProgram::setConstant(const std::string name, std::string value)
+void ShaderProgram::setConstant(const std::string &name, const std::string &value)
 {
 	constants.insert(std::make_pair(name, value));
 }
 
 void ShaderProgram::compileAndLink()
 {
+	if (id) throw std::runtime_error("Shader program already compiled");
 	this->id = glCreateProgram();
 
 	for (auto it : shadersByType)
@@ -149,4 +161,4 @@ void ShaderProgram::compileAndLink()
 	}
 }
 
-GLuint ShaderProgram::getId() { return id; }
+const GLuint &ShaderProgram::getId() const { return id; }
