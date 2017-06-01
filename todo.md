@@ -1,5 +1,6 @@
 ## To Do
-- [ ] Proper move semantics & const ref params
+- [ ] Initialization with {}
+- [ ] Use lambdas for complex initialization
 - [ ] Clean up planet structures
 - [ ] Separate shaders & shader pipelines
 - [ ] Correct flares
@@ -10,6 +11,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Proper move semantics & const ref params
 - [x] Change skipMipmap with maxSize
 - [x] Proper CMake compile features
 - [x] Move profiler to own file
