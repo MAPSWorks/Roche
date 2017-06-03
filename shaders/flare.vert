@@ -1,22 +1,21 @@
-#version 450
+out gl_PerVertex
+{
+  vec4 gl_Position;
+  float gl_PointSize;
+  float gl_ClipDistance[];
+};
 
 layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec4 inUv;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
-	mat4 projMat;
-	mat4 viewMat;
-	vec4 viewPos;
-	float ambientColor;
-	float exposure;
+	SceneUBO sceneUBO;
 };
 
 layout (binding = 1, std140) uniform flareDynamicUBO
 {
-	mat4 modelMat;
-	vec4 color;
-	float brightness;
+	FlareUBO flareUBO;
 };
 
 layout (location = 0) out vec4 passUv;
@@ -24,5 +23,5 @@ layout (location = 0) out vec4 passUv;
 void main()
 {
 	passUv = inUv;
-	gl_Position = modelMat*inPosition;
+	gl_Position = flareUBO.modelMat*inPosition;
 }

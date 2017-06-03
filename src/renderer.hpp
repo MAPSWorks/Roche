@@ -3,6 +3,7 @@
 #include "planet.hpp"
 #include <glm/glm.hpp>
 #include <map>
+#include <string>
 
 class Renderer
 {
@@ -23,6 +24,7 @@ public:
 		float exposure,
 		float ambientColor,
 		std::vector<PlanetState> planetStates) {}
+	virtual void takeScreenshot(const std::string &filename) {}
 	virtual void destroy() {}
 	
 	virtual std::vector<std::pair<std::string,uint64_t>> getProfilerTimes() {}

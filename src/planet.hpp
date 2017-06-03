@@ -41,7 +41,7 @@ struct BodyParameters
 	float radius; // km
 	double GM; // gravitational parameter
 	bool isStar; // for lighting computation
-	float albedo; // light intensity from far away
+	float brightness; // light intensity from far away
 	float cloudDispPeriod;
 	float nightTexIntensity;
 };

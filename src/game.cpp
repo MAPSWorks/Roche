@@ -10,9 +10,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vector>
-#include <mutex>
-#include <atomic>
-#include <thread>
 #include <functional>
 #include <memory>
 #include <algorithm>
@@ -26,12 +23,12 @@
 
 #include "thirdparty/shaun/sweeper.hpp"
 #include "thirdparty/shaun/parser.hpp"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "thirdparty/stb_image_write.h"
 
 #include <glm/ext.hpp>
 
 const float CAMERA_FOVY = 40.0;
+
+std::string generateScreenshotName();
 
 Game::Game()
 {
@@ -43,26 +40,19 @@ Game::~Game()
 	renderer->destroy();
 
 	glfwTerminate();
-
-	quit = true;
-	screenshotThread.join();
 }
 
 std::string readFile(const std::string &filename)
 {
 	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-	if (in)
-	{
-		std::string contents;
-		in.seekg(0, std::ios::end);
-		contents.resize(in.tellg());
-		in.seekg(0, std::ios::beg);
-		in.read(&contents[0], contents.size());
-		in.close();
-		return contents;
-	}
-	throw std::runtime_error("Can't open" + filename);
-	return "";
+	if (!in) throw std::runtime_error("Can't open" + filename);
+	std::string contents;
+	in.seekg(0, std::ios::end);
+	contents.resize(in.tellg());
+	in.seekg(0, std::ios::beg);
+	in.read(&contents[0], contents.size());
+	in.close();
+	return contents;
 }
 
 void Game::loadSettingsFile()
@@ -70,8 +60,8 @@ void Game::loadSettingsFile()
 	using namespace shaun;
 	try 
 	{
-		parser p;
-		std::string fileContent = readFile("config/settings.sn");
+		parser p{};
+		const std::string fileContent = readFile("config/settings.sn");
 		object obj = p.parse(fileContent.c_str());
 		sweeper swp(&obj);
 
@@ -138,8 +128,6 @@ void Game::init()
 	{
 		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
-	// Screenshot thread
-	initScreenshotThread();
 
 	// Renderer init
 	renderer->init(planetParams, msaaSamples, maxTexSize, width, height);
@@ -240,7 +228,7 @@ void Game::loadPlanetFiles()
 					 sin(declination));
 				bodyParam.rotationPeriod = get<double>(body("rotPeriod"));
 				bodyParam.meanColor = get<glm::vec3>(body("meanColor"));
-				bodyParam.albedo = get<double>(body("albedo"));
+				bodyParam.brightness = get<double>(body("brightness"));
 				bodyParam.GM = get<double>(body("GM"));
 				bodyParam.isStar = get<bool>(  body("isStar"));
 				assetPaths.diffuseFilename = get<std::string>(body("diffuse"));
@@ -464,12 +452,9 @@ void Game::update(const double dt)
 	preMousePosX = posX;
 	preMousePosY = posY;
 
-	if (isPressedOnce(GLFW_KEY_F12) && !save)
+	if (isPressedOnce(GLFW_KEY_F12))
 	{
-		int width,height;
-		glfwGetWindowSize(win, &width, &height);
-		glReadPixels(0,0,width,height, GL_RGBA, GL_UNSIGNED_BYTE, screenshotBuffer.data());
-		save = true;
+		renderer->takeScreenshot(generateScreenshotName());
 	}
 
 	// Shift scene so view is at (0,0,0)
@@ -517,46 +502,18 @@ bool Game::isRunning()
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
 }
 
-void Game::initScreenshotThread()
+std::string generateScreenshotName()
 {
-	screenshotBuffer.resize(width*height*4);
-	screenshotThread = std::thread([this]
-	{
-		while (!quit)
-		{
-			if (save)
-			{
-				// Filename building
-				time_t t = time(0);
-				struct tm *now = localtime(&t);
-				std::stringstream filenameBuilder;
-				filenameBuilder << 
-					"./screenshots/screenshot_" << 
-					(now->tm_year+1900) << "-" << 
-					(now->tm_mon+1) << "-" << 
-					(now->tm_mday) << "_" << 
-					(now->tm_hour) << "-" << 
-					(now->tm_min) << "-" << 
-					(now->tm_sec) << ".png";
-				std::string filename = filenameBuilder.str();
-
-				// Flip upside down
-				std::vector<uint8_t> upsideDownBuf(screenshotBuffer.size());
-				for (int i=0;i<height;++i)
-				{
-					memcpy(upsideDownBuf.data()+i*width*4, screenshotBuffer.data()+(height-i-1)*width*4, width*4);
-				}
-
-				// Save screenshot
-				if (!stbi_write_png(filename.c_str(), width, height, 4,
-					upsideDownBuf.data(), width*4))
-				{
-					std::cout << "WARNING : Can't save screenshot " << filename << std::endl;
-				}
-
-				save = false;
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		}
-	});
+	time_t t = time(0);
+	struct tm *now = localtime(&t);
+	std::stringstream filenameBuilder;
+	filenameBuilder << 
+		"./screenshots/screenshot_" << 
+		(now->tm_year+1900) << "-" << 
+		(now->tm_mon+1) << "-" << 
+		(now->tm_mday) << "_" << 
+		(now->tm_hour) << "-" << 
+		(now->tm_min) << "-" << 
+		(now->tm_sec) << ".png";
+	return filenameBuilder.str();
 }

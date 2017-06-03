@@ -1,21 +1,13 @@
-#version 450
-
 layout (location = 0) in vec4 passUv;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
-	mat4 projMat;
-	mat4 viewMat;
-	vec4 viewPos;
-	float ambientColor;
-	float exposure;
+	SceneUBO sceneUBO;
 };
 
 layout (binding = 1, std140) uniform flareDynamicUBO
 {
-	mat4 modelMat;
-	vec4 color;
-	float brightness;
+	FlareUBO flareUBO;
 };
 
 layout (binding = 2) uniform sampler1D intensityTex;
@@ -34,5 +26,6 @@ void main()
 	vec3 halo = texture(haloTex, clamp(haloCoord,0,1)).rgb*0.2;
 	float fade = pow(1-clamp(passUv.t,0,1),2.2);
 
-	outColor = vec4(color.xyz*(vec3(intensity)+halo)*lines*brightness*fade,1.0);
+	outColor = vec4(flareUBO.color.xyz*(vec3(intensity)+halo)*
+		lines*flareUBO.brightness*fade,1.0);
 }

@@ -1,14 +1,3 @@
-#version 450
-
-layout (binding = 0, std140) uniform sceneDynamicUBO
-{
-	mat4 projMat;
-	mat4 viewMat;
-	vec4 viewPos;
-	float ambientColor;
-	float exposure;
-};
-
 layout (binding = 1) uniform sampler2DMS hdr;
 layout (binding = 2) uniform sampler2D bloom;
 

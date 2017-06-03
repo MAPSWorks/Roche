@@ -10,13 +10,50 @@ uint32_t Buffer::_alignUBO = 256;
 uint32_t Buffer::_alignSSBO = 32;
 bool Buffer::_limitsDefined = false;
 
-Buffer::Buffer(bool dynamic, bool write, bool read) : Buffer()
+Buffer::Buffer(const Usage usage, const Access access, uint32_t size) : 
+	Buffer()
 {
-	_dynamic = dynamic;
-	_write = write;
-	_read = read;
+	_usage = usage;
+	_access = access;
 
 	glCreateBuffers(1, &_id);
+
+	if (size != 0)
+	{
+		_lastOffset = size;
+		validate();
+	}
+}
+
+Buffer::Buffer(Buffer &&b) :
+	_id{b._id},
+	_size{b._size},
+	_validated{b._validated},
+	_lastOffset{b._lastOffset},
+	_mapPtr{b._mapPtr},
+	_usage{b._usage},
+	_access{b._access}
+{
+	b._id = 0;
+}
+
+Buffer &Buffer::operator=(Buffer &&b)
+{
+	if (_id) glDeleteBuffers(1, &_id);
+	_id = b._id;
+	_size = b._size;
+	_validated = b._validated;
+	_lastOffset = b._lastOffset;
+	_mapPtr = b._mapPtr;
+	_usage = b._usage;
+	_access = b._access;
+	b._id = 0;
+	return *this;
+}
+
+Buffer::~Buffer()
+{
+	if (_id) glDeleteBuffers(1, &_id);
 }
 
 void Buffer::getLimits()
@@ -78,6 +115,22 @@ void Buffer::storageStatic()
 	glNamedBufferStorage(_id, _size, nullptr, GL_DYNAMIC_STORAGE_BIT);
 }
 
+GLbitfield getAccessBits(const Buffer::Access access)
+{
+	switch (access)
+	{
+		case Buffer::Access::NO_ACCESS: 
+			return 0;
+		case Buffer::Access::WRITE_ONLY: 
+			return GL_MAP_WRITE_BIT;
+		case Buffer::Access::READ_ONLY: 
+			return GL_MAP_READ_BIT;
+		case Buffer::Access::READ_WRITE: 
+			return GL_MAP_WRITE_BIT|GL_MAP_READ_BIT;
+		default : return 0;
+	}
+}
+
 void Buffer::storageDynamic()
 {
 	const GLbitfield storageFlags = 
@@ -85,15 +138,15 @@ void Buffer::storageDynamic()
 #ifdef USE_COHERENT_MAPPING
 	GL_MAP_COHERENT_BIT |
 #endif
-	(_write?GL_MAP_WRITE_BIT:0) | 
-	(_read ?GL_MAP_READ_BIT :0) ;
+	getAccessBits(_access);
 
 	glNamedBufferStorage(_id, _size, nullptr, storageFlags);
-	if (_write || _read)
+	if (_access != Access::NO_ACCESS)
 	{
 		const GLbitfield mapFlags = storageFlags
 #ifndef USE_COHERENT_MAPPING
-		| GL_MAP_FLUSH_EXPLICIT_BIT
+		| ((_access==Access::WRITE_ONLY
+		|| _access==Access::READ_WRITE)?GL_MAP_FLUSH_EXPLICIT_BIT:0)
 #endif
 		;
 		_mapPtr = glMapNamedBufferRange(_id, 0, _size, mapFlags);
@@ -108,7 +161,7 @@ void Buffer::validate()
 	{
 		_size = _lastOffset;
 		// Create storage
-		if (_dynamic) storageDynamic();
+		if (_usage == Usage::DYNAMIC) storageDynamic();
 		else storageStatic();
 	}
 	_validated = true;
@@ -116,14 +169,15 @@ void Buffer::validate()
 
 void Buffer::write(const BufferRange range, const void *data)
 {
-	if (!_write)
+	if (_access == Access::NO_ACCESS || 
+		_access == Access::READ_ONLY)
 		throw runtime_error("Can't write to a buffer that does not support writes");
 
 	if (!_validated)
 		throw runtime_error("Can't write to a non-validated buffer");
 
 	// Dynamic data : memcpy to persistent mapped buffer
-	if (_dynamic)
+	if (_usage == Usage::DYNAMIC)
 	{
 		memcpy((uint8_t*)_mapPtr+range.getOffset(), data, range.getSize());
 #ifndef USE_COHERENT_MAPPING
@@ -139,13 +193,14 @@ void Buffer::write(const BufferRange range, const void *data)
 
 void Buffer::read(const BufferRange range, void *data)
 {
-	if (!_read)
+	if (_access == Access::NO_ACCESS ||
+		_access == Access::WRITE_ONLY)
 		throw runtime_error("Can't read from a buffer that does not support reads");
 
 	if (!_validated) 
 		throw runtime_error("Can't read from a non-validated buffer");
 
-	if (_dynamic)
+	if (_usage == Usage::DYNAMIC)
 	{
 		memcpy(data, (uint8_t*)_mapPtr+range.getOffset(), range.getSize());
 	}
@@ -162,11 +217,11 @@ const GLuint &Buffer::getId() const
 
 void *Buffer::getPtr() const
 {
-	if (!_dynamic) 
+	if (_usage == Usage::STATIC) 
 		throw runtime_error("Can't get pointer on static buffer");
 	if (!_validated) 
 		throw runtime_error("Can't get pointer before validation");
-	if (!_read && !_write) 
+	if (_access == Access::NO_ACCESS) 
 		throw runtime_error("Can't get pointer of buffer that does not support writes or reads");
 	if (!_mapPtr)
 		throw runtime_error("Can't get pointer : pointer is null");

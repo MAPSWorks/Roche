@@ -12,6 +12,7 @@ public:
 	Fence& operator=(Fence &&);
 	~Fence();
 	void wait();
+	void waitClient();
 	void lock();
 
 private:

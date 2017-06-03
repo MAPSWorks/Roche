@@ -1,0 +1,157 @@
+#version 450
+
+struct SceneUBO
+{
+	mat4 projMat;
+	mat4 viewMat;
+	vec4 viewPos;
+	float ambientColor;
+	float exposure;
+};
+
+struct PlanetUBO
+{
+	mat4 modelMat;
+	mat4 atmoMat;
+	mat4 ringFarMat;
+	mat4 ringNearMat;
+	vec4 planetPos;
+	vec4 lightDir;
+	vec4 K;
+	float starBrightness;
+	float cloudDisp;
+	float nightIntensity;
+	float radius;
+	float atmoHeight;
+};
+
+struct FlareUBO
+{
+	mat4 modelMat;
+	vec4 color;
+	float brightness;
+};
+
+float rayleigh(float cc)
+{
+	return 0.75 * (1.0 + cc);
+}
+
+const float G_M = -0.85;
+const float G_M2 = G_M*G_M;
+
+float mie(float c, float cc)
+{
+	float a = (1.0-G_M2)*(1.0+cc);
+	float b = 1.0 + G_M2 - 2.0*G_M*c;
+	b*= sqrt(b);
+	b*= 2.0+G_M2;
+
+	return 1.5*a/b;
+}
+
+float ray_sphere_far(vec3 ori, vec3 ray, float radius)
+{
+	float b = dot(ori, ray);
+	float c = dot(ori,ori) - radius*radius;
+	return -b+sqrt(b*b-c);
+}
+
+float ray_sphere_near(vec3 ori, vec3 ray, float radius)
+{
+	float b = dot(ori, ray);
+	float c = dot(ori,ori) - radius*radius;
+	return -b-sqrt(b*b-c);
+}
+
+const int IN_SAMPLES_ATMO = 10;
+
+vec3 in_scattering_atmo(
+	vec3 viewer,
+	vec3 view_dir,
+	vec3 light_dir,
+	float radius,
+	float atmos_height,
+	sampler2D atmo,
+	vec4 K)
+{
+	float far = length(view_dir);
+	view_dir = normalize(view_dir);
+
+	float b = dot(viewer, view_dir);
+	float c = dot(viewer,viewer) - pow(radius+atmos_height,2);
+	if (b*b-c <= 0) return vec3(0,0,0);
+	float near = -b-sqrt(b*b-c);
+	if (near < 0) return vec3(0,0,0);
+
+	float len = (far-near)/float(IN_SAMPLES_ATMO);
+	vec3 step = view_dir*len;
+
+	vec3 p = viewer+view_dir*near;
+	vec3 v = p+step*0.5;
+
+	vec3 sum = vec3(0.0);
+	for (int i=0;i<IN_SAMPLES_ATMO;++i)
+	{
+		float alt = (length(v)-radius)/atmos_height;
+		vec3 norm_v = normalize(v);
+
+		float angle_view = dot(norm_v, -view_dir)*0.5+0.5;
+		float angle_light = dot(norm_v, light_dir)*0.5+0.5;
+
+		vec2 s = texture(atmo, vec2(angle_view,alt)).rg;
+
+		float n = s.g + texture(atmo, vec2(angle_light,alt)).g;
+		float dens = s.r;
+		sum += dens * exp(-n*(K.xyz+K.www));
+		v += step;
+	}
+
+	sum *= len / atmos_height;
+
+	return sum;
+}
+
+const int IN_SAMPLES_PLANET = 50;
+
+vec3 in_scattering_planet(
+	vec3 viewer,
+	vec3 view_dir,
+	vec3 light_dir,
+	float radius,
+	float atmos_height,
+	sampler2D atmo,
+	vec4 K)
+{
+	float far = length(view_dir);
+	view_dir = normalize(view_dir);
+
+	float near = ray_sphere_near(viewer, view_dir, radius+atmos_height);
+
+	float len = (far-near)/float(IN_SAMPLES_PLANET);
+	vec3 step = view_dir*len;
+
+	vec3 p = viewer+view_dir*near;
+	vec3 v = p+step*0.5;
+
+	vec3 sum = vec3(0.0);
+	for (int i=0;i<IN_SAMPLES_PLANET;++i)
+	{
+		float alt = (length(v)-radius)/atmos_height;
+		vec3 norm_v = normalize(v);
+
+		float angle_view = dot(norm_v, -view_dir)*0.5+0.5;
+		float angle_light = dot(norm_v, light_dir)*0.5+0.5;
+
+		vec2 s = texture(atmo, vec2(angle_view,alt)).rg;
+
+		float n = s.g + texture(atmo, vec2(angle_light,alt)).g;
+		float dens = s.r;
+		sum += dens * exp(-n*(K.xyz+K.www));
+		v += step;
+	}
+
+	sum *= len / atmos_height;
+
+	return sum;
+}

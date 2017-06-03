@@ -5,10 +5,15 @@
 #include <stdexcept>
 #include <cstring>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "thirdparty/stb_image_write.h"
 
 using namespace glm;
 using namespace std;
@@ -240,8 +245,13 @@ void RendererGL::init(
 	this->planetData.resize(planetCount);
 	this->fences.resize(bufferFrames);
 
-	vertexBuffer = Buffer(false);
-	indexBuffer = Buffer(false);
+	vertexBuffer = Buffer(
+		Buffer::Usage::STATIC,
+		Buffer::Access::WRITE_ONLY);
+
+	indexBuffer = Buffer(
+		Buffer::Usage::STATIC, 
+		Buffer::Access::WRITE_ONLY);
 
 	createVertexArray();
 
@@ -304,7 +314,10 @@ void RendererGL::init(
 	}
 
 	// Dynamic UBO buffer assigning
-	uboBuffer = Buffer(true);
+	uboBuffer = Buffer(
+		Buffer::Usage::DYNAMIC, 
+		Buffer::Access::WRITE_ONLY);
+
 	dynamicData.resize(bufferFrames); // multiple buffering
 	for (auto &data : dynamicData)
 	{
@@ -329,8 +342,9 @@ void RendererGL::init(
 	createShaders();
 	createRendertargets();
 	createTextures();
-
-	initThread();
+	createScreenshot();
+	initStreamTexThread();
+	initScreenshotThread();
 }
 
 void RendererGL::createTextures()
@@ -495,74 +509,223 @@ void RendererGL::createRendertargets()
 	glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
+pair<bool, string> loadFile(const string &filename)
+{
+	ifstream in(filename.c_str(), ios::in | ios::binary);
+	if (!in) return make_pair(false, "");
+	string source;
+	in.seekg(0, ios::end);
+	source.resize(in.tellg());
+	in.seekg(0, ios::beg);
+	in.read(&source[0], source.size());
+	return make_pair(true, source);
+}
+
+string loadSource(const string &folder, const string &filename)
+{
+	const auto result{loadFile(folder + filename)};
+	if (!result.first) throw runtime_error(string("Can't load ") + filename);
+	return result.second;
+}
+
+pair<bool, string> checkShaderProgram(const GLuint program)
+{
+	GLint success{0};
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if (success) return make_pair(true, "");
+
+	string log;
+	log.resize(2048);
+	glGetProgramInfoLog(program, log.size(), nullptr, &log[0]);
+	return make_pair(false, log);
+}
+
+GLuint createShader(const GLenum type, const vector<string> &sources)
+{
+	const vector<const char*> csources = [&]{
+		vector<const char*> s(sources.size());
+		for (int i=0;i<sources.size();++i) s[i] = sources[i].c_str();
+		return s;
+	}();
+	const GLuint program{
+		glCreateShaderProgramv(type, csources.size(), csources.data())};
+	const auto res{checkShaderProgram(program)};
+	if (!res.first)
+		throw runtime_error(string("Can't create shader : ") + res.second);
+	return program;
+}
+
 void RendererGL::createShaders()
 {
-	Shader planetVert(GL_VERTEX_SHADER, "shaders/planet.vert");
-	Shader planetFrag(GL_FRAGMENT_SHADER, "shaders/planet.frag");
-	Shader deferredVert(GL_VERTEX_SHADER, "shaders/deferred.vert");
+	// Base folder
+	const string folder{"shaders/"};
 
-	programSun.addShader(planetVert);
-	programSun.addShader(planetFrag);
-	programSun.setConstant("IS_STAR", "");
-	programSun.compileAndLink();
+	// Header
+	const string headerSource{loadSource(folder, "header.shad")};
 
-	programPlanet.addShader(planetVert);
-	programPlanet.addShader(planetFrag);
-	programPlanet.compileAndLink();
+	// Vert shaders
+	const string planetVertSource{loadSource(folder, "planet.vert")};
+	const string flareVertSource{loadSource(folder, "flare.vert")};
+	const string deferredSource{loadSource(folder, "deferred.vert")};
+	
+	// Frag shaders
+	const string planetFragSource{loadSource(folder, "planet.frag")};
+	const string atmoSource{loadSource(folder, "atmo.frag")};
+	const string ringFragSource{loadSource(folder, "ring.frag")};
+	const string flareFragSource{loadSource(folder, "flare.frag")};
+	const string tonemapSource{loadSource(folder, "tonemap.frag")};
 
-	programPlanetAtmo.addShader(planetVert);
-	programPlanetAtmo.addShader(planetFrag);
-	programPlanetAtmo.setConstant("HAS_ATMO", "");
-	programPlanetAtmo.compileAndLink();
+	// Compute shaders
+	const string downsampleSource{loadSource(folder, "downsample.comp")};
+	const string highpassSource{loadSource(folder, "highpass.comp")};
+	const string blurWSource{loadSource(folder, "blur_w.comp")};
+	const string blurHSource{loadSource(folder, "blur_h.comp")};
+	const string bloomAddSource{loadSource(folder, "bloom_add.comp")};
 
-	programAtmo.addShader(planetVert);
-	programAtmo.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/atmo.frag"));
-	programAtmo.setConstant("IS_ATMO", "");
-	programAtmo.compileAndLink();
+	// Defines
+	const string isStar{"#define IS_STAR\n"};
+	const string hasAtmo{"#define HAS_ATMO\n"};
+	const string isAtmo{"#define IS_ATMO\n"};
+	const string isFarRing{"#define IS_FAR_RING\n"};
+	const string isNearRing{"#define IS_NEAR_RING\n"};
 
-	programRingFar.addShader(planetVert);
-	programRingFar.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/ring.frag"));
-	programRingFar.setConstant("IS_FAR_RING", "");
-	programRingFar.compileAndLink();
+	// Vertex shader programs
+	shaderVertPlanetBare = createShader(GL_VERTEX_SHADER, 
+		{headerSource, planetVertSource});
 
-	programRingNear.addShader(planetVert);
-	programRingNear.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/ring.frag"));
-	programRingNear.setConstant("IS_NEAR_RING", "");
-	programRingNear.compileAndLink();
+	shaderVertPlanetAtmo = createShader(GL_VERTEX_SHADER, 
+		{headerSource, hasAtmo, planetVertSource});
 
-	programHighpass.addShader(Shader(GL_COMPUTE_SHADER, "shaders/highpass.comp"));
-	programHighpass.compileAndLink();
+	shaderVertAtmo = createShader(GL_VERTEX_SHADER, 
+		{headerSource, isAtmo, planetVertSource});
 
-	programDownsample.addShader(Shader(GL_COMPUTE_SHADER, "shaders/downsample.comp"));
-	programDownsample.compileAndLink();
+	shaderVertSun = createShader(GL_VERTEX_SHADER,
+		{headerSource, isStar, planetVertSource});
 
-	programBlurW.addShader(Shader(GL_COMPUTE_SHADER, "shaders/blur_w.comp"));
-	programBlurW.compileAndLink();
+	shaderVertRingFar = createShader(GL_VERTEX_SHADER,
+		{headerSource, isFarRing, planetVertSource});
 
-	programBlurH.addShader(Shader(GL_COMPUTE_SHADER, "shaders/blur_h.comp"));
-	programBlurH.compileAndLink();
+	shaderVertRingNear = createShader(GL_VERTEX_SHADER,
+		{headerSource, isNearRing, planetVertSource});
 
-	programBloomAdd.addShader(Shader(GL_COMPUTE_SHADER, "shaders/bloom_add.comp"));
-	programBloomAdd.compileAndLink();
+	shaderVertFlare = createShader(GL_VERTEX_SHADER,
+		{headerSource, flareVertSource});
 
-	programFlare.addShader(Shader(GL_VERTEX_SHADER, "shaders/flare.vert"));
-	programFlare.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/flare.frag"));
-	programFlare.compileAndLink();
+	shaderVertTonemap = createShader(GL_VERTEX_SHADER,
+		{headerSource, deferredSource});
 
-	programTonemap.addShader(deferredVert);
-	programTonemap.addShader(Shader(GL_FRAGMENT_SHADER, "shaders/tonemap.frag"));
-	programTonemap.compileAndLink();
+	// Fragment shader programs
+	shaderFragPlanetBare = createShader(GL_FRAGMENT_SHADER, 
+		{headerSource, planetFragSource});
+
+	shaderFragPlanetAtmo = createShader(GL_FRAGMENT_SHADER, 
+		{headerSource, hasAtmo, planetFragSource});
+
+	shaderFragAtmo = createShader(GL_FRAGMENT_SHADER, 
+		{headerSource, isAtmo, atmoSource});
+
+	shaderFragSun = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, isStar, planetFragSource});
+
+	shaderFragRingFar = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, isFarRing, ringFragSource});
+
+	shaderFragRingNear = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, isNearRing, ringFragSource});
+
+	shaderFragFlare = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, flareFragSource});
+
+	shaderFragTonemap = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, tonemapSource});
+
+	// Compute shader programs
+	shaderCompHighpass = createShader(GL_COMPUTE_SHADER,
+		{headerSource, highpassSource});
+
+	shaderCompDownsample = createShader(GL_COMPUTE_SHADER,
+		{headerSource, downsampleSource});
+
+	shaderCompBlurW = createShader(GL_COMPUTE_SHADER,
+		{headerSource, blurWSource});
+
+	shaderCompBlurH = createShader(GL_COMPUTE_SHADER,
+		{headerSource, blurHSource});
+
+	shaderCompBloomAdd = createShader(GL_COMPUTE_SHADER,
+		{headerSource, bloomAddSource});
+
+	// Pipelines
+	glCreateProgramPipelines(1, &pipelinePlanetBare);
+	glCreateProgramPipelines(1, &pipelinePlanetAtmo);
+	glCreateProgramPipelines(1, &pipelineAtmo);
+	glCreateProgramPipelines(1, &pipelineSun);
+	glCreateProgramPipelines(1, &pipelineRingFar);
+	glCreateProgramPipelines(1, &pipelineRingNear);
+	glCreateProgramPipelines(1, &pipelineFlare);
+	glCreateProgramPipelines(1, &pipelineTonemap);
+
+	// Compute pipelines
+	glCreateProgramPipelines(1, &pipelineHighpass);
+	glCreateProgramPipelines(1, &pipelineDownsample);
+	glCreateProgramPipelines(1, &pipelineBlurW);
+	glCreateProgramPipelines(1, &pipelineBlurH);
+	glCreateProgramPipelines(1, &pipelineBloomAdd);
+
+	// Pipeline use
+	glUseProgramStages(pipelinePlanetBare, GL_VERTEX_SHADER_BIT, shaderVertPlanetBare);
+	glUseProgramStages(pipelinePlanetAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanetAtmo);
+	glUseProgramStages(pipelineAtmo, GL_VERTEX_SHADER_BIT, shaderVertAtmo);
+	glUseProgramStages(pipelineSun, GL_VERTEX_SHADER_BIT, shaderVertSun);
+	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertRingFar);
+	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertRingNear);
+	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
+	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertTonemap);
+
+	glUseProgramStages(pipelinePlanetBare, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetBare);
+	glUseProgramStages(pipelinePlanetAtmo, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetAtmo);
+	glUseProgramStages(pipelineAtmo, GL_FRAGMENT_SHADER_BIT, shaderFragAtmo);
+	glUseProgramStages(pipelineSun, GL_FRAGMENT_SHADER_BIT, shaderFragSun);
+	glUseProgramStages(pipelineRingFar, GL_FRAGMENT_SHADER_BIT, shaderFragRingFar);
+	glUseProgramStages(pipelineRingNear, GL_FRAGMENT_SHADER_BIT, shaderFragRingNear);
+	glUseProgramStages(pipelineFlare, GL_FRAGMENT_SHADER_BIT, shaderFragFlare);
+	glUseProgramStages(pipelineTonemap, GL_FRAGMENT_SHADER_BIT, shaderFragTonemap);
+
+	glUseProgramStages(pipelineHighpass, GL_COMPUTE_SHADER_BIT, shaderCompHighpass);
+	glUseProgramStages(pipelineDownsample, GL_COMPUTE_SHADER_BIT, shaderCompDownsample);
+	glUseProgramStages(pipelineBlurW, GL_COMPUTE_SHADER_BIT, shaderCompBlurW);
+	glUseProgramStages(pipelineBlurH, GL_COMPUTE_SHADER_BIT, shaderCompBlurH);
+	glUseProgramStages(pipelineBloomAdd, GL_COMPUTE_SHADER_BIT, shaderCompBloomAdd);
+}
+
+void RendererGL::createScreenshot()
+{
+	// Find best transfer format
+	glGetInternalformativ(GL_RENDERBUFFER, GL_RGBA8, GL_READ_PIXELS_FORMAT,
+		1, (GLint*)&screenshotBestFormat);
+	if (screenshotBestFormat != GL_BGRA) screenshotBestFormat = GL_RGBA;
+
+	screenshotBuffer.resize(4*windowWidth*windowHeight);
 }
 
 void RendererGL::destroy()
 {
 	// Kill thread
 	{
-		lock_guard<mutex> lk(texWaitMutex);
+		lock_guard<mutex> lk1(texWaitMutex);
+		lock_guard<mutex> lk2(screenshotMutex);
 		killThread = true;
 	}
 	texWaitCondition.notify_one();
 	texLoadThread.join();
+	screenshotCond.notify_one();
+	screenshotThread.join();
+}
+
+void RendererGL::takeScreenshot(const string &filename)
+{
+	screenshot = true;
+	screenshotFilename = filename;
 }
 
 /// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
@@ -771,7 +934,7 @@ void RendererGL::render(
 
 	// Dynamic data upload
 	profiler.begin("Sync wait");
-	fences[frameId].wait();
+	fences[frameId].waitClient();
 	profiler.end();
 
 	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
@@ -821,11 +984,38 @@ void RendererGL::render(
 	renderTonemap(currentData);
 	profiler.end();
 
+	if (screenshot)
+	{
+		saveScreenshot();
+		screenshot = false;
+	}
+
 	profiler.end();
 
 	fences[frameId].lock();
 
 	frameId = (frameId+1)%bufferFrames;
+
+}
+
+void RendererGL::saveScreenshot()
+{
+	// Cancel if already saving screenshot
+	{
+		lock_guard<mutex> lk(screenshotMutex);
+		if (screenshotTaken) return;
+	}
+	// Read screen
+	glReadBuffer(GL_FRONT);
+	glReadPixels(0, 0, windowWidth, windowHeight, 
+		screenshotBestFormat, GL_UNSIGNED_BYTE, screenshotBuffer.data());
+
+	// Tell the thread to save
+	{
+		lock_guard<mutex> lk(screenshotMutex);
+		screenshotTaken = true;
+	}
+	screenshotCond.notify_one();
 }
 
 void RendererGL::renderHdr(
@@ -859,10 +1049,10 @@ void RendererGL::renderHdr(
 		auto &data = planetData[i];
 		const bool star = planetParams[i].bodyParam.isStar;
 		const bool hasAtmo = planetParams[i].atmoParam.hasAtmosphere;
-		glUseProgram(
-			(star?
-			programSun:
-			(hasAtmo?programPlanetAtmo:programPlanet)).getId());
+		glBindProgramPipeline(
+			star?
+			pipelineSun:
+			(hasAtmo?pipelinePlanetAtmo:pipelinePlanetBare));
 
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
@@ -892,10 +1082,13 @@ void RendererGL::renderHdr(
 		// Min LOD smoothing
 		for (auto tex : {&data.diffuse, &data.cloud, &data.night})
 		{
-			if (tex->smoothLodMin > tex->lodMin)
-				tex->smoothLodMin = std::max((float)tex->lodMin, 
-					tex->smoothLodMin - 0.1f*ceil(tex->smoothLodMin - tex->lodMin));
-			glSamplerParameterf(tex->sampler, GL_TEXTURE_MIN_LOD, tex->smoothLodMin);
+			if (tex->id)
+			{
+				if (tex->smoothLodMin > tex->lodMin)
+					tex->smoothLodMin = std::max((float)tex->lodMin, 
+						tex->smoothLodMin - 0.1f*ceil(tex->smoothLodMin - tex->lodMin));
+				glSamplerParameterf(tex->sampler, GL_TEXTURE_MIN_LOD, tex->smoothLodMin);
+			}
 		}
 
 		if (hasAtmo)
@@ -942,7 +1135,7 @@ void RendererGL::renderAtmo(
 		// Far rings
 		if (hasRings)
 		{
-			glUseProgram(programRingFar.getId());
+			glBindProgramPipeline(pipelineRingFar);
 			glBindSampler(2, ringSampler);
 			glBindTextureUnit(2, data.ringTex1);
 			glBindSampler(3, ringSampler);
@@ -951,7 +1144,7 @@ void RendererGL::renderAtmo(
 		}
 
 		// Atmosphere
-		glUseProgram(programAtmo.getId());
+		glBindProgramPipeline(pipelineAtmo);
 		
 		glBindSampler(2, atmoSampler);
 		glBindTextureUnit(2, data.atmoLookupTable);
@@ -960,7 +1153,7 @@ void RendererGL::renderAtmo(
 		// Near rings
 		if (hasRings)
 		{
-			glUseProgram(programRingNear.getId());
+			glBindProgramPipeline(pipelineRingNear);
 			glBindSampler(2, ringSampler);
 			glBindTextureUnit(2, data.ringTex1);
 			glBindSampler(3, ringSampler);
@@ -974,14 +1167,14 @@ void RendererGL::renderBloom()
 {
 	const int workgroupSize = 16;
 	// Highpass
-	glUseProgram(programHighpass.getId());
+	glBindProgramPipeline(pipelineHighpass);
 	glBindImageTexture(0, hdrMSRendertarget       , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
 	glBindImageTexture(1, highpassRendertargets[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
 	glDispatchCompute(
 		(int)ceil(windowWidth/(float)workgroupSize), 
 		(int)ceil(windowHeight/(float)workgroupSize), 1);
 
-	glUseProgram(programDownsample.getId());
+	glBindProgramPipeline(pipelineDownsample);
 	// Downsample to 16x
 	for (int i=0;i<4;++i)
 	{
@@ -1016,7 +1209,7 @@ void RendererGL::renderBloom()
 		const int blurPasses = 2;
 		for (int j=0;j<2;++j)
 		{
-			glUseProgram((j?programBlurW:programBlurH).getId());
+			glBindProgramPipeline(j?pipelineBlurW:pipelineBlurH);
 			for (int k=0;k<blurPasses;++k)
 			{
 				const int ping = (j*blurPasses+k)%2;
@@ -1033,7 +1226,7 @@ void RendererGL::renderBloom()
 		// Add blur with higher res
 		if (i!=3)
 		{
-			glUseProgram(programBloomAdd.getId());
+			glBindProgramPipeline(pipelineBloomAdd);
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 			glBindSampler(0, rendertargetSampler);
@@ -1065,7 +1258,7 @@ void RendererGL::renderFlares(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 
-	glUseProgram(programFlare.getId());
+	glBindProgramPipeline(pipelineFlare);
 
 	for (uint32_t i : farPlanets)
 	{
@@ -1103,7 +1296,7 @@ void RendererGL::renderTonemap(const DynamicData data)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	glUseProgram(programTonemap.getId());
+	glBindProgramPipeline(pipelineTonemap);
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
@@ -1309,7 +1502,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	ubo.K = params.atmoParam.K;
 	ubo.cloudDisp = state.cloudDisp;
 	ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
-	ubo.albedo = params.bodyParam.albedo;
+	ubo.starBrightness = params.bodyParam.brightness;
 	ubo.radius = params.bodyParam.radius;
 	ubo.atmoHeight = params.atmoParam.maxHeight;
 
@@ -1350,7 +1543,7 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 		exp*
 		radius*radius*
 		(isStar?100.f:
-		params.bodyParam.albedo*0.2f*phase)
+		params.bodyParam.brightness*0.2f*phase)
 		/dot(cutDist,cutDist))
 		*fade;
 
@@ -1362,7 +1555,7 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 	return ubo;
 }
 
-void RendererGL::initThread() {
+void RendererGL::initStreamTexThread() {
 	texLoadThread = thread([&,this]()
 	{
 		while (true)
@@ -1371,9 +1564,8 @@ void RendererGL::initThread() {
 			{
 				unique_lock<mutex> lk(texWaitMutex);
 				texWaitCondition.wait(lk, [&]{ return killThread || !texWaitQueue.empty();});
+				if (killThread) return;
 			}
-
-			if (killThread) return;
 
 			// Get info about texture were are going to load
 			TexWait texWait;
@@ -1421,6 +1613,55 @@ void RendererGL::initThread() {
 				lock_guard<mutex> lk(texLoadedMutex);
 				for (auto tl : texLoaded)
 					texLoadedQueue.push(tl);
+			}
+		}
+	});
+}
+
+void RendererGL::initScreenshotThread()
+{
+	screenshotThread = thread([&,this]()
+	{
+		while (true)
+		{
+			// Wait on kill or screenshot waiting to be saved
+			{
+				unique_lock<mutex> lk(screenshotMutex);
+				screenshotCond.wait(lk, [&]{ return killThread || screenshotTaken;});
+				if (killThread) return;
+			}
+
+			// Create temp buffer for operations
+			vector<uint8_t> buffer(4*windowWidth*windowHeight);
+			{
+				lock_guard<mutex> lk(screenshotMutex);
+				// Flip upside down
+				for (int i=0;i<windowHeight;++i)
+				{
+					memcpy(buffer.data()+i*windowWidth*4, 
+						screenshotBuffer.data()+(windowHeight-i-1)*windowWidth*4, 
+						windowWidth*4);
+				}
+				// Unlock resource
+				screenshotTaken = false;
+			}
+
+			// Flip GL_BGRA to GL_RGBA
+			if (screenshotBestFormat == GL_BGRA)
+			{
+				for (int i=0;i<windowWidth*windowHeight*4;i+=4)
+				{
+					swap(buffer[i+0], buffer[i+2]);
+				}
+			}
+
+			// Save screenshot
+			if (!stbi_write_png(screenshotFilename.c_str(), 
+				windowWidth, windowHeight, 4,
+				buffer.data(), windowWidth*4))
+			{
+				cout << "WARNING : Can't save screenshot " << 
+					screenshotFilename << endl;
 			}
 		}
 	});

@@ -42,7 +42,7 @@ DDSLoader::DDSLoader(int maxSize_) : maxSize(maxSize_)
 
 }
 
-int getFormatBytesPerBlock(DDSLoader::Format format)
+int getFormatBytesPerBlock(const DDSLoader::Format format)
 {
 	switch (format)
 	{
@@ -52,12 +52,14 @@ int getFormatBytesPerBlock(DDSLoader::Format format)
 	}
 }
 
-int getImageSize(const int width, const int height, DDSLoader::Format format)
+int getImageSize(const int width, const int height,
+	const DDSLoader::Format format)
 {
-	return max(1, (width+3)/4)*max(1, (height+3)/4)*getFormatBytesPerBlock(format);
+	return max(1, (width+3)/4)*max(1, (height+3)/4)*
+	getFormatBytesPerBlock(format);
 }
 
-DDSLoader::Format getFourCCFormat(char* fourCC)
+DDSLoader::Format getFourCCFormat(const char* fourCC)
 {
 	if (!strncmp(fourCC, "DXT1", 4))
 	{
@@ -101,13 +103,16 @@ bool DDSLoader::open(const string &filename)
 	height = header.dwHeight;
 
 	// Compute which mipmaps to skip
-	int maxDim = max(width, height);
-	int skipMipmap = 0;
-	if (maxSize != -1)
-	{
-		for (int i=maxDim;i>maxSize;i=i/2)
-			skipMipmap++;
-	}
+	const int maxDim = max(width, height);
+	const int skipMipmap = [&]{
+		int skipMipmap = 0;
+		if (maxSize != -1)
+		{
+			for (int i=maxDim;i>maxSize;i=i/2)
+				skipMipmap++;
+		}
+		return skipMipmap;
+	}();
 
 	// Skip mipmaps
 	size_t offset = 128;
@@ -152,16 +157,22 @@ int DDSLoader::getHeight(const int mipmapLevel) const
 	return max(1, height>>mipmapLevel);
 }
 
-void DDSLoader::getImageData(int mipmapLevel, int mipmapCount, 
+void DDSLoader::getImageData(const int mipmapLevel, int mipmapCount, 
 	size_t *imageSize, uint8_t *data) const
 {
 	if (mipmapLevel+mipmapCount-1 >= getMipmapCount()) return;
-	else if (mipmapLevel < 0) mipmapLevel = 0;
+	else if (mipmapLevel < 0) throw runtime_error("Can't load mipmap level < 0");
 
 	// Offset into file to get pixel data
-	int size = 0;
-	for (int i=mipmapLevel;i<mipmapLevel+mipmapCount;++i) size += sizes[i];
-	if (imageSize) *imageSize = size;
+	const int size = [&]{
+		int size = 0;
+		for (int i=mipmapLevel;i<mipmapLevel+mipmapCount;++i)
+			size += sizes[i];
+		return size;
+	}();
+
+	if (imageSize)
+		*imageSize = size;
 
 	if (data)
 	{

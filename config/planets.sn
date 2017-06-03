@@ -11,7 +11,7 @@ planets: [
 		diffuse:"tex/sun/diffuse.dds"
 		isStar:true
 		meanColor:[1.0,1.0,0.9]
-		albedo:5
+		brightness:5
 	}
 }
 {
@@ -31,7 +31,7 @@ planets: [
 		declination:61.45
 		rotPeriod:5067000
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.142
+		brightness:0.142
 		GM:22032.9
 		diffuse:"tex/mercury/diffuse.dds"
 	}
@@ -53,7 +53,7 @@ planets: [
 		declination:67.16
 		rotPeriod:-20997360
 		meanColor:[1.0,0.95,0.8]
-		albedo:0.67
+		brightness:0.67
 		GM:324859.9
 		diffuse:"tex/venus/diffuse.dds"
 	}
@@ -81,7 +81,7 @@ planets: [
 		declination:90
 		rotPeriod:86164.091
 		meanColor:[0.94,0.97,1.0]
-		albedo:0.367
+		brightness:0.367
 		GM:398600.440
 		diffuse:"tex/earth/diffuse.dds"
 		night:"tex/earth/night.dds"
@@ -113,7 +113,7 @@ planets: [
 		declination:67.16
 		rotPeriod:2360586
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.12
+		brightness:0.12
 		GM:4902.768
 		diffuse:"tex/earth/moon/diffuse.dds"
 	}
@@ -135,7 +135,7 @@ planets: [
 		declination:52.88650
 		rotPeriod:88642
 		meanColor:[1.0,0.9,0.9]
-		albedo:0.170
+		brightness:0.170
 		GM:42828.9
 		diffuse:"tex/mars/diffuse.dds"
 	}
@@ -163,7 +163,7 @@ planets: [
 		declination:66.764
 		rotPeriod:19231.2
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.423
+		brightness:0.423
 		GM:17.8
 		diffuse:"tex/vesta/diffuse.dds"
 	}
@@ -185,7 +185,7 @@ planets: [
 		declination:66.764
 		rotPeriod:32667.012
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.090
+		brightness:0.090
 		GM:63.2
 		diffuse:"tex/ceres/diffuse.dds"
 	}
@@ -207,7 +207,7 @@ planets: [
 		declination:64.496
 		rotPeriod:35730
 		meanColor:[1.0,0.99,0.98]
-		albedo:0.52
+		brightness:0.52
 		GM:126686534
 		diffuse:"tex/jupiter/diffuse.dds"
 	}
@@ -235,7 +235,7 @@ planets: [
 		declination:64.496
 		rotPeriod:1.530389098146819E+05
 		meanColor:[1.0,0.96,0.90]
-		albedo:0.63
+		brightness:0.63
 		GM:0
 		diffuse:"tex/jupiter/io/diffuse.dds"
 	}
@@ -257,7 +257,7 @@ planets: [
 		declination:64.496
 		rotPeriod:3.069941568596450E+05
 		meanColor:[1.0,0.99,0.96]
-		albedo:0.67
+		brightness:0.67
 		GM:0
 		diffuse:"tex/jupiter/europa/diffuse.dds"
 	}
@@ -279,7 +279,7 @@ planets: [
 		declination:64.496
 		rotPeriod:6.185164679655199E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.43
+		brightness:0.43
 		GM:0
 		diffuse:"tex/jupiter/ganymede/diffuse.dds"
 	}
@@ -301,7 +301,7 @@ planets: [
 		declination:64.496
 		rotPeriod:1.443187314612591E+06
 		meanColor:[1.0,0.97,0.96]
-		albedo:0.22
+		brightness:0.22
 		GM:0
 		diffuse:"tex/jupiter/callisto/diffuse.dds"
 	}
@@ -323,7 +323,7 @@ planets: [
 		declination:83.537
 		rotPeriod:37980
 		meanColor:[1.0,0.98,0.96]
-		albedo:0.47
+		brightness:0.47
 		GM:37931187
 		diffuse:"tex/saturn/diffuse.dds"
 	}
@@ -362,7 +362,7 @@ planets: [
 		declination:83.537
 		rotPeriod:8.184044290751277E+04
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.962
+		brightness:0.962
 		GM:0
 		diffuse:"tex/saturn/mimas/diffuse.dds"
 	}
@@ -384,7 +384,7 @@ planets: [
 		declination:83.537
 		rotPeriod:1.187620763017552E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:1.04
+		brightness:1.04
 		GM:0
 		diffuse:"tex/saturn/enceladus/diffuse.dds"
 	}
@@ -406,7 +406,7 @@ planets: [
 		declination:83.537
 		rotPeriod:1.634393455060252E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.80
+		brightness:0.80
 		GM:0
 		diffuse:"tex/saturn/tethys/diffuse.dds"
 	}
@@ -428,7 +428,7 @@ planets: [
 		declination:83.537
 		rotPeriod:2.367627575044749E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.6
+		brightness:0.6
 		GM:0
 		diffuse:"tex/saturn/dione/diffuse.dds"
 	}
@@ -450,7 +450,7 @@ planets: [
 		declination:83.537
 		rotPeriod:3.905354920207487E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.6
+		brightness:0.6
 		GM:0
 		diffuse:"tex/saturn/rhea/diffuse.dds"
 	}
@@ -472,7 +472,7 @@ planets: [
 		declination:83.537
 		rotPeriod:1.377905939181029E+06
 		meanColor:[1.0,0.97,0.94]
-		albedo:0.2
+		brightness:0.2
 		GM:0
 		diffuse:"tex/saturn/titan/diffuse.dds"
 	}
@@ -500,7 +500,7 @@ planets: [
 		declination:83.537
 		rotPeriod:6.853311665503774E+06
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.6
+		brightness:0.6
 		GM:120.51
 		diffuse:"tex/saturn/iapetus/diffuse.dds"
 	}
@@ -523,7 +523,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:62064
 		meanColor:[0.93,0.97,1.0]
-		albedo:0.51
+		brightness:0.51
 		GM:5793939
 		diffuse:"tex/uranus/diffuse.dds"
 	}
@@ -551,7 +551,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:1.221785307098922E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.27 
+		brightness:0.27 
 		GM:0.0
 		diffuse:"tex/uranus/miranda/diffuse.dds"
 	}
@@ -573,7 +573,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:2.177948929193003E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.34 
+		brightness:0.34 
 		GM:0.0
 		diffuse:"tex/uranus/ariel/diffuse.dds"
 	}
@@ -595,7 +595,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:3.580955244932137E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.18 
+		brightness:0.18 
 		GM:0.0
 		diffuse:"tex/uranus/umbriel/diffuse.dds"
 	}
@@ -617,7 +617,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:7.522359193044165E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.27
+		brightness:0.27
 		GM:0.0
 		diffuse:"tex/uranus/titania/diffuse.dds"
 	}
@@ -639,7 +639,7 @@ planets: [
 		declination:-15.175
 		rotPeriod:7.522359193044165E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.24
+		brightness:0.24
 		GM:0.0
 		diffuse:"tex/uranus/oberon/diffuse.dds"
 	}
@@ -662,7 +662,7 @@ planets: [
 		declination:42.950
 		rotPeriod:57996
 		meanColor:[0.94,0.97,1.0]
-		albedo:0.41
+		brightness:0.41
 		GM:6836529
 		diffuse:"tex/neptune/diffuse.dds"
 	}
@@ -690,7 +690,7 @@ planets: [
 		declination:42.950
 		rotPeriod:9.701179388941791E+04
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.06
+		brightness:0.06
 		GM:0.0
 		diffuse:"tex/neptune/proteus/diffuse.dds"
 	}
@@ -712,7 +712,7 @@ planets: [
 		declination:42.950
 		rotPeriod:-5.077817809625707E+05
 		meanColor:[1.0,1.0,0.99]
-		albedo:0.7 
+		brightness:0.7 
 		GM:0.0
 		diffuse:"tex/neptune/triton/diffuse.dds"
 	}
@@ -734,7 +734,7 @@ planets: [
 		declination:42.950
 		rotPeriod:5.077817809625707E+05
 		meanColor:[1.0,1.0,1.0]
-		albedo:0.2
+		brightness:0.2
 		GM:0.0
 		diffuse:"tex/neptune/nereid/diffuse.dds"
 	}
@@ -756,7 +756,7 @@ planets: [
 		declination:-6.163
 		rotPeriod:551856
 		meanColor:[1.0,0.99,0.95]
-		albedo:0.57
+		brightness:0.57
 		GM:871
 		diffuse:"tex/pluto/diffuse.dds"
 	}
@@ -784,7 +784,7 @@ planets: [
 		declination:-6.163
 		rotPeriod:584020
 		meanColor:[1.0,0.99,0.97]
-		albedo:0.2
+		brightness:0.2
 		GM:106
 		diffuse:"tex/pluto/charon/diffuse.dds"
 	}

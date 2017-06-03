@@ -8,8 +8,7 @@
 
 #include <bitset>
 #include <vector>
-#include <atomic>
-#include <thread>
+#include <memory>
 
 class Game
 {
@@ -25,7 +24,6 @@ private:
 
 	void loadPlanetFiles();
 	void loadSettingsFile();
-	void initScreenshotThread();
 
 	std::unique_ptr<Renderer> renderer;
 	float exposure = 0.0;
@@ -43,13 +41,6 @@ private:
 	size_t timeWarpIndex = 0;
 	std::vector<double> timeWarpValues 
 		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};;
-
-	// THREADING RELATED STUFF
-	std::thread screenshotThread; // Writes screenshots to files
-	std::atomic<bool> save; // Indicates if the screenshot thread has to save the framebuffer to a file now
-	std::atomic<bool> quit; // boolean for killing threads
-
-	std::vector<uint8_t> screenshotBuffer;
 
 	// INTERACTION RELATED STUFF
 	double preMousePosX = 0.0;

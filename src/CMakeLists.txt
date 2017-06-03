@@ -13,7 +13,6 @@ set(SOURCE
 	thirdparty/shaun/sweeper.cpp)
 
 set(SOURCE_GL
-	shader.cpp
 	renderer_gl.cpp
 	fence.cpp
 	gl_util.cpp

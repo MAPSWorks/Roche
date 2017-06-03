@@ -1,8 +1,5 @@
 ## To Do
-- [ ] Initialization with {}
-- [ ] Use lambdas for complex initialization
 - [ ] Clean up planet structures
-- [ ] Separate shaders & shader pipelines
 - [ ] Correct flares
 - [ ] Better texture streaming management
 - [ ] PBOs
@@ -11,6 +8,10 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better screenshot thread
+- [x] Move screenshot functionality into renderer
+- [x] Use lambdas for complex initialization
+- [x] Separate shaders & shader pipelines
 - [x] Proper move semantics & const ref params
 - [x] Change skipMipmap with maxSize
 - [x] Proper CMake compile features

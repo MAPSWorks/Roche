@@ -2,7 +2,6 @@
 
 #include "renderer.hpp"
 #include "graphics_api.hpp"
-#include "shader.hpp"
 #include "fence.hpp"
 #include "ddsloader.hpp"
 #include "gl_util.hpp"
@@ -36,6 +35,7 @@ public:
 		float exposure,
 		float ambientColor,
 		std::vector<PlanetState> planetStates) override;
+	void takeScreenshot(const std::string &filename) override;
 	void destroy() override;
 
 	std::vector<std::pair<std::string,uint64_t>> getProfilerTimes() override;
@@ -66,7 +66,7 @@ private:
 		glm::vec4 planetPos;
 		glm::vec4 lightDir;
 		glm::vec4 K;
-		float albedo;
+		float starBrightness;
 		float cloudDisp;
 		float nightTexIntensity;
 		float radius;
@@ -85,6 +85,7 @@ private:
 	void createVertexArray();
 	void createRendertargets();
 	void createShaders();
+	void createScreenshot();
 
 	void renderHdr(
 		std::vector<uint32_t> closePlanets, 
@@ -102,9 +103,22 @@ private:
 	void unloadTextures(std::vector<uint32_t> planets);
 	void uploadLoadedTextures();
 
-	void initThread();
+	void initStreamTexThread();
+	void initScreenshotThread();
+
+	void saveScreenshot();
 
 	GPUProfilerGL profiler;
+
+	// Screenshot info
+	bool screenshot = false;
+	std::string screenshotFilename = "";
+	GLenum screenshotBestFormat = GL_RGBA;
+	std::vector<uint8_t> screenshotBuffer;
+	std::thread screenshotThread;
+	bool screenshotTaken = false;
+	std::mutex screenshotMutex;
+	std::condition_variable screenshotCond;
 
 	uint32_t planetCount = 0;
 	int msaaSamples = 1;
@@ -144,22 +158,52 @@ private:
 	// Rendertarget sampler
 	GLuint rendertargetSampler;
 
+	// HDR framebuffer
 	GLuint hdrFbo;
 
-	// Shaders
-	ShaderProgram programPlanet;
-	ShaderProgram programPlanetAtmo;
-	ShaderProgram programAtmo;
-	ShaderProgram programSun;
-	ShaderProgram programRingFar;
-	ShaderProgram programRingNear;
-	ShaderProgram programHighpass;
-	ShaderProgram programDownsample;
-	ShaderProgram programBlurW;
-	ShaderProgram programBlurH;
-	ShaderProgram programBloomAdd;
-	ShaderProgram programFlare;
-	ShaderProgram programTonemap;
+	// Vertex Shaders
+	GLuint shaderVertPlanetBare;
+	GLuint shaderVertPlanetAtmo;
+	GLuint shaderVertAtmo;
+	GLuint shaderVertSun;
+	GLuint shaderVertRingFar;
+	GLuint shaderVertRingNear;
+	GLuint shaderVertFlare;
+	GLuint shaderVertTonemap;
+
+	// Fragment Shaders
+	GLuint shaderFragPlanetBare;
+	GLuint shaderFragPlanetAtmo;
+	GLuint shaderFragAtmo;
+	GLuint shaderFragSun;
+	GLuint shaderFragRingFar;
+	GLuint shaderFragRingNear;
+	GLuint shaderFragFlare;
+	GLuint shaderFragTonemap;
+
+	// Compute Shaders
+	GLuint shaderCompHighpass;
+	GLuint shaderCompDownsample;
+	GLuint shaderCompBlurW;
+	GLuint shaderCompBlurH;
+	GLuint shaderCompBloomAdd;
+
+	// Pipelines
+	GLuint pipelinePlanetBare;
+	GLuint pipelinePlanetAtmo;
+	GLuint pipelineAtmo;
+	GLuint pipelineSun;
+	GLuint pipelineRingFar;
+	GLuint pipelineRingNear;
+	GLuint pipelineFlare;
+	GLuint pipelineTonemap;
+
+	// Compute pipelines
+	GLuint pipelineHighpass;
+	GLuint pipelineDownsample;
+	GLuint pipelineBlurW;
+	GLuint pipelineBlurH;
+	GLuint pipelineBloomAdd;
 
 	// Multiple buffering
 	uint32_t frameId;

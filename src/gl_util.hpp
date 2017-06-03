@@ -65,6 +65,16 @@ private:
 class Buffer
 {
 public:
+	enum class Usage
+	{
+		STATIC,DYNAMIC
+	};
+
+	enum class Access
+	{
+		NO_ACCESS, READ_ONLY, WRITE_ONLY, READ_WRITE
+	};
+
 	// Constructors
 	/**
 	 * Creates an empty buffer without OpenGL context attached.
@@ -81,7 +91,13 @@ public:
 	 * @param write application can write to the buffer
 	 * @param read application can read from the buffer
 	 */
-	explicit Buffer(bool dynamic, bool write = true, bool read = false);
+	Buffer(Usage usage, Access access, uint32_t size=0);
+
+	Buffer(const Buffer &) = delete;
+	Buffer(Buffer &&);
+	Buffer &operator=(const Buffer&) = delete;
+	Buffer &operator=(Buffer &&);
+	~Buffer();
 
 	/**
 	 * Reserves a range in the buffer
@@ -158,9 +174,8 @@ private:
 	uint32_t _lastOffset = 0; // Offset+size of last assigned element
 	void *_mapPtr = nullptr; // Persistent map for dynamic buffers
 
-	bool _dynamic = false; // 'dynamic' (updates every frame) or 'static' (rare updates)
-	bool _write = false;
-	bool _read = false; // write and read operations possible or not
+	Usage _usage = Usage::STATIC;
+	Access _access = Access::WRITE_ONLY;
 
 	static uint32_t _alignUBO; // minimum alignment between UBOs
 	static uint32_t _alignSSBO; // minimum alignment between SSBOs
