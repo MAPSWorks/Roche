@@ -17,8 +17,8 @@ public:
 	int getWidth(int mipmapLevel) const;
 	int getHeight(int mipmapLevel) const;
 	Format getFormat() const;
-	void getImageData(int mipmapLevel, 
-		size_t *imageSize, uint8_t *data) const;
+	size_t getImageSize(int mipmapLevel) const;
+	std::vector<uint8_t> getImageData(int mipmapLevel) const;
 
 private:
 	std::string _filename = "";

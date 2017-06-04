@@ -52,7 +52,7 @@ int getFormatBytesPerBlock(const DDSLoader::Format format)
 	}
 }
 
-int getImageSize(const int width, const int height,
+int getSize(const int width, const int height,
 	const DDSLoader::Format format)
 {
 	return max(1, (width+3)/4)*max(1, (height+3)/4)*
@@ -123,7 +123,7 @@ bool DDSLoader::open(const string &filename)
 	// Compute mipmap offsets & sizes
 	for (int i=0;i<_mipmapCount;++i)
 	{
-		int size = getImageSize(
+		int size = getSize(
 			getMipSize(_width , i),
 			getMipSize(_height, i),
 			_format);
@@ -141,7 +141,7 @@ DDSLoader::Format DDSLoader::getFormat() const
 
 int DDSLoader::getMipmapCount() const
 {
-	return _mipmapCount;
+	return _mipmapCount-_skipMipmap;
 }
 
 int DDSLoader::getWidth(const int mipmapLevel) const
@@ -154,23 +154,25 @@ int DDSLoader::getHeight(const int mipmapLevel) const
 	return getMipSize(_height, _skipMipmap+mipmapLevel);
 }
 
-void DDSLoader::getImageData(const int mipmapLevel, 
-	size_t *imageSize, uint8_t *data) const
+size_t DDSLoader::getImageSize(const int mipmapLevel) const
 {
-	if (mipmapLevel >= getMipmapCount()) return;
-	else if (mipmapLevel < 0) throw runtime_error("Can't load mipmap level < 0");
-
-	const int size = _sizes[mipmapLevel+_skipMipmap];
-
-	if (imageSize)
-		*imageSize = size;
-
-	if (data)
+	if (mipmapLevel >= getMipmapCount() ||
+		mipmapLevel+_skipMipmap<0)
 	{
-		ifstream in(_filename.c_str(), ios::in | ios::binary);
-		if (!in) return;
-		const int offset = _offsets[mipmapLevel+_skipMipmap];
-		in.seekg(offset, ios::beg);
-		in.read((char*)data, size);
+		throw runtime_error("Mipmap level out of range");
 	}
+
+	return _sizes[mipmapLevel+_skipMipmap];
+}
+
+vector<uint8_t> DDSLoader::getImageData(const int mipmapLevel) const
+{
+	vector<uint8_t> data(getImageSize(mipmapLevel));
+
+	ifstream in(_filename.c_str(), ios::in | ios::binary);
+	if (!in) throw runtime_error(string("Can't open file ") + _filename);
+	in.seekg(_offsets[mipmapLevel+_skipMipmap], ios::beg);
+	in.read((char*)data.data(), data.size());
+
+	return data;
 }

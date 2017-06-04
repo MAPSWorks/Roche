@@ -300,8 +300,7 @@ private:
 		GLenum format;
 		int mipmap;
 		int width, height;
-		int imageSize;
-		std::shared_ptr<std::vector<uint8_t>> data;
+		std::vector<uint8_t> data;
 	};
 
 	std::mutex texWaitMutex;

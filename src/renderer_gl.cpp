@@ -753,10 +753,7 @@ RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 		loader.getWidth(0), loader.getHeight(0));
 	// Starting lod
 	const int maxLod = mipmapCount-1;
-	size_t size = 0;
-	loader.getImageData(maxLod, &size, nullptr);
-	vector<uint8_t> block(size);
-	loader.getImageData(maxLod, nullptr, block.data());
+	const vector<uint8_t> block = loader.getImageData(maxLod);
 	glCompressedTextureSubImage2D(id, maxLod, 0, 0, 1, 1, 
 		DDSFormatToGL(loader.getFormat()), block.size(), block.data());
 
@@ -1413,7 +1410,7 @@ void RendererGL::uploadLoadedTextures()
 			0, 0, 
 			texLoaded.width, texLoaded.height, 
 			texLoaded.format,
-			texLoaded.imageSize, texLoaded.data->data());
+			texLoaded.data.size(), texLoaded.data.data());
 		*texLoaded.lodMin = std::min(*texLoaded.lodMin, texLoaded.mipmap);
 	}
 }
@@ -1549,14 +1546,7 @@ void RendererGL::initStreamTexThread() {
 				texWaitQueue.pop();
 			}
 
-			shared_ptr<vector<uint8_t>> imageData = make_shared<vector<uint8_t>>();
-
 			// Load image data
-			size_t imageSize;
-			texWait.loader.getImageData(texWait.mipmap, &imageSize, nullptr);
-			imageData->resize(imageSize);
-			texWait.loader.getImageData(texWait.mipmap, &imageSize, imageData->data());
-
 			TexLoaded tl{};
 			tl.id = texWait.id;
 			tl.sampler = texWait.sampler;
@@ -1565,8 +1555,7 @@ void RendererGL::initStreamTexThread() {
 			tl.format = DDSFormatToGL(texWait.loader.getFormat());
 			tl.width  = texWait.loader.getWidth (tl.mipmap);
 			tl.height = texWait.loader.getHeight(tl.mipmap);
-			tl.imageSize = imageSize;
-			tl.data = imageData;
+			tl.data = texWait.loader.getImageData(texWait.mipmap);;
 
 			// Emulate slow loading times with this
 			//this_thread::sleep_for(chrono::milliseconds(1000));
