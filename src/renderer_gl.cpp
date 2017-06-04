@@ -728,98 +728,68 @@ void RendererGL::takeScreenshot(const string &filename)
 	screenshotFilename = filename;
 }
 
-/// Converts a RGBA color to a BC1, BC2 or BC3 block (roughly, without interpolation)
-void RGBAToBC(const vec4 color, DDSLoader::Format format, vector<uint8_t> &block)
-{
-	// RGB8 to 5_6_5
-	uint16_t color0 = 
-		(((int)(color.r*0x1F)&0x1F)<<11) | 
-		(((int)(color.g*0x3F)&0x3F)<<5) | 
-		((int)(color.b*0x1F)&0x1F);
-
-	if (format == DDSLoader::Format::BC1)
-	{
-		block.resize(8);
-	}
-	else 
-	{
-		block.resize(16);
-		if (format == DDSLoader::Format::BC2)
-		{
-			int alpha = (color.a*0xF);
-			uint8_t alphaCodes = (alpha << 4) | alpha;
-			for (int i=8;i<16;++i) block[i] = alphaCodes;
-		}
-		else if (format == DDSLoader::Format::BC3)
-		{
-			uint8_t alpha = (color.a*0xFF);
-			block[8] = alpha;
-			block[9] = alpha;
-		}
-	}
-
-	block[0] = color0&0xFF;
-	block[1] = (color0>>8)&0xFF;
-	block[2] = color0&0xFF;
-	block[3] = (color0>>8)&0xFF;
-	char codes = (color.a > 0.5)?0x00:0xFF;
-	for (int i=4;i<8;++i) block[i] = codes;
-}
-
 RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 	const string filename,
 	int *lodMin,
 	const vec4 defaultColor)
 {
 	DDSLoader loader(maxTexSize);
-	if (loader.open(filename))
+	if (!loader.open(filename)) return PlanetData::StreamTex(0,0,0,0);
+
+	if (loader.getMipmapCount() != 
+		mipmapCount(std::max(loader.getWidth(0), loader.getHeight(0))))
 	{
-		const int mipmapCount = loader.getMipmapCount();
-		// Create texture
-		GLuint id;
-		glCreateTextures(GL_TEXTURE_2D, 1, &id);
-		glTextureStorage2D(id, 
-			mipmapCount, DDSFormatToGL(loader.getFormat()), 
-			loader.getWidth(0), loader.getHeight(0));
-		// Default color at highest mipmap
-		*lodMin = mipmapCount-1;
-		vector<uint8_t> block;
-		RGBAToBC(defaultColor, loader.getFormat(), block);
-		glCompressedTextureSubImage2D(id, *lodMin, 0, 0, 1, 1, 
-			DDSFormatToGL(loader.getFormat()), block.size(), block.data());
-
-		// Create sampler
-		GLuint sampler;
-		glCreateSamplers(1, &sampler);
-		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
-		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameteri(sampler, GL_TEXTURE_MIN_LOD, *lodMin);
-
-		// Create jobs
-		const int groupLoadMipmap = 8; // Number of highest mipmaps to load together
-		int jobCount = std::max(mipmapCount-groupLoadMipmap+1, 1);
-		vector<TexWait> texWait(jobCount);
-		for (int i=0;i<texWait.size();++i)
-		{
-			texWait[i] = {id, sampler, lodMin, jobCount-i-1, (i)?1:std::min(groupLoadMipmap,mipmapCount), loader};
-		}
-
-		// Push jobs to queue
-		{
-			lock_guard<mutex> lk(texWaitMutex);
-			for (auto tw : texWait)
-			{
-				texWaitQueue.push(tw);
-			}
-		}
-		// Wake up loading thread
-		texWaitCondition.notify_one();
-		return PlanetData::StreamTex(id, sampler, *lodMin, *lodMin);
+		cout << "Warning: Can't load stream texture " << filename
+		<< ": not enough mipmaps" << endl;
+		return PlanetData::StreamTex(0,0,0,0);
 	}
-	return PlanetData::StreamTex(0,0,0,0);
+
+	const int mipmapCount = loader.getMipmapCount();
+	// Create texture
+	GLuint id;
+	glCreateTextures(GL_TEXTURE_2D, 1, &id);
+	glTextureStorage2D(id, 
+		mipmapCount, DDSFormatToGL(loader.getFormat()), 
+		loader.getWidth(0), loader.getHeight(0));
+	// Starting lod
+	const int maxLod = mipmapCount-1;
+	size_t size = 0;
+	loader.getImageData(maxLod, 1, &size, nullptr);
+	vector<uint8_t> block(size);
+	loader.getImageData(maxLod, 1, nullptr, block.data());
+	glCompressedTextureSubImage2D(id, maxLod, 0, 0, 1, 1, 
+		DDSFormatToGL(loader.getFormat()), block.size(), block.data());
+
+	// Create sampler
+	GLuint sampler;
+	glCreateSamplers(1, &sampler);
+	glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
+	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glSamplerParameteri(sampler, GL_TEXTURE_MIN_LOD, maxLod);
+
+	// Create jobs
+	const int jobCount = mipmapCount-1;
+	vector<TexWait> texWait(jobCount);
+	for (int i=0;i<texWait.size();++i)
+	{
+		texWait[i] = {id, sampler, lodMin, jobCount-i-1, 1, loader};
+	}
+
+	// Push jobs to queue
+	{
+		lock_guard<mutex> lk(texWaitMutex);
+		for (auto tw : texWait)
+		{
+			texWaitQueue.push(tw);
+		}
+	}
+	// Wake up loading thread
+	texWaitCondition.notify_one();
+	return PlanetData::StreamTex(id, sampler, maxLod, maxLod);
+	
 }
 
 void RendererGL::unloadDDSTexture(PlanetData::StreamTex tex)

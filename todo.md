@@ -8,6 +8,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Load highest mipmap instead of default color for stream textures
 - [x] Better screenshot thread
 - [x] Move screenshot functionality into renderer
 - [x] Use lambdas for complex initialization
