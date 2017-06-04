@@ -1,4 +1,5 @@
 ## To Do
+- [ ] Break renderergl into several classes
 - [ ] Clean up planet structures
 - [ ] Correct flares
 - [ ] Better texture streaming management
