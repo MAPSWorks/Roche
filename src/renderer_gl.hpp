@@ -289,7 +289,6 @@ private:
 		GLuint sampler;
 		int *lodMin;
 		int mipmap;
-		int mipmapCount;
 		DDSLoader loader;
 	};
 
@@ -300,7 +299,6 @@ private:
 		int *lodMin;
 		GLenum format;
 		int mipmap;
-		int mipmapOffset;
 		int width, height;
 		int imageSize;
 		std::shared_ptr<std::vector<uint8_t>> data;

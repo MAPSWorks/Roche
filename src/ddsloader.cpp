@@ -37,7 +37,7 @@ struct DDS_HEADER {
 	DWORD           dwReserved2;
 };
 
-DDSLoader::DDSLoader(int maxSize_) : maxSize(maxSize_)
+DDSLoader::DDSLoader(int maxSize) : _maxSize(maxSize)
 {
 
 }
@@ -59,6 +59,11 @@ int getImageSize(const int width, const int height,
 	getFormatBytesPerBlock(format);
 }
 
+int getMipSize(int origSize, int mipLevel)
+{
+	return max(1, origSize>>mipLevel);
+}
+
 DDSLoader::Format getFourCCFormat(const char* fourCC)
 {
 	if (!strncmp(fourCC, "DXT1", 4))
@@ -78,8 +83,8 @@ DDSLoader::Format getFourCCFormat(const char* fourCC)
 
 bool DDSLoader::open(const string &filename)
 {
-	this->filename = filename;
-	ifstream in(filename.c_str(), ios::in | ios::binary);
+	_filename = filename;
+	ifstream in(_filename.c_str(), ios::in | ios::binary);
 	if (!in) return false;
 
 	// Magic number
@@ -94,21 +99,20 @@ bool DDSLoader::open(const string &filename)
 	// DDS header
 	DDS_HEADER header;
 	in.read((char*)&header, sizeof(DDS_HEADER));
-	format = getFourCCFormat((char*)&(header.ddspf.dwFourCC));
+	_format = getFourCCFormat((char*)&(header.ddspf.dwFourCC));
 
-	// Mipmap count check
-	mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
-
-	width = header.dwWidth;
-	height = header.dwHeight;
+	// Header info
+	_width = header.dwWidth;
+	_height = header.dwHeight;
+	_mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
 
 	// Compute which mipmaps to skip
-	const int maxDim = max(width, height);
-	const int skipMipmap = [&]{
+	const int maxDim = max(_width, _height);
+	_skipMipmap = [&]{
 		int skipMipmap = 0;
-		if (maxSize != -1)
+		if (_maxSize != -1)
 		{
-			for (int i=maxDim;i>maxSize;i=i/2)
+			for (int i=maxDim;i>_maxSize;i=i/2)
 				skipMipmap++;
 		}
 		return skipMipmap;
@@ -116,69 +120,56 @@ bool DDSLoader::open(const string &filename)
 
 	// Skip mipmaps
 	size_t offset = 128;
-	for (int i=0;i<skipMipmap;++i)
-	{
-		offset += getImageSize(getWidth(i), getHeight(i), format);
-	}
-
 	// Compute mipmap offsets & sizes
-	for (int i=skipMipmap;i<mipmapCount;++i)
+	for (int i=0;i<_mipmapCount;++i)
 	{
-		int size = getImageSize(getWidth(i), getHeight(i), format);
-		offsets.push_back(offset);
-		sizes.push_back(size);
+		int size = getImageSize(
+			getMipSize(_width , i),
+			getMipSize(_height, i),
+			_format);
+		_offsets.push_back(offset);
+		_sizes.push_back(size);
 		offset += size;
 	}
-
-	width = width >> skipMipmap;
-	height = height >> skipMipmap;
-	mipmapCount -= skipMipmap;
-
 	return true;
 }
 
 DDSLoader::Format DDSLoader::getFormat() const
 {
-	return format;
+	return _format;
 }
 
 int DDSLoader::getMipmapCount() const
 {
-	return mipmapCount;
+	return _mipmapCount;
 }
 
 int DDSLoader::getWidth(const int mipmapLevel) const
 {
-	return max(1, width>>mipmapLevel);
+	return getMipSize(_width, _skipMipmap+mipmapLevel);
 }
 
 int DDSLoader::getHeight(const int mipmapLevel) const
 {
-	return max(1, height>>mipmapLevel);
+	return getMipSize(_height, _skipMipmap+mipmapLevel);
 }
 
-void DDSLoader::getImageData(const int mipmapLevel, int mipmapCount, 
+void DDSLoader::getImageData(const int mipmapLevel, 
 	size_t *imageSize, uint8_t *data) const
 {
-	if (mipmapLevel+mipmapCount-1 >= getMipmapCount()) return;
+	if (mipmapLevel >= getMipmapCount()) return;
 	else if (mipmapLevel < 0) throw runtime_error("Can't load mipmap level < 0");
 
-	// Offset into file to get pixel data
-	const int size = [&]{
-		int size = 0;
-		for (int i=mipmapLevel;i<mipmapLevel+mipmapCount;++i)
-			size += sizes[i];
-		return size;
-	}();
+	const int size = _sizes[mipmapLevel+_skipMipmap];
 
 	if (imageSize)
 		*imageSize = size;
 
 	if (data)
 	{
-		ifstream in(filename.c_str(), ios::in | ios::binary);
+		ifstream in(_filename.c_str(), ios::in | ios::binary);
 		if (!in) return;
-		const int offset = offsets[mipmapLevel];
+		const int offset = _offsets[mipmapLevel+_skipMipmap];
 		in.seekg(offset, ios::beg);
 		in.read((char*)data, size);
 	}

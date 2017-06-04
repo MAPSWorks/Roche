@@ -17,16 +17,17 @@ public:
 	int getWidth(int mipmapLevel) const;
 	int getHeight(int mipmapLevel) const;
 	Format getFormat() const;
-	void getImageData(int mipmapLevel, int mipmapCount, 
+	void getImageData(int mipmapLevel, 
 		size_t *imageSize, uint8_t *data) const;
 
 private:
-	std::string filename = "";
-	int mipmapCount = 0;
-	int width = 0;
-	int height = 0;
-	int maxSize;
-	Format format = Format::Undefined;
-	std::vector<int> offsets; // Offsets for mipmaps in the file
-	std::vector<int> sizes; // Image sizes
+	std::string _filename = "";
+	int _mipmapCount = 0;
+	int _width = 0;
+	int _height = 0;
+	int _maxSize = -1;
+	int _skipMipmap = 0;
+	Format _format = Format::Undefined;
+	std::vector<int> _offsets; // Offsets for mipmaps in the file
+	std::vector<int> _sizes; // Image sizes
 };

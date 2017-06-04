@@ -8,6 +8,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Remove grouped mipmap loading from ddsloader
 - [x] Load highest mipmap instead of default color for stream textures
 - [x] Better screenshot thread
 - [x] Move screenshot functionality into renderer

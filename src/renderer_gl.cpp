@@ -754,9 +754,9 @@ RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 	// Starting lod
 	const int maxLod = mipmapCount-1;
 	size_t size = 0;
-	loader.getImageData(maxLod, 1, &size, nullptr);
+	loader.getImageData(maxLod, &size, nullptr);
 	vector<uint8_t> block(size);
-	loader.getImageData(maxLod, 1, nullptr, block.data());
+	loader.getImageData(maxLod, nullptr, block.data());
 	glCompressedTextureSubImage2D(id, maxLod, 0, 0, 1, 1, 
 		DDSFormatToGL(loader.getFormat()), block.size(), block.data());
 
@@ -773,9 +773,13 @@ RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
 	// Create jobs
 	const int jobCount = mipmapCount-1;
 	vector<TexWait> texWait(jobCount);
-	for (int i=0;i<texWait.size();++i)
+	for (int i=0;i<jobCount;++i)
 	{
-		texWait[i] = {id, sampler, lodMin, jobCount-i-1, 1, loader};
+		texWait[i].id = id;
+		texWait[i].sampler = sampler;
+		texWait[i].lodMin = lodMin;
+		texWait[i].mipmap = jobCount-i-1;
+		texWait[i].loader = loader;
 	}
 
 	// Push jobs to queue
@@ -1409,7 +1413,7 @@ void RendererGL::uploadLoadedTextures()
 			0, 0, 
 			texLoaded.width, texLoaded.height, 
 			texLoaded.format,
-			texLoaded.imageSize, texLoaded.data->data()+texLoaded.mipmapOffset);
+			texLoaded.imageSize, texLoaded.data->data());
 		*texLoaded.lodMin = std::min(*texLoaded.lodMin, texLoaded.mipmap);
 	}
 }
@@ -1549,31 +1553,20 @@ void RendererGL::initStreamTexThread() {
 
 			// Load image data
 			size_t imageSize;
-			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, nullptr);
+			texWait.loader.getImageData(texWait.mipmap, &imageSize, nullptr);
 			imageData->resize(imageSize);
-			texWait.loader.getImageData(texWait.mipmap, texWait.mipmapCount, &imageSize, imageData->data());
+			texWait.loader.getImageData(texWait.mipmap, &imageSize, imageData->data());
 
-			vector<TexLoaded> texLoaded(texWait.mipmapCount);
-			size_t offset = 0;
-
-			for (unsigned int i=0;i<texLoaded.size();++i)
-			{
-				auto &tl = texLoaded[i];
-				tl.id = texWait.id;
-				tl.sampler = texWait.sampler;
-				tl.lodMin = texWait.lodMin;
-				tl.mipmap = texWait.mipmap+i;
-				tl.mipmapOffset = offset;
-				tl.format = DDSFormatToGL(texWait.loader.getFormat());
-				tl.width  = texWait.loader.getWidth (tl.mipmap);
-				tl.height = texWait.loader.getHeight(tl.mipmap);
-				tl.data = imageData;
-				// Compute size of current mipmap + offset of next mipmap
-				size_t size0;
-				texWait.loader.getImageData(tl.mipmap, 1, &size0, nullptr);
-				tl.imageSize = size0;
-				offset += size0;
-			}
+			TexLoaded tl{};
+			tl.id = texWait.id;
+			tl.sampler = texWait.sampler;
+			tl.lodMin = texWait.lodMin;
+			tl.mipmap = texWait.mipmap;
+			tl.format = DDSFormatToGL(texWait.loader.getFormat());
+			tl.width  = texWait.loader.getWidth (tl.mipmap);
+			tl.height = texWait.loader.getHeight(tl.mipmap);
+			tl.imageSize = imageSize;
+			tl.data = imageData;
 
 			// Emulate slow loading times with this
 			//this_thread::sleep_for(chrono::milliseconds(1000));
@@ -1581,8 +1574,7 @@ void RendererGL::initStreamTexThread() {
 			// Push loaded texture into queue
 			{
 				lock_guard<mutex> lk(texLoadedMutex);
-				for (auto tl : texLoaded)
-					texLoadedQueue.push(tl);
+				texLoadedQueue.push(tl);
 			}
 		}
 	});
