@@ -32,7 +32,7 @@ private:
 	
 	// Main planet collection
 	uint32_t planetCount = 0;
-	std::vector<PlanetParameters> planetParams; // Immutable parameters
+	std::vector<Planet> planetParams; // Immutable parameters
 	std::vector<PlanetState> planetStates; // Mutable state
 	std::vector<int> planetParents;
 

@@ -93,7 +93,7 @@ void Game::init()
 	loadSettingsFile();
 	loadPlanetFiles();
 
-	cameraPolar.z = planetParams[focusedPlanetId].bodyParam.radius*4;
+	cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
 
 	// Window & context creation
 	if (!glfwInit())
@@ -174,6 +174,14 @@ glm::vec4 get(shaun::sweeper swp)
 	return ret;
 }
 
+glm::vec3 axis(const float rightAscension, const float declination)
+{
+	return glm::vec3(
+		-sin(rightAscension)*cos(declination),
+		 cos(rightAscension)*cos(declination),
+		 sin(declination));
+}
+	
 void Game::loadPlanetFiles()
 {
 	using namespace shaun;
@@ -194,91 +202,102 @@ void Game::loadPlanetFiles()
 
 		for (uint32_t i=0;i<planetCount;++i)
 		{
-			PlanetParameters planet = {};
 			sweeper pl(planetsSweeper[i]);
-			planet.name = std::string(pl("name").value<string>());
-			planet.parentName = get<std::string>(pl("parent"));
+			Planet planet(std::string(pl("name").value<string>()));
+			planet.setParentName(get<std::string>(pl("parent")));
 
-			auto & orbitParam = planet.orbitParam;
-			auto & bodyParam = planet.bodyParam;
-			auto & atmoParam = planet.atmoParam;
-			auto & assetPaths = planet.assetPaths;
-			auto & ringParam = planet.ringParam;
-
-			sweeper orbit(pl("orbit"));
-			if (!orbit.is_null())
+			sweeper orbitsw(pl("orbit"));
+			if (!orbitsw.is_null())
 			{
-				
-				orbitParam.ecc = get<double>(orbit("ecc"));
-				orbitParam.sma = get<double>(orbit("sma"));
-				orbitParam.inc = glm::radians(get<double>(orbit("inc")));
-				orbitParam.lan = glm::radians(get<double>(orbit("lan")));
-				orbitParam.arg = glm::radians(get<double>(orbit("arg")));
-				orbitParam.m0  = glm::radians(get<double>(orbit("m0" )));
+				const Planet::Orbit orbit(
+					get<double>(orbitsw("ecc")),
+					get<double>(orbitsw("sma")),
+					glm::radians(get<double>(orbitsw("inc"))),
+					glm::radians(get<double>(orbitsw("lan"))),
+					glm::radians(get<double>(orbitsw("arg"))),
+					glm::radians(get<double>(orbitsw("m0"))));
+				planet.setOrbit(orbit);
 			}
-			sweeper body(pl("body"));
-			if (!body.is_null())
+			sweeper bodysw(pl("body"));
+			if (!bodysw.is_null())
 			{
-				bodyParam.radius = get<double>(body("radius"));
-				float rightAscension = glm::radians(get<double>(body("rightAscension")));
-				float declination = glm::radians(get<double>(body("declination")));
-				bodyParam.rotationAxis = glm::vec3(
-					-sin(rightAscension)*cos(declination),
-					 cos(rightAscension)*cos(declination),
-					 sin(declination));
-				bodyParam.rotationPeriod = get<double>(body("rotPeriod"));
-				bodyParam.meanColor = get<glm::vec3>(body("meanColor"));
-				bodyParam.brightness = get<double>(body("brightness"));
-				bodyParam.GM = get<double>(body("GM"));
-				bodyParam.isStar = get<bool>(  body("isStar"));
-				assetPaths.diffuseFilename = get<std::string>(body("diffuse"));
-				assetPaths.nightFilename = get<std::string>(body("night"));
-				assetPaths.cloudFilename = get<std::string>(body("cloud"));
-				assetPaths.modelFilename = get<std::string>(body("model"));
-				bodyParam.cloudDispPeriod = get<double>(body("cloudDispPeriod"));
-				bodyParam.nightTexIntensity = get<double>(body("nightTexIntensity"));
+				const Planet::Body body(
+					get<double>(bodysw("radius")),
+					get<double>(bodysw("GM")),
+					axis(
+						glm::radians(get<double>(bodysw("rightAscension"))),
+						glm::radians(get<double>(bodysw("declination")))),
+					get<double>(bodysw("rotPeriod")),
+					get<glm::vec3>(bodysw("meanColor"))*
+					(float)get<double>(bodysw("albedo")),
+					get<std::string>(bodysw("diffuse")));
+				planet.setBody(body);
 			}
-			sweeper atmo(pl("atmosphere"));
-			atmoParam.hasAtmosphere = !atmo.is_null();
-			if (!atmo.is_null())
+			sweeper atmosw(pl("atmo"));
+			if (!atmosw.is_null())
 			{
-				atmoParam.hasAtmosphere = true;
-				atmoParam.maxHeight = get<double>(atmo("maxAltitude"));
-				atmoParam.K = get<glm::vec4>(atmo("K"));
-				atmoParam.density = get<double>(atmo("density"));
-				atmoParam.scaleHeight = get<double>(atmo("scaleHeight"));
+				Planet::Atmo atmo(
+					get<glm::vec4>(atmosw("K")),
+					get<double>(atmosw("density")),
+					get<double>(atmosw("maxHeight")),
+					get<double>(atmosw("scaleHeight")));
+				planet.setAtmo(atmo);
 			}
 
-			sweeper ring(pl("ring"));
-			ringParam.hasRings = !ring.is_null();
-			if (!ring.is_null())
+			sweeper ringsw(pl("ring"));
+			if (!ringsw.is_null())
 			{
-				ringParam.innerDistance = get<double>(ring("inner"));
-				ringParam.outerDistance = get<double>(ring("outer"));
-				float rightAscension = glm::radians(get<double>(ring("rightAscension")));
-				float declination = glm::radians(get<double>(ring("declination")));
-				ringParam.normal = glm::vec3(
-					-sin(rightAscension)*cos(declination),
-					 cos(rightAscension)*cos(declination),
-					 sin(declination));
-				assetPaths.backscatFilename = get<std::string>(ring("backscat"));
-				assetPaths.forwardscatFilename = get<std::string>(ring("forwardscat"));
-				assetPaths.unlitFilename = get<std::string>(ring("unlit"));
-				assetPaths.transparencyFilename = get<std::string>(ring("transparency"));
-				assetPaths.colorFilename = get<std::string>(ring("color"));
+				Planet::Ring ring(
+					get<double>(ringsw("inner")),
+					get<double>(ringsw("outer")),
+					axis(
+						glm::radians(get<double>(ringsw("rightAscension"))),
+						glm::radians(get<double>(ringsw("declination")))),
+					get<std::string>(ringsw("backscat")),
+					get<std::string>(ringsw("forwardscat")),
+					get<std::string>(ringsw("unlit")),
+					get<std::string>(ringsw("transparency")),
+					get<std::string>(ringsw("color")));
+				planet.setRing(ring);
 			}
+
+			sweeper starsw(pl("star"));
+			if (!starsw.is_null())
+			{
+				Planet::Star star(get<double>(starsw("brightness")));
+				planet.setStar(star);
+			}
+
+			sweeper cloudssw(pl("clouds"));
+			if (!cloudssw.is_null())
+			{
+				Planet::Clouds clouds(
+					get<std::string>(cloudssw("filename")),
+					get<double>(cloudssw("period")));
+				planet.setClouds(clouds);
+			}
+
+			sweeper nightsw(pl("night"));
+			if (!nightsw.is_null())
+			{
+				Planet::Night night(
+					get<std::string>(nightsw("filename")),
+					get<double>(nightsw("intensity")));
+				planet.setNight(night);
+			}
+
 			planetParams[i] = planet;
 		}
 		// Assign planet parents
 		for (uint32_t i=0;i<planetCount;++i)
 		{
-			const std::string parent = planetParams[i].parentName;
+			const std::string parent = planetParams[i].getParentName();
 			if (parent != "")
 			{
 				for (uint32_t j=0;j<planetCount;++j)
 				{
 					if (i==j) continue;
-					if (planetParams[j].name == parent)
+					if (planetParams[j].getName() == parent)
 					{
 						planetParents[i] = j;
 						break;
@@ -315,33 +334,38 @@ void Game::update(const double dt)
 	for (uint32_t i=0;i<planetCount;++i)
 	{
 		// Relative position update
-		if (planetParents[i] == -1)
-			planetStates[i].position = glm::dvec3(0,0,0);
-		else
-		{
-			relativePositions[i] = 
-				planetParams[i].orbitParam.computePosition(
-					epoch, planetParams[planetParents[i]].bodyParam.GM);
-		}
-		// Rotation
-		planetStates[i].rotationAngle = (2.0*glm::pi<float>()*epoch)/planetParams[i].bodyParam.rotationPeriod + glm::pi<float>();
-		// Cloud rotation
-		const float period = planetParams[i].bodyParam.cloudDispPeriod;
-		planetStates[i].cloudDisp = (period)?
-			fmod(-epoch/period, 1.f):
-			0.f;
+		relativePositions[i] = 
+			(planetParents[i] == -1 || !planetParams[i].hasOrbit())?
+			glm::dvec3(0.0):
+			planetParams[i].getOrbit().computePosition(
+				epoch, planetParams[planetParents[i]].getBody().getGM());
 	}
 
 	// Planet absolute position update
 	for (uint32_t i=0;i<planetCount;++i)
 	{
-		planetStates[i].position = relativePositions[i];
+		glm::dvec3 absPosition = relativePositions[i];
 		int parent = planetParents[i];
 		while (parent != -1)
 		{
-			planetStates[i].position += relativePositions[parent];
+			absPosition += relativePositions[parent];
 			parent = planetParents[parent];
 		}
+
+		// Planet Angle
+		const float rotationAngle = 
+			(2.0*glm::pi<float>()*epoch)
+			/planetParams[i].getBody().getRotationPeriod()
+			+ glm::pi<float>();
+
+		// Cloud Displacement
+		const float cloudDisp = [&]{
+			if (planetParams[i].hasClouds()) return 0.0;
+			const float period = planetParams[i].getClouds().getPeriod();
+			return (period)?fmod(-epoch/period, 1.f):0.f;
+		}();
+
+		planetStates[i] = PlanetState(absPosition, rotationAngle, cloudDisp);
 	}
 
 	// Time warping
@@ -360,7 +384,7 @@ void Game::update(const double dt)
 		if (isSwitching)
 		{
 			isSwitching = false;
-			cameraPolar.z = planetParams[focusedPlanetId].bodyParam.radius*4;
+			cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
 		}
 		else
 		{
@@ -375,16 +399,16 @@ void Game::update(const double dt)
 	{
 		const float t = switchFrameCurrent/(float)switchFrames;
 		const double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
-		const glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].position;
-		cameraCenter = (planetStates[focusedPlanetId].position - previousPlanetPos)*f + previousPlanetPos;
-		const float targetDist = planetParams[focusedPlanetId].bodyParam.radius*4;
+		const glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].getPosition();
+		cameraCenter = (planetStates[focusedPlanetId].getPosition() - previousPlanetPos)*f + previousPlanetPos;
+		const float targetDist = planetParams[focusedPlanetId].getBody().getRadius()*4;
 		cameraPolar.z = (targetDist - switchPreviousDist)*f + switchPreviousDist;
 
 		++switchFrameCurrent;
 	}
 	else
 	{
-		cameraCenter = planetStates[focusedPlanetId].position;
+		cameraCenter = planetStates[focusedPlanetId].getPosition();
 	}
 
 	if (switchFrameCurrent > switchFrames)
@@ -445,7 +469,7 @@ void Game::update(const double dt)
 		cameraPolar.y = -glm::pi<float>()/2 + 0.001;
 		viewSpeed.y = 0;
 	}
-	const float radius = planetParams[focusedPlanetId].bodyParam.radius;
+	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
 	if (cameraPolar.z < radius) cameraPolar.z = radius;
 
 	// Mouse reset

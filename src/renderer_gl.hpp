@@ -22,7 +22,7 @@ public:
 	RendererGL() = default;
 	void windowHints() override;
 	void init(
-		std::vector<PlanetParameters> planetParams, 
+		std::vector<Planet> planetParams, 
 		int msaa,
 		int maxTexSize,
 		int windowWidth,
@@ -209,7 +209,7 @@ private:
 	uint32_t frameId;
 	uint32_t bufferFrames;
 
-	std::vector<PlanetParameters> planetParams; // Static parameters
+	std::vector<Planet> planetParams; // Static parameters
 
 	struct PlanetData
 	{
@@ -253,11 +253,11 @@ private:
 	void unloadDDSTexture(PlanetData::StreamTex tex);
 
 	PlanetDynamicUBO getPlanetUBO(glm::dvec3 viewPos, glm::mat4 viewMat,
-	PlanetState state, PlanetParameters params, PlanetData data);
+	PlanetState state, Planet params, PlanetData data);
 
 	FlareDynamicUBO getFlareUBO(glm::dvec3 viewPos, glm::mat4 projMat,
 	glm::mat4 viewMat, float fovy, float exp, 
-	PlanetState state, PlanetParameters params);
+	PlanetState state, Planet params);
 
 	std::vector<PlanetData> planetData;
 

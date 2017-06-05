@@ -11,7 +11,7 @@ public:
 	virtual ~Renderer() {}
 	virtual void windowHints() {}
 	virtual void init(
-		std::vector<PlanetParameters> planetParams, 
+		std::vector<Planet> planetParams, 
 		int msaa,
 		int maxTexSize,
 		int windowWidth,

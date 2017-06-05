@@ -227,7 +227,7 @@ vector<DrawCommand> getCommands(
 }
 
 void RendererGL::init(
-	const vector<PlanetParameters> planetParams,
+	const vector<Planet> planetParams,
 	const int msaa,
 	const int maxTexSize,
 	const int windowWidth,
@@ -276,19 +276,15 @@ void RendererGL::init(
 	vector<int> ringModelId(planetCount, -1);
 	for (uint32_t i=0;i<planetCount;++i)
 	{
-		const PlanetParameters param = planetParams[i];
-		if (param.assetPaths.modelFilename != "")
-		{
-			throw runtime_error("Custom model not supported");
-		}
+		const Planet param = planetParams[i];
 		// Rings
-		if (param.ringParam.hasRings)
+		if (param.hasRing())
 		{
 			ringModelId[i] = vertices.size();
 			vertices.emplace_back();
 			indices.emplace_back();
-			float near = param.ringParam.innerDistance;
-			float far = param.ringParam.outerDistance;
+			float near = param.getRing().getInnerDistance();
+			float far = param.getRing().getOuterDistance();
 			const int ringMeridians = 128;
 			generateRingModel(ringMeridians, near, far, 
 				vertices.back(), indices.back());
@@ -837,8 +833,8 @@ void RendererGL::render(
 	for (uint32_t i=0;i<planetStates.size();++i)
 	{
 		auto &data = planetData[i];
-		const float radius = planetParams[i].bodyParam.radius;
-		const dvec3 pos = planetStates[i].position;
+		const float radius = planetParams[i].getBody().getRadius();
+		const dvec3 pos = planetStates[i].getPosition();
 		const double dist = distance(viewPos, pos)/radius;
 		if (dist < texLoadDistance && !data.texLoaded)
 		{
@@ -859,12 +855,12 @@ void RendererGL::render(
 				// Detailed model
 				closePlanets.push_back(i);
 				// Planet atmospheres
-				if (planetParams[i].atmoParam.hasAtmosphere)
+				if (planetParams[i].hasAtmo())
 				{
 					atmoPlanets.push_back(i);
 				}
 			}
-			if (dist > farPlanetMinDistance || planetParams[i].bodyParam.isStar)
+			if (dist > farPlanetMinDistance || planetParams[i].isStar())
 			{
 				// Flares
 				farPlanets.push_back(i);
@@ -921,16 +917,16 @@ void RendererGL::render(
 	// Planet sorting from front to back
 	sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
 	{
-		const float distI = distance(planetStates[i].position, viewPos);
-		const float distJ = distance(planetStates[j].position, viewPos);
+		const float distI = distance(planetStates[i].getPosition(), viewPos);
+		const float distJ = distance(planetStates[j].getPosition(), viewPos);
 		return distI < distJ;
 	});
 
 	// Atmosphere sorting from back to front
 	sort(atmoPlanets.begin(), atmoPlanets.end(), [&](int i, int j)
 	{
-		const float distI = distance(planetStates[i].position, viewPos);
-		const float distJ = distance(planetStates[j].position, viewPos);
+		const float distI = distance(planetStates[i].getPosition(), viewPos);
+		const float distJ = distance(planetStates[j].getPosition(), viewPos);
 		return distI > distJ;
 	});
 
@@ -1018,8 +1014,8 @@ void RendererGL::renderHdr(
 	for (uint32_t i : closePlanets)
 	{
 		auto &data = planetData[i];
-		const bool star = planetParams[i].bodyParam.isStar;
-		const bool hasAtmo = planetParams[i].atmoParam.hasAtmosphere;
+		const bool star = planetParams[i].isStar();
+		const bool hasAtmo = planetParams[i].hasAtmo();
 		glBindProgramPipeline(
 			star?
 			pipelineSun:
@@ -1098,7 +1094,7 @@ void RendererGL::renderAtmo(
 			data.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
-		bool hasRings = planetParams[i].ringParam.hasRings;
+		bool hasRings = planetParams[i].hasRing();
 
 		auto &data = planetData[i];
 		DrawCommand ringModel = data.ringModel;
@@ -1288,19 +1284,21 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 	// Texture loading
 	for (uint32_t i : texLoadPlanets)
 	{
-		const PlanetParameters param = planetParams[i];
+		const Planet param = planetParams[i];
 		auto &data = planetData[i];
 		// Textures & samplers
-		data.diffuse = loadDDSTexture(param.assetPaths.diffuseFilename, &data.diffuse.lodMin, vec4(1,1,1,1));
-		data.cloud = loadDDSTexture(param.assetPaths.cloudFilename, &data.cloud.lodMin  , vec4(0,0,0,0));
-		data.night = loadDDSTexture(param.assetPaths.nightFilename, &data.night.lodMin  , vec4(0,0,0,0));
+		data.diffuse = loadDDSTexture(param.getBody().getDiffuseFilename(), &data.diffuse.lodMin, vec4(1,1,1,1));
+		if (param.hasClouds())
+			data.cloud = loadDDSTexture(param.getClouds().getFilename(), &data.cloud.lodMin  , vec4(0,0,0,0));
+		if (param.hasNight())
+			data.night = loadDDSTexture(param.getNight().getFilename(), &data.night.lodMin  , vec4(0,0,0,0));
 
 		// Generate atmospheric scattering lookup texture
-		if (param.atmoParam.hasAtmosphere)
+		if (param.hasAtmo())
 		{
 			const int size = 128;
-			vector<float> table;
-			planetParams[i].atmoParam.generateLookupTable(table, size, param.bodyParam.radius);
+			vector<float> table = 
+				planetParams[i].getAtmo().generateLookupTable(size, param.getBody().getRadius());
 
 			GLuint &tex = data.atmoLookupTable;
 
@@ -1311,17 +1309,15 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 		}
 
 		// Load ring textures
-		if (param.ringParam.hasRings)
+		if (param.hasRing())
 		{
 			// Load files
-			vector<float> backscat, forwardscat, unlit, transparency, color;
-			const RingParameters ringParam = param.ringParam;
-			const AssetPaths assetPaths = param.assetPaths;
-			ringParam.loadFile(assetPaths.backscatFilename, backscat);
-			ringParam.loadFile(assetPaths.forwardscatFilename, forwardscat);
-			ringParam.loadFile(assetPaths.unlitFilename, unlit);
-			ringParam.loadFile(assetPaths.transparencyFilename, transparency);
-			ringParam.loadFile(assetPaths.colorFilename, color);
+			const Planet::Ring &ring = param.getRing();
+			vector<float> backscat = ring.loadFile(ring.getBackscatFilename());
+			vector<float> forwardscat = ring.loadFile(ring.getForwardscatFilename());
+			vector<float> unlit = ring.loadFile(ring.getUnlitFilename());
+			vector<float> transparency = ring.loadFile(ring.getTransparencyFilename());
+			vector<float> color = ring.loadFile(ring.getColorFilename());
 
 			size_t size = backscat.size();
 
@@ -1381,12 +1377,12 @@ void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
 		data.cloud = PlanetData::StreamTex();
 		data.night = PlanetData::StreamTex();
 
-		if (param.atmoParam.hasAtmosphere)
+		if (param.hasAtmo())
 		{
 			glDeleteTextures(1, &data.atmoLookupTable);
 		}
 
-		if (param.ringParam.hasRings)
+		if (param.hasRing())
 		{
 			glDeleteTextures(1, &data.ringTex1);
 			glDeleteTextures(2, &data.ringTex2);
@@ -1417,65 +1413,77 @@ void RendererGL::uploadLoadedTextures()
 
 RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	const dvec3 viewPos, const mat4 viewMat,
-	const PlanetState state, const PlanetParameters params,
+	const PlanetState state, const Planet params,
 	const PlanetData data)
 {
-	const vec3 planetPos = state.position - viewPos;
+	const vec3 planetPos = state.getPosition() - viewPos;
 
 	// Planet rotation
 	const vec3 north = vec3(0,0,1);
-	const vec3 rotAxis = params.bodyParam.rotationAxis;
+	const vec3 rotAxis = params.getBody().getRotationAxis();
 	const quat q = rotate(quat(), 
 		(float)acos(dot(north, rotAxis)), 
 		cross(north, rotAxis))*
-		rotate(quat(), state.rotationAngle, north);
+		rotate(quat(), state.getRotationAngle(), north);
 
 	// Model matrix
 	const mat4 modelMat = 
 		translate(mat4(), planetPos)*
 		mat4_cast(q)*
-		scale(mat4(), vec3(params.bodyParam.radius));
+		scale(mat4(), vec3(params.getBody().getRadius()));
 
 	// Atmosphere matrix
-	const mat4 atmoMat = 
+	const mat4 atmoMat = (params.hasAtmo())?
 		translate(mat4(), planetPos)*
 		mat4_cast(q)*
-		scale(mat4(), -vec3(params.bodyParam.radius+params.atmoParam.maxHeight));
+		scale(mat4(), -vec3(params.getBody().getRadius()+params.getAtmo().getMaxHeight())):
+		mat4(0.0);
 
 	// Ring matrices
-	const vec3 towards = normalize(planetPos);
-	const vec3 up = params.ringParam.normal;
-	const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
-	const vec3 right = normalize(cross(towards, up));
-	const vec3 newTowards = cross(right, up);
+	pair<mat4, mat4> ringMatrices = [&]{
+		if (!params.hasRing()) return make_pair(mat4(0),mat4(0));
 
-	const mat4 lookAtFar = mat4(mat3(sideflip*right, -newTowards, up));
-	const mat4 lookAtNear = mat4(mat3(-sideflip*right, newTowards, up));
+		const vec3 towards = normalize(planetPos);
+		const vec3 up = params.getRing().getNormal();
+		const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
+		const vec3 right = normalize(cross(towards, up));
+		const vec3 newTowards = cross(right, up);
 
-	const mat4 ringFarMat = 
-		translate(mat4(), planetPos)*
-		lookAtFar;
+		const mat4 lookAtFar = mat4(mat3(sideflip*right, -newTowards, up));
+		const mat4 lookAtNear = mat4(mat3(-sideflip*right, newTowards, up));
 
-	const mat4 ringNearMat =
-		translate(mat4(), planetPos)*
-		lookAtNear;
+		const mat4 ringFarMat = 
+			translate(mat4(), planetPos)*
+			lookAtFar;
+
+		const mat4 ringNearMat =
+			translate(mat4(), planetPos)*
+			lookAtNear;
+
+		return make_pair(ringFarMat, ringNearMat);
+	}();
+	
 
 	// Light direction
-	const vec3 lightDir = vec3(normalize(-state.position));
+	const vec3 lightDir = vec3(normalize(-state.getPosition()));
 
-	PlanetDynamicUBO ubo;
+	PlanetDynamicUBO ubo{};
 	ubo.modelMat = modelMat;
 	ubo.atmoMat = atmoMat;
-	ubo.ringFarMat = ringFarMat;
-	ubo.ringNearMat = ringNearMat;
+	ubo.ringFarMat = ringMatrices.first;
+	ubo.ringNearMat = ringMatrices.second;
 	ubo.planetPos = viewMat*vec4(planetPos, 1.0);
 	ubo.lightDir = viewMat*vec4(lightDir,0.0);
-	ubo.K = params.atmoParam.K;
-	ubo.cloudDisp = state.cloudDisp;
-	ubo.nightTexIntensity = params.bodyParam.nightTexIntensity;
-	ubo.starBrightness = params.bodyParam.brightness;
-	ubo.radius = params.bodyParam.radius;
-	ubo.atmoHeight = params.atmoParam.maxHeight;
+	ubo.K = params.hasAtmo()
+		?params.getAtmo().getScatteringConstant()
+		:glm::vec4(0.0);
+	ubo.cloudDisp = state.getCloudDisp();
+	ubo.nightTexIntensity = params.hasNight()
+		?params.getNight().getIntensity():0.0;
+	ubo.starBrightness = params.isStar()
+		?params.getStar().getBrightness():0.0;
+	ubo.radius = params.getBody().getRadius();
+	ubo.atmoHeight = params.hasAtmo()?params.getAtmo().getMaxHeight():0.0;
 
 	return ubo;
 }
@@ -1483,9 +1491,9 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 	const dvec3 viewPos, const mat4 projMat,
 	const mat4 viewMat, const float fovy, const float exp, 
-	const PlanetState state, const PlanetParameters params)
+	const PlanetState state, const Planet params)
 {
-	const vec3 planetPos = vec3(state.position - viewPos);
+	const vec3 planetPos = vec3(state.getPosition() - viewPos);
 	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
 	const vec2 screen = vec2(clip)/clip.w;
 	const float FLARE_SIZE_DEGREES = 20.0;
@@ -1496,31 +1504,30 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 			FLARE_SIZE_DEGREES*(float)glm::pi<float>()/(fovy*180.0f));
 
 	const float phaseAngle = acos(dot(
-		(vec3)normalize(state.position), 
+		(vec3)normalize(state.getPosition()), 
 		normalize(planetPos)));
 	const float phase = 
 		(1-phaseAngle/glm::pi<float>())*cos(phaseAngle)+
 		(1/glm::pi<float>())*sin(phaseAngle);
-	const bool isStar = params.bodyParam.isStar;
-	const float radius = params.bodyParam.radius;
-	const double dist = distance(viewPos, state.position)/radius;
-	const float fade = clamp(isStar?
+	const float radius = params.getBody().getRadius();
+	const double dist = distance(viewPos, state.getPosition())/radius;
+	const float fade = clamp(params.isStar()?
 		(float)   dist/10:
 		(float) ((dist-farPlanetMinDistance)/
-						(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
+		(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
 	const vec3 cutDist = planetPos*0.005f;
 	
 	const float brightness = std::min(4.0f,
 		exp*
 		radius*radius*
-		(isStar?100.f:
-		params.bodyParam.brightness*0.2f*phase)
+		(params.isStar()?params.getStar().getBrightness():
+		0.2f*phase)
 		/dot(cutDist,cutDist))
 		*fade;
 
 	FlareDynamicUBO ubo;
 	ubo.modelMat = modelMat;
-	ubo.color = vec4(params.bodyParam.meanColor,1.0);
+	ubo.color = vec4(params.getBody().getMeanColor(),1.0);
 	ubo.brightness = brightness;
 
 	return ubo;

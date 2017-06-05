@@ -1,8 +1,5 @@
 ## To Do
-- [ ] Invalidate framebuffer attachments
 - [ ] Break renderergl into several classes
-- [ ] Use std::future instead of threads for screenshots & tex loading
-- [ ] Clean up planet structures
 - [ ] Correct flares
 - [ ] Better texture streaming management
 - [ ] PBOs
@@ -12,6 +9,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Clean up planet structures
 - [x] Better ddsloader API
 - [x] Remove grouped mipmap loading from ddsloader
 - [x] Load highest mipmap instead of default color for stream textures
