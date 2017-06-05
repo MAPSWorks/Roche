@@ -1,10 +1,13 @@
 ## To Do
+- [ ] Invalidate framebuffer attachments
 - [ ] Break renderergl into several classes
+- [ ] Use std::future instead of threads for screenshots & tex loading
 - [ ] Clean up planet structures
 - [ ] Correct flares
 - [ ] Better texture streaming management
 - [ ] PBOs
 - [ ] Use BC7 for textures
+- [ ] Specular support
 - [ ] Sparse textures?
 - [ ] Vulkan implementation, one day
 
