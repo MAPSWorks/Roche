@@ -49,8 +49,7 @@ void main(void)
 	passPosition = sceneUBO.viewMat*mMat*inPosition;
 	gl_Position = sceneUBO.projMat*passPosition;
 	// Logarithmic depth buffer
-	gl_Position.z = log2(max(1e-6, 1.0+gl_Position.w)) * (2.0/log2(5e10 + 1.0)) - 1.0;
-	gl_Position.z *= gl_Position.w;
+	gl_Position.z = logDepth(gl_Position.w, sceneUBO.logDepthCoef);
 
 #if defined(HAS_ATMO)
 	vec3 pp = passPosition.xyz-planetUBO.planetPos.xyz;

@@ -7,6 +7,7 @@ struct SceneUBO
 	vec4 viewPos;
 	float ambientColor;
 	float exposure;
+	float logDepthCoef;
 };
 
 struct PlanetUBO
@@ -31,6 +32,11 @@ struct FlareUBO
 	vec4 color;
 	float brightness;
 };
+
+float logDepth(float w, float coef)
+{
+	return log2(max(1e-6, w)) * coef * w;
+}
 
 float rayleigh(float cc)
 {

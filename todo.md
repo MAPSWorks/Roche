@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Change depth clip control to be from zero to one
 - [ ] Break renderergl into several classes
 - [ ] Correct flares
 - [ ] Better texture streaming management
@@ -10,6 +9,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Change depth clip control to be from zero to one
 - [x] Clean up planet structures
 - [x] Better ddsloader API
 - [x] Remove grouped mipmap loading from ddsloader

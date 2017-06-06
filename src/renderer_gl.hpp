@@ -55,6 +55,7 @@ private:
 		glm::vec4 viewPos;
 		float ambientColor;
 		float exposure;
+		float logDepthCoef;
 	};
 
 	struct PlanetDynamicUBO
@@ -125,6 +126,7 @@ private:
 	int maxTexSize = -1;
 	int windowWidth = 0;
 	int windowHeight = 0;
+	float farPlane = 5e10;
 
 	// Constants for distance based loading
 	float closePlanetMaxDistance;

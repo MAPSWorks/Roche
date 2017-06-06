@@ -346,6 +346,9 @@ void RendererGL::init(
 	glFrontFace(GL_CCW);
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
+
+	// Clip control
+	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 }
 
 void RendererGL::createTextures()
@@ -824,7 +827,7 @@ void RendererGL::render(
 	auto &currentData = dynamicData[frameId];
 
 	// Projection and view matrices
-	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 1.f, (float)5e10);
+	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 0.001f, farPlane);
 	const mat4 viewMat = lookAt(vec3(0), (vec3)(viewCenter-viewPos), viewUp);
 
 	// Planet classification
@@ -887,6 +890,7 @@ void RendererGL::render(
 	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = ambientColor;
 	sceneUBO.exposure = exp;
+	sceneUBO.logDepthCoef = (1.0/log2(farPlane + 1.0));
 
 	// Planet uniform update
 	// Close planets (detailed model)
