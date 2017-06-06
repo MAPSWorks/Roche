@@ -847,8 +847,12 @@ void RendererGL::render(
 	for (uint32_t i=0;i<planetStates.size();++i)
 	{
 		auto &data = planetData[i];
-		const float radius = planetParams[i].getBody().getRadius();
-		const dvec3 pos = planetStates[i].getPosition();
+		const auto &param = planetParams[i];
+		const auto &state = planetStates[i];
+		const float radius = param.getBody().getRadius();
+		const float maxRadius = radius+(param.hasRing()?
+			param.getRing().getOuterDistance():0);
+		const dvec3 pos = state.getPosition();
 		const double dist = distance(viewPos, pos)/radius;
 		if (dist < texLoadDistance && !data.texLoaded)
 		{
@@ -862,19 +866,19 @@ void RendererGL::render(
 		}
 
 		// Don't render planets behind the view
-		if ((viewMat*vec4(pos - viewPos,1.0)).z < 0)
+		if ((viewMat*vec4(pos - viewPos,1.0)).z < maxRadius)
 		{
 			if (dist < closePlanetMaxDistance)
 			{
 				// Detailed model
 				closePlanets.push_back(i);
 				// Planet atmospheres
-				if (planetParams[i].hasAtmo())
+				if (param.hasAtmo())
 				{
 					atmoPlanets.push_back(i);
 				}
 			}
-			if (dist > farPlanetMinDistance || planetParams[i].isStar())
+			if (dist > farPlanetMinDistance || param.isStar())
 			{
 				// Flares
 				farPlanets.push_back(i);
