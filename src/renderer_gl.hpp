@@ -6,6 +6,7 @@
 #include "ddsloader.hpp"
 #include "gl_util.hpp"
 #include "gl_profiler.hpp"
+#include "screenshot.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -105,21 +106,17 @@ private:
 	void uploadLoadedTextures();
 
 	void initStreamTexThread();
-	void initScreenshotThread();
 
 	void saveScreenshot();
 
 	GPUProfilerGL profiler;
 
 	// Screenshot info
-	bool screenshot = false;
-	std::string screenshotFilename = "";
-	GLenum screenshotBestFormat = GL_RGBA;
-	std::vector<uint8_t> screenshotBuffer;
-	std::thread screenshotThread;
-	bool screenshotTaken = false;
-	std::mutex screenshotMutex;
-	std::condition_variable screenshotCond;
+	bool takeScreen = false;
+	std::string screenFilename = "";
+	Screenshot::Format screenBestFormat = Screenshot::Format::RGBA8;
+	GLenum screenBestFormatGL = GL_RGBA;
+	Screenshot screenshot;
 
 	uint32_t planetCount = 0;
 	int msaaSamples = 1;

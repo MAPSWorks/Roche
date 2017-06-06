@@ -12,9 +12,6 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "thirdparty/stb_image_write.h"
-
 using namespace glm;
 using namespace std;
 
@@ -340,7 +337,6 @@ void RendererGL::init(
 	createTextures();
 	createScreenshot();
 	initStreamTexThread();
-	initScreenshotThread();
 
 	// Backface culling
 	glFrontFace(GL_CCW);
@@ -712,10 +708,13 @@ void RendererGL::createScreenshot()
 {
 	// Find best transfer format
 	glGetInternalformativ(GL_RENDERBUFFER, GL_RGBA8, GL_READ_PIXELS_FORMAT,
-		1, (GLint*)&screenshotBestFormat);
-	if (screenshotBestFormat != GL_BGRA) screenshotBestFormat = GL_RGBA;
+		1, (GLint*)&screenBestFormatGL);
+	if (screenBestFormatGL != GL_BGRA) screenBestFormatGL = GL_RGBA;
 
-	screenshotBuffer.resize(4*windowWidth*windowHeight);
+	if (screenBestFormatGL == GL_RGBA) 
+		screenBestFormat = Screenshot::Format::RGBA8;
+	else if (screenBestFormatGL == GL_BGRA) 
+		screenBestFormat = Screenshot::Format::BGRA8;
 }
 
 void RendererGL::destroy()
@@ -723,19 +722,16 @@ void RendererGL::destroy()
 	// Kill thread
 	{
 		lock_guard<mutex> lk1(texWaitMutex);
-		lock_guard<mutex> lk2(screenshotMutex);
 		killThread = true;
 	}
 	texWaitCondition.notify_one();
 	texLoadThread.join();
-	screenshotCond.notify_one();
-	screenshotThread.join();
 }
 
 void RendererGL::takeScreenshot(const string &filename)
 {
-	screenshot = true;
-	screenshotFilename = filename;
+	takeScreen = true;
+	screenFilename = filename;
 }
 
 RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
@@ -965,10 +961,10 @@ void RendererGL::render(
 	renderTonemap(currentData);
 	profiler.end();
 
-	if (screenshot)
+	if (takeScreen)
 	{
 		saveScreenshot();
-		screenshot = false;
+		takeScreen = false;
 	}
 
 	profiler.end();
@@ -982,21 +978,16 @@ void RendererGL::render(
 void RendererGL::saveScreenshot()
 {
 	// Cancel if already saving screenshot
-	{
-		lock_guard<mutex> lk(screenshotMutex);
-		if (screenshotTaken) return;
-	}
+	if (screenshot.isSaving()) return;
 	// Read screen
+	vector<uint8_t> buffer(4*windowWidth*windowHeight);
 	glReadBuffer(GL_FRONT);
 	glReadPixels(0, 0, windowWidth, windowHeight, 
-		screenshotBestFormat, GL_UNSIGNED_BYTE, screenshotBuffer.data());
-
-	// Tell the thread to save
-	{
-		lock_guard<mutex> lk(screenshotMutex);
-		screenshotTaken = true;
-	}
-	screenshotCond.notify_one();
+		screenBestFormatGL, GL_UNSIGNED_BYTE, buffer.data());
+	screenshot.save(
+		screenFilename,
+		windowWidth, windowHeight, 
+		screenBestFormat, buffer);
 }
 
 void RendererGL::renderHdr(
@@ -1574,55 +1565,6 @@ void RendererGL::initStreamTexThread() {
 			{
 				lock_guard<mutex> lk(texLoadedMutex);
 				texLoadedQueue.push(tl);
-			}
-		}
-	});
-}
-
-void RendererGL::initScreenshotThread()
-{
-	screenshotThread = thread([&,this]()
-	{
-		while (true)
-		{
-			// Wait on kill or screenshot waiting to be saved
-			{
-				unique_lock<mutex> lk(screenshotMutex);
-				screenshotCond.wait(lk, [&]{ return killThread || screenshotTaken;});
-				if (killThread) return;
-			}
-
-			// Create temp buffer for operations
-			vector<uint8_t> buffer(4*windowWidth*windowHeight);
-			{
-				lock_guard<mutex> lk(screenshotMutex);
-				// Flip upside down
-				for (int i=0;i<windowHeight;++i)
-				{
-					memcpy(buffer.data()+i*windowWidth*4, 
-						screenshotBuffer.data()+(windowHeight-i-1)*windowWidth*4, 
-						windowWidth*4);
-				}
-				// Unlock resource
-				screenshotTaken = false;
-			}
-
-			// Flip GL_BGRA to GL_RGBA
-			if (screenshotBestFormat == GL_BGRA)
-			{
-				for (int i=0;i<windowWidth*windowHeight*4;i+=4)
-				{
-					swap(buffer[i+0], buffer[i+2]);
-				}
-			}
-
-			// Save screenshot
-			if (!stbi_write_png(screenshotFilename.c_str(), 
-				windowWidth, windowHeight, 4,
-				buffer.data(), windowWidth*4))
-			{
-				cout << "WARNING : Can't save screenshot " << 
-					screenshotFilename << endl;
 			}
 		}
 	});

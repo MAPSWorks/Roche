@@ -16,7 +16,8 @@ set(SOURCE_GL
 	renderer_gl.cpp
 	fence.cpp
 	gl_util.cpp
-	gl_profiler.cpp)
+	gl_profiler.cpp
+	screenshot.cpp)
 
 project (roche)
 
