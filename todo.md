@@ -1,4 +1,5 @@
-## To Do
+## To Do-
+- [ ] Change depth clip control to be from zero to one
 - [ ] Break renderergl into several classes
 - [ ] Correct flares
 - [ ] Better texture streaming management
