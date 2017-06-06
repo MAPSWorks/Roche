@@ -352,6 +352,9 @@ void RendererGL::init(
 
 	// Depth test
 	glEnable(GL_DEPTH_TEST);
+
+	// Blending
+	glEnable(GL_BLEND);
 }
 
 void RendererGL::createTextures()
@@ -999,10 +1002,9 @@ void RendererGL::renderHdr(
 	// Depth test/write
 	glDepthMask(GL_TRUE);
 	glDepthFunc(GL_LESS);
-	// No stencil writes
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 	// No blending
-	glDisable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ZERO);
 
 	// Clearing
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
@@ -1081,10 +1083,7 @@ void RendererGL::renderAtmo(
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
-	// No stencil writes
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 	// Blending
-	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_SRC_ALPHA);
 
@@ -1219,11 +1218,8 @@ void RendererGL::renderFlares(
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
-	// No stencil writes
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	// Blending add
-	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 
@@ -1256,14 +1252,13 @@ void RendererGL::renderFlares(
 
 void RendererGL::renderTonemap(const DynamicData data)
 {
-	// No stencil test/write
-	glStencilFunc(GL_ALWAYS, 0, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
 	glDepthMask(GL_FALSE);
 
-	glDisable(GL_BLEND);
+	// No blending
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ZERO);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
