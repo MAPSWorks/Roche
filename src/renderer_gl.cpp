@@ -1056,7 +1056,7 @@ void RendererGL::renderHdr(
 			{
 				if (tex->smoothLodMin > tex->lodMin)
 					tex->smoothLodMin = std::max((float)tex->lodMin, 
-						tex->smoothLodMin - 0.1f*ceil(tex->smoothLodMin - tex->lodMin));
+						tex->smoothLodMin - 0.5f*ceil(tex->smoothLodMin - tex->lodMin));
 				glSamplerParameterf(tex->sampler, GL_TEXTURE_MIN_LOD, tex->smoothLodMin);
 			}
 		}
