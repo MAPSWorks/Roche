@@ -11,19 +11,19 @@ public:
 	virtual ~Renderer() {}
 	virtual void windowHints() {}
 	virtual void init(
-		std::vector<Planet> planetParams, 
+		const std::vector<Planet> &planetParams, 
 		int msaa,
 		int maxTexSize,
 		int windowWidth,
 		int windowHeight) {}
 	virtual void render(
-		glm::dvec3 viewPos, 
+		const glm::dvec3 &viewPos, 
 		float fovy,
-		glm::dvec3 viewCenter,
-		glm::vec3 viewUp,
+		const glm::dvec3 &viewCenter,
+		const glm::vec3 &viewUp,
 		float exposure,
 		float ambientColor,
-		std::vector<PlanetState> planetStates) {}
+		const std::vector<PlanetState> &planetStates) {}
 	virtual void takeScreenshot(const std::string &filename) {}
 	virtual void destroy() {}
 	

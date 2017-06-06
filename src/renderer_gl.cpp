@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <array>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/constants.hpp>
@@ -177,17 +178,6 @@ void generateRingModel(
 	}
 }
 
-GLenum DDSFormatToGL(DDSLoader::Format format)
-{
-	switch (format)
-	{
-		case DDSLoader::Format::BC1: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
-		case DDSLoader::Format::BC2: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT;
-		case DDSLoader::Format::BC3: return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT;
-	}
-	return 0;
-}
-
 template <class V, class I>
 vector<DrawCommand> getCommands(
 	GLuint vao, GLenum mode, GLenum indexType,
@@ -224,7 +214,7 @@ vector<DrawCommand> getCommands(
 }
 
 void RendererGL::init(
-	const vector<Planet> planetParams,
+	const vector<Planet> &planetParams,
 	const int msaa,
 	const int maxTexSize,
 	const int windowWidth,
@@ -336,7 +326,6 @@ void RendererGL::init(
 	createRendertargets();
 	createTextures();
 	createScreenshot();
-	initStreamTexThread();
 
 	// Backface culling
 	glFrontFace(GL_CCW);
@@ -353,32 +342,33 @@ void RendererGL::init(
 	glEnable(GL_BLEND);
 }
 
-void RendererGL::createTextures()
+float getAnisotropy(const int requestedAnisotropy)
 {
-	// Anisotropy
 	float maxAnisotropy;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
 
+	return (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
+}
+
+GLuint create1PixTex(const array<uint8_t, 4> pixColor)
+{
+	GLuint id;
+	glCreateTextures(GL_TEXTURE_2D, 1, &id);
+	glTextureStorage2D(id, 1, GL_RGBA8, 1, 1);
+	glTextureSubImage2D(id, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixColor.data());
+	return id;
+}
+
+void RendererGL::createTextures()
+{
+	// Anisotropy
 	const float requestedAnisotropy = 16.f;
-	textureAnisotropy = (requestedAnisotropy > maxAnisotropy)?maxAnisotropy:requestedAnisotropy;
+	textureAnisotropy = getAnisotropy(requestedAnisotropy);
 
-	// Default diffuse tex
-	const uint8_t diffuseData[] = {0, 0, 0};
-	glCreateTextures(GL_TEXTURE_2D, 1, &diffuseTexDefault);
-	glTextureStorage2D(diffuseTexDefault, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(diffuseTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, diffuseData);
-	
-	// Default cloud tex
-	const uint8_t cloudData[] = {255, 255, 255, 0};
-	glCreateTextures(GL_TEXTURE_2D, 1, &cloudTexDefault);
-	glTextureStorage2D(cloudTexDefault, 1, GL_RGBA8, 1, 1);
-	glTextureSubImage2D(cloudTexDefault, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, cloudData);
-
-	// Default night tex
-	const uint8_t nightData[] = {0, 0, 0};
-	glCreateTextures(GL_TEXTURE_2D, 1, &nightTexDefault);
-	glTextureStorage2D(nightTexDefault, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(nightTexDefault, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, nightData);
+	// Default textures 
+	diffuseTexDefault = create1PixTex({0,0,0,255});
+	cloudTexDefault = create1PixTex({255,255,255,0});
+	nightTexDefault = create1PixTex({0,0,0,255});
 
 	createFlare();
 
@@ -400,11 +390,6 @@ void RendererGL::createTextures()
 	glSamplerParameteri(ringSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glSamplerParameteri(ringSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(ringSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
-}
-
-int mipmapCount(int size)
-{
-	return 1 +std::floor(std::log2(size));
 }
 
 void RendererGL::createFlare()
@@ -719,13 +704,7 @@ void RendererGL::createScreenshot()
 
 void RendererGL::destroy()
 {
-	// Kill thread
-	{
-		lock_guard<mutex> lk1(texWaitMutex);
-		killThread = true;
-	}
-	texWaitCondition.notify_one();
-	texLoadThread.join();
+
 }
 
 void RendererGL::takeScreenshot(const string &filename)
@@ -734,87 +713,14 @@ void RendererGL::takeScreenshot(const string &filename)
 	screenFilename = filename;
 }
 
-RendererGL::PlanetData::StreamTex RendererGL::loadDDSTexture(
-	const string filename,
-	int *lodMin,
-	const vec4 defaultColor)
-{
-	DDSLoader loader(maxTexSize);
-	if (!loader.open(filename)) return PlanetData::StreamTex(0,0,0,0);
-
-	if (loader.getMipmapCount() != 
-		mipmapCount(std::max(loader.getWidth(0), loader.getHeight(0))))
-	{
-		cout << "Warning: Can't load stream texture " << filename
-		<< ": not enough mipmaps" << endl;
-		return PlanetData::StreamTex(0,0,0,0);
-	}
-
-	const int mipmapCount = loader.getMipmapCount();
-	// Create texture
-	GLuint id;
-	glCreateTextures(GL_TEXTURE_2D, 1, &id);
-	glTextureStorage2D(id, 
-		mipmapCount, DDSFormatToGL(loader.getFormat()), 
-		loader.getWidth(0), loader.getHeight(0));
-	// Starting lod
-	const int maxLod = mipmapCount-1;
-	const vector<uint8_t> block = loader.getImageData(maxLod);
-	glCompressedTextureSubImage2D(id, maxLod, 0, 0, 1, 1, 
-		DDSFormatToGL(loader.getFormat()), block.size(), block.data());
-
-	// Create sampler
-	GLuint sampler;
-	glCreateSamplers(1, &sampler);
-	glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
-	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glSamplerParameteri(sampler, GL_TEXTURE_MIN_LOD, maxLod);
-
-	// Create jobs
-	const int jobCount = mipmapCount-1;
-	vector<TexWait> texWait(jobCount);
-	for (int i=0;i<jobCount;++i)
-	{
-		texWait[i].id = id;
-		texWait[i].sampler = sampler;
-		texWait[i].lodMin = lodMin;
-		texWait[i].mipmap = jobCount-i-1;
-		texWait[i].loader = loader;
-	}
-
-	// Push jobs to queue
-	{
-		lock_guard<mutex> lk(texWaitMutex);
-		for (auto tw : texWait)
-		{
-			texWaitQueue.push(tw);
-		}
-	}
-	// Wake up loading thread
-	texWaitCondition.notify_one();
-	return PlanetData::StreamTex(id, sampler, maxLod, maxLod);
-	
-}
-
-void RendererGL::unloadDDSTexture(PlanetData::StreamTex tex)
-{
-	if (tex.id)
-		glDeleteTextures(1, &tex.id);
-	if (tex.sampler)
-		glDeleteSamplers(1, &tex.sampler);
-}
-
 void RendererGL::render(
-		const dvec3 viewPos, 
+		const dvec3 &viewPos, 
 		const float fovy,
-		const dvec3 viewCenter,
-		const vec3 viewUp,
+		const dvec3 &viewCenter,
+		const vec3 &viewUp,
 		const float exposure,
 		const float ambientColor,
-		const vector<PlanetState> planetStates)
+		const vector<PlanetState> &planetStates)
 {
 
 	const float closePlanetMinSizePixels = 1;
@@ -991,8 +897,8 @@ void RendererGL::saveScreenshot()
 }
 
 void RendererGL::renderHdr(
-	const vector<uint32_t> closePlanets,
-	const DynamicData ddata)
+	const vector<uint32_t> &closePlanets,
+	const DynamicData &ddata)
 {
 	// Depth test/write
 	glDepthMask(GL_TRUE);
@@ -1035,31 +941,16 @@ void RendererGL::renderHdr(
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
-		bool hasDiffuse = data.diffuse.id;
-		bool hasCloud = data.cloud.id;
-		bool hasNight = data.night.id;
 		GLuint samplers[] = {
-			hasDiffuse?data.diffuse.sampler:planetTexSampler,
-			hasCloud?data.cloud.sampler:planetTexSampler,
-			hasNight?data.night.sampler:planetTexSampler};
+			planetTexSampler,
+			planetTexSampler,
+			planetTexSampler};
 		GLuint texs[] = {
-			hasDiffuse?data.diffuse.id:diffuseTexDefault,
-			hasCloud?data.cloud.id:cloudTexDefault,
-			hasNight?data.night.id:nightTexDefault};
+			data.diffuse.getId(diffuseTexDefault),
+			data.cloud.getId(cloudTexDefault),
+			data.night.getId(nightTexDefault)};
 		glBindSamplers(2, 3, samplers);
 		glBindTextures(2, 3, texs);
-
-		// Min LOD smoothing
-		for (auto tex : {&data.diffuse, &data.cloud, &data.night})
-		{
-			if (tex->id)
-			{
-				if (tex->smoothLodMin > tex->lodMin)
-					tex->smoothLodMin = std::max((float)tex->lodMin, 
-						tex->smoothLodMin - 0.5f*ceil(tex->smoothLodMin - tex->lodMin));
-				glSamplerParameterf(tex->sampler, GL_TEXTURE_MIN_LOD, tex->smoothLodMin);
-			}
-		}
 
 		if (hasAtmo)
 		{
@@ -1072,8 +963,8 @@ void RendererGL::renderHdr(
 }
 
 void RendererGL::renderAtmo(
-	const vector<uint32_t> atmoPlanets,
-	const DynamicData data)
+	const vector<uint32_t> &atmoPlanets,
+	const DynamicData &data)
 {
 	// Only depth test
 	glDepthMask(GL_FALSE);
@@ -1207,8 +1098,8 @@ void RendererGL::renderBloom()
 }
 
 void RendererGL::renderFlares(
-	const vector<uint32_t> farPlanets, 
-	const DynamicData data)
+	const vector<uint32_t> &farPlanets, 
+	const DynamicData &data)
 {
 	// Only depth test
 	glDepthMask(GL_FALSE);
@@ -1245,7 +1136,7 @@ void RendererGL::renderFlares(
 	}
 }
 
-void RendererGL::renderTonemap(const DynamicData data)
+void RendererGL::renderTonemap(const DynamicData &data)
 {
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
@@ -1273,7 +1164,7 @@ void RendererGL::renderTonemap(const DynamicData data)
 	fullscreenTri.draw();
 }
 
-void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
+void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 {
 	// Texture loading
 	for (uint32_t i : texLoadPlanets)
@@ -1281,11 +1172,11 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 		const Planet param = planetParams[i];
 		auto &data = planetData[i];
 		// Textures & samplers
-		data.diffuse = loadDDSTexture(param.getBody().getDiffuseFilename(), &data.diffuse.lodMin, vec4(1,1,1,1));
+		data.diffuse = StreamTex(param.getBody().getDiffuseFilename(), streamer, maxTexSize);
 		if (param.hasClouds())
-			data.cloud = loadDDSTexture(param.getClouds().getFilename(), &data.cloud.lodMin  , vec4(0,0,0,0));
+			data.cloud = StreamTex(param.getClouds().getFilename(), streamer, maxTexSize);
 		if (param.hasNight())
-			data.night = loadDDSTexture(param.getNight().getFilename(), &data.night.lodMin  , vec4(0,0,0,0));
+			data.night = StreamTex(param.getNight().getFilename(), streamer, maxTexSize);
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
@@ -1356,20 +1247,13 @@ void RendererGL::loadTextures(const vector<uint32_t> texLoadPlanets)
 	}
 }
 
-void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
+void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 {
 	// Texture unloading
 	for (uint32_t i : texUnloadPlanets)
 	{
 		auto &data = planetData[i];
 		const auto param = planetParams[i];
-		unloadDDSTexture(data.diffuse);
-		unloadDDSTexture(data.cloud);
-		unloadDDSTexture(data.night);
-
-		data.diffuse = PlanetData::StreamTex();
-		data.cloud = PlanetData::StreamTex();
-		data.night = PlanetData::StreamTex();
 
 		if (param.hasAtmo())
 		{
@@ -1382,33 +1266,32 @@ void RendererGL::unloadTextures(vector<uint32_t> texUnloadPlanets)
 			glDeleteTextures(2, &data.ringTex2);
 		}
 
+		// Reset variables
 		data.texLoaded = false;
+		data.diffuse.destroy();
+		data.cloud.destroy();
+		data.night.destroy();
+		data.atmoLookupTable = 0;
+		data.ringTex1 = 0;
+		data.ringTex2 = 0;
 	}
 }
 
 void RendererGL::uploadLoadedTextures()
 {
 	// Texture uploading
-	lock_guard<mutex> lk(texLoadedMutex);
-	while (!texLoadedQueue.empty())
+	for (uint32_t i=0;i<planetData.size();++i)
 	{
-		TexLoaded texLoaded = texLoadedQueue.front();
-		texLoadedQueue.pop();
-		glCompressedTextureSubImage2D(
-			texLoaded.id,
-			texLoaded.mipmap,
-			0, 0, 
-			texLoaded.width, texLoaded.height, 
-			texLoaded.format,
-			texLoaded.data.size(), texLoaded.data.data());
-		*texLoaded.lodMin = std::min(*texLoaded.lodMin, texLoaded.mipmap);
+		planetData[i].diffuse.update(streamer);
+		planetData[i].cloud.update(streamer);
+		planetData[i].night.update(streamer);
 	}
 }
 
 RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
-	const dvec3 viewPos, const mat4 viewMat,
-	const PlanetState state, const Planet params,
-	const PlanetData data)
+	const dvec3 &viewPos, const mat4 &viewMat,
+	const PlanetState &state, const Planet &params,
+	const PlanetData &data)
 {
 	const vec3 planetPos = state.getPosition() - viewPos;
 
@@ -1483,9 +1366,9 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 }
 
 RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
-	const dvec3 viewPos, const mat4 projMat,
-	const mat4 viewMat, const float fovy, const float exp, 
-	const PlanetState state, const Planet params)
+	const dvec3 &viewPos, const mat4 &projMat,
+	const mat4 &viewMat, const float fovy, const float exp, 
+	const PlanetState &state, const Planet &params)
 {
 	const vec3 planetPos = vec3(state.getPosition() - viewPos);
 	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
@@ -1525,49 +1408,6 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 	ubo.brightness = brightness;
 
 	return ubo;
-}
-
-void RendererGL::initStreamTexThread() {
-	texLoadThread = thread([&,this]()
-	{
-		while (true)
-		{
-			// Wait for kill or queue not empty
-			{
-				unique_lock<mutex> lk(texWaitMutex);
-				texWaitCondition.wait(lk, [&]{ return killThread || !texWaitQueue.empty();});
-				if (killThread) return;
-			}
-
-			// Get info about texture were are going to load
-			TexWait texWait;
-			{
-				lock_guard<mutex> lk(texWaitMutex);
-				texWait = texWaitQueue.front();
-				texWaitQueue.pop();
-			}
-
-			// Load image data
-			TexLoaded tl{};
-			tl.id = texWait.id;
-			tl.sampler = texWait.sampler;
-			tl.lodMin = texWait.lodMin;
-			tl.mipmap = texWait.mipmap;
-			tl.format = DDSFormatToGL(texWait.loader.getFormat());
-			tl.width  = texWait.loader.getWidth (tl.mipmap);
-			tl.height = texWait.loader.getHeight(tl.mipmap);
-			tl.data = texWait.loader.getImageData(texWait.mipmap);;
-
-			// Emulate slow loading times with this
-			//this_thread::sleep_for(chrono::milliseconds(1000));
-			
-			// Push loaded texture into queue
-			{
-				lock_guard<mutex> lk(texLoadedMutex);
-				texLoadedQueue.push(tl);
-			}
-		}
-	});
 }
 
 vector<pair<string,uint64_t>> RendererGL::getProfilerTimes()

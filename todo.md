@@ -9,6 +9,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Isolate screenshot and texture streaming functionality
 - [x] Change depth clip control to be from zero to one
 - [x] Clean up planet structures
 - [x] Better ddsloader API

@@ -7,6 +7,7 @@
 #include "gl_util.hpp"
 #include "gl_profiler.hpp"
 #include "screenshot.hpp"
+#include "tex_stream.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -23,19 +24,19 @@ public:
 	RendererGL() = default;
 	void windowHints() override;
 	void init(
-		std::vector<Planet> planetParams, 
+		const std::vector<Planet> &planetParams, 
 		int msaa,
 		int maxTexSize,
 		int windowWidth,
 		int windowHeight) override;
 	void render(
-		glm::dvec3 viewPos, 
+		const glm::dvec3 &viewPos, 
 		float fovy,
-		glm::dvec3 viewCenter,
-		glm::vec3 viewUp,
+		const glm::dvec3 &viewCenter,
+		const glm::vec3 &viewUp,
 		float exposure,
 		float ambientColor,
-		std::vector<PlanetState> planetStates) override;
+		const std::vector<PlanetState> &planetStates) override;
 	void takeScreenshot(const std::string &filename) override;
 	void destroy() override;
 
@@ -90,22 +91,20 @@ private:
 	void createScreenshot();
 
 	void renderHdr(
-		std::vector<uint32_t> closePlanets, 
-		DynamicData data);
+		const std::vector<uint32_t> &closePlanets, 
+		const DynamicData &data);
 	void renderAtmo(
-		std::vector<uint32_t> atmoPlanets,
-		DynamicData data);
+		const std::vector<uint32_t> &atmoPlanets,
+		const DynamicData &data);
 	void renderBloom();
 	void renderFlares(
-		std::vector<uint32_t> farPlanets, 
-		DynamicData data);
-	void renderTonemap(DynamicData data);
+		const std::vector<uint32_t> &farPlanets, 
+		const DynamicData &data);
+	void renderTonemap(const DynamicData &data);
 
-	void loadTextures(std::vector<uint32_t> planets);
-	void unloadTextures(std::vector<uint32_t> planets);
+	void loadTextures(const std::vector<uint32_t> &planets);
+	void unloadTextures(const std::vector<uint32_t> &planets);
 	void uploadLoadedTextures();
-
-	void initStreamTexThread();
 
 	void saveScreenshot();
 
@@ -214,49 +213,33 @@ private:
 	{
 		DrawCommand planetModel;
 		DrawCommand ringModel;
-		bool texLoaded;
+		bool texLoaded = false;
 
-		struct StreamTex
-		{
-			GLuint id;
-			GLuint sampler;
-			int lodMin;
-			float smoothLodMin;
-			StreamTex() { id = 0; sampler = 0; lodMin = 0; smoothLodMin = 0.f;}
-			StreamTex(GLuint id, GLuint sampler, GLuint lodMin, float smoothLodMin)
-			{
-				this->id = id;
-				this->sampler = sampler;
-				this->lodMin = lodMin;
-				this->smoothLodMin = smoothLodMin;
-			}
-		};
+		StreamTex diffuse{};
+		StreamTex cloud{};
+		StreamTex night{};
 
-		StreamTex diffuse;
-		StreamTex cloud;
-		StreamTex night;
-
-		GLuint atmoLookupTable;
-		GLuint ringTex1;
-		GLuint ringTex2;
-		PlanetData()
-		{
-			texLoaded = false;
-			atmoLookupTable = 0;
-			ringTex1 = 0;
-			ringTex2 = 0;
-		}
+		GLuint atmoLookupTable = 0;
+		GLuint ringTex1 = 0;
+		GLuint ringTex2 = 0;
+		PlanetData() = default;
 	};
 
-	PlanetData::StreamTex loadDDSTexture(std::string filename, int *lodMin, glm::vec4 defaultColor);
-	void unloadDDSTexture(PlanetData::StreamTex tex);
+	PlanetDynamicUBO getPlanetUBO(
+		const glm::dvec3 &viewPos, 
+		const glm::mat4 &viewMat,
+		const PlanetState &state, 
+		const Planet &params, 
+		const PlanetData &data);
 
-	PlanetDynamicUBO getPlanetUBO(glm::dvec3 viewPos, glm::mat4 viewMat,
-	PlanetState state, Planet params, PlanetData data);
-
-	FlareDynamicUBO getFlareUBO(glm::dvec3 viewPos, glm::mat4 projMat,
-	glm::mat4 viewMat, float fovy, float exp, 
-	PlanetState state, Planet params);
+	FlareDynamicUBO getFlareUBO(
+		const glm::dvec3 &viewPos, 
+		const glm::mat4 &projMat,
+		const glm::mat4 &viewMat, 
+		float fovy,
+		float exp, 
+		const PlanetState &state, 
+		const Planet &params);
 
 	std::vector<PlanetData> planetData;
 
@@ -281,32 +264,6 @@ private:
 	DrawCommand flareModel;
 	DrawCommand fullscreenTri;
 
-	// Texture load threading
-	struct TexWait // Texture waiting to be loaded
-	{
-		GLuint id;
-		GLuint sampler;
-		int *lodMin;
-		int mipmap;
-		DDSLoader loader;
-	};
-
-	struct TexLoaded // Texture that have finished loading
-	{
-		GLuint id;
-		GLuint sampler;
-		int *lodMin;
-		GLenum format;
-		int mipmap;
-		int width, height;
-		std::vector<uint8_t> data;
-	};
-
-	std::mutex texWaitMutex;
-	std::condition_variable texWaitCondition;
-	std::queue<TexWait> texWaitQueue; // Queue where texture are waiting for loading
-	std::mutex texLoadedMutex;
-	std::queue<TexLoaded> texLoadedQueue; // Queue of textures that have finished loading
-	std::thread texLoadThread;
-	bool killThread;
+	// Stream loading
+	DDSStreamer streamer;
 };
