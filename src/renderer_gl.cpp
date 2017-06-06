@@ -349,6 +349,9 @@ void RendererGL::init(
 
 	// Clip control
 	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
+	// Depth test
+	glEnable(GL_DEPTH_TEST);
 }
 
 void RendererGL::createTextures()
@@ -884,7 +887,7 @@ void RendererGL::render(
 	const float exp = pow(2, exposure);
 
 	// Scene uniform update
-	SceneDynamicUBO sceneUBO;
+	SceneDynamicUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
@@ -994,7 +997,6 @@ void RendererGL::renderHdr(
 	const DynamicData ddata)
 {
 	// Depth test/write
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 	glDepthFunc(GL_LESS);
 	// No stencil writes
@@ -1077,7 +1079,6 @@ void RendererGL::renderAtmo(
 	const DynamicData data)
 {
 	// Only depth test
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
 	// No stencil writes
@@ -1216,7 +1217,6 @@ void RendererGL::renderFlares(
 	const DynamicData data)
 {
 	// Only depth test
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
 	// No stencil writes
@@ -1260,7 +1260,7 @@ void RendererGL::renderTonemap(const DynamicData data)
 	glStencilFunc(GL_ALWAYS, 0, 0xFF);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 	// No depth test/write
-	glDisable(GL_DEPTH_TEST);
+	glDepthFunc(GL_ALWAYS);
 	glDepthMask(GL_FALSE);
 
 	glDisable(GL_BLEND);
@@ -1529,7 +1529,7 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 		/dot(cutDist,cutDist))
 		*fade;
 
-	FlareDynamicUBO ubo;
+	FlareDynamicUBO ubo{};
 	ubo.modelMat = modelMat;
 	ubo.color = vec4(params.getBody().getMeanColor(),1.0);
 	ubo.brightness = brightness;
