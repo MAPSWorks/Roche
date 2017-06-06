@@ -341,6 +341,11 @@ void RendererGL::init(
 	createScreenshot();
 	initStreamTexThread();
 	initScreenshotThread();
+
+	// Backface culling
+	glFrontFace(GL_CCW);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 }
 
 void RendererGL::createTextures()
@@ -929,11 +934,6 @@ void RendererGL::render(
 		const float distJ = distance(planetStates[j].getPosition(), viewPos);
 		return distI > distJ;
 	});
-
-	// Backface culling
-	glFrontFace(GL_CCW);
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
 
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
