@@ -1,14 +1,11 @@
 ## To Do
-- [ ] Break renderergl into several classes
 - [ ] Correct flares
-- [ ] Better texture streaming management
-- [ ] PBOs
 - [ ] Use BC7 for textures
 - [ ] Specular support
-- [ ] Sparse textures?
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better texture streaming management
 - [x] Isolate screenshot and texture streaming functionality
 - [x] Change depth clip control to be from zero to one
 - [x] Clean up planet structures
