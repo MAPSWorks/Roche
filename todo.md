@@ -1,4 +1,5 @@
 ## To Do
+- [ ] Lower res spheres + tesselation (also for rings)
 - [ ] Correct flares
 - [ ] Use BC7 for textures
 - [ ] Specular support
