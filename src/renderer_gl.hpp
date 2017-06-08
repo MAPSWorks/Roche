@@ -166,7 +166,10 @@ private:
 	GLuint shaderVertFlare;
 	GLuint shaderVertTonemap;
 
-	// Tesselation Evaluation Shaders
+	// Tessellation
+	GLuint shaderTescPlanet;
+
+	// Tessellation Evaluation Shaders
 	GLuint shaderTesePlanetBare;
 	GLuint shaderTesePlanetAtmo;
 	GLuint shaderTeseAtmo;

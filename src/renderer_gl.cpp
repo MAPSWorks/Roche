@@ -355,13 +355,7 @@ void RendererGL::init(
 	glEnable(GL_BLEND);
 
 	// Patch primitives
-	
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
-	
-	float outerTess[4] = {4.0,4.0,4.0,4.0};
-	float innerTess[4] = {4.0,4.0};
-	glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, outerTess);
-	glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, innerTess);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -581,6 +575,9 @@ void RendererGL::createShaders()
 	const string flareVertSource{loadSource(folder, "flare.vert")};
 	const string deferredSource{loadSource(folder, "deferred.vert")};
 
+	// Tesc shaders
+	const string planetTescSource{loadSource(folder, "planet.tesc")};
+
 	// Tese shaders
 	const string planetTeseSource{loadSource(folder, "planet.tese")};
 	
@@ -615,7 +612,11 @@ void RendererGL::createShaders()
 	shaderVertTonemap = createShader(GL_VERTEX_SHADER,
 		{headerSource, deferredSource});
 
-	// Tesselation evaluation shader programs
+	// Tessellation control shader programs
+	shaderTescPlanet = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, planetTescSource});
+
+	// Tessellation evaluation shader programs
 	shaderTesePlanetBare = createShader(GL_TESS_EVALUATION_SHADER,
 		{headerSource, planetTeseSource});
 
@@ -701,6 +702,13 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
 	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertTonemap);
+
+	glUseProgramStages(pipelinePlanetBare, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelineAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelineSun, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelineRingFar, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelineRingNear, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
 
 	glUseProgramStages(pipelinePlanetBare, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetBare);
 	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetAtmo);
