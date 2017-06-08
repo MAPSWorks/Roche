@@ -43,15 +43,21 @@ GLenum indexType()
 	}
 }
 
-void generateSphere(
-	const int meridians, 
-	const int rings, 
-	const bool exterior, 
-	vector<Vertex> &vertices, 
-	vector<Index> &indices)
+struct ModelInfo
 {
+	GLenum mode;
+	vector<Vertex> vertices;
+	vector<Index> indices;
+};
+
+ModelInfo generateSphere(
+	const int meridians, 
+	const int rings)
+{
+	ModelInfo info{};
 	// Vertices
-	vertices.resize((meridians+1)*(rings+1));
+	info.mode = GL_TRIANGLES;
+	info.vertices.resize((meridians+1)*(rings+1));
 	size_t offset = 0;
 	for (int i=0;i<=rings;++i)
 	{
@@ -63,12 +69,13 @@ void generateSphere(
 			const float theta = 2*glm::pi<float>()*((float)j/(float)meridians);
 			const float ct = cos(theta);
 			const float st = sin(theta);
-			vec3 pos = vec3(cp*ct,cp*st,sp);
-			vec3 normal = normalize(pos);
-			vec3 tangent = cross(normal, vec3(0,0,1));
-			vertices[offset] = {
+			const vec3 pos = vec3(cp*ct,cp*st,sp);
+			const vec2 uv = vec2(j/(float)meridians, 1.f-i/(float)rings);
+			const vec3 normal = normalize(pos);
+			const vec3 tangent = cross(normal, vec3(0,0,1));
+			info.vertices[offset] = {
 				vec4(pos,1), 
-				vec4((float)j/(float)meridians, 1.f-(float)i/(float)rings,0.0,0.0),
+				vec4(uv,0,0),
 				vec4(normal,0),
 				vec4(tangent,0)
 			};
@@ -77,7 +84,7 @@ void generateSphere(
 	}
 
 	// Indices
-	indices.resize(meridians*rings*6);
+	info.indices.resize(meridians*rings*6);
 	offset = 0;
 	for (int i=0;i<rings;++i)
 	{
@@ -87,67 +94,70 @@ void generateSphere(
 			const Index j1 = j+1;
 			vector<Index> ind = {
 				(Index)(i *(rings+1)+j),
-				(Index)(i1*(rings+1)+j),
-				(Index)(i1*(rings+1)+j1),
-				(Index)(i1*(rings+1)+j1),
 				(Index)(i *(rings+1)+j1),
+				(Index)(i1*(rings+1)+j1),
+				(Index)(i1*(rings+1)+j1),
+				(Index)(i1*(rings+1)+j),
 				(Index)(i *(rings+1)+j)
 			};
-			// Remove back face culling
-			if (!exterior)
-				swap(ind[1], ind[4]);
-
 			// Copy to indices
-			memcpy(&indices[offset*6], ind.data(), ind.size()*sizeof(Index));
+			memcpy(&info.indices[offset*6], ind.data(), ind.size()*sizeof(Index));
 			offset++;
 		}
 	}
+	return info;
 }
 
-void generateFullscreenTri(vector<Vertex> &vertices, vector<Index> &indices)
+ModelInfo generateFullscreenTri()
 {
-	vertices.resize(3);
-	vertices[0].position = vec4(-2,-1,0,1);
-	vertices[1].position = vec4( 2,-1,0,1);
-	vertices[2].position = vec4( 0, 4,0,1);
+	ModelInfo info{};
+	info.mode = GL_TRIANGLES;
+	info.vertices.resize(3);
+	info.vertices[0].position = vec4(-2,-1,0,1);
+	info.vertices[1].position = vec4( 2,-1,0,1);
+	info.vertices[2].position = vec4( 0, 4,0,1);
 
-	indices = {0,1,2};
+	info.indices = {0,1,2};
+	return info;
 }
 
-void generateFlareModel(vector<Vertex> &vertices, vector<Index> &indices)
+ModelInfo generateFlareModel()
 {
+	ModelInfo info{};
+	info.mode = GL_TRIANGLES;
 	const int detail = 32;
-	vertices.resize((detail+1)*2);
+	info.vertices.resize((detail+1)*2);
 
 	for (int i=0;i<=detail;++i)
 	{
 		const float f = i/(float)detail;
 		const vec2 pos = vec2(cos(f*2*glm::pi<float>()),sin(f*2*glm::pi<float>()));
-		vertices[i*2+0] = {vec4(0,0,0,1), vec4(f, 0, 0.5, 0.5)};
-		vertices[i*2+1] = {vec4(pos,0,1), vec4(f, 1, pos*vec2(0.5)+vec2(0.5))};
+		info.vertices[i*2+0] = {vec4(0,0,0,1), vec4(f, 0, 0.5, 0.5)};
+		info.vertices[i*2+1] = {vec4(pos,0,1), vec4(f, 1, pos*vec2(0.5)+vec2(0.5))};
 	}
 
-	indices.resize(detail*6);
+	info.indices.resize(detail*6);
 	for (int i=0;i<detail;++i)
 	{
-		indices[i*6+0] = (i*2)+0;
-		indices[i*6+1] = (i*2)+1;
-		indices[i*6+2] = (i*2)+2;
-		indices[i*6+3] = (i*2)+2;
-		indices[i*6+4] = (i*2)+1;
-		indices[i*6+5] = (i*2)+3;
+		info.indices[i*6+0] = (i*2)+0;
+		info.indices[i*6+1] = (i*2)+1;
+		info.indices[i*6+2] = (i*2)+2;
+		info.indices[i*6+3] = (i*2)+2;
+		info.indices[i*6+4] = (i*2)+1;
+		info.indices[i*6+5] = (i*2)+3;
 	}
+	return info;
 }
 
-void generateRingModel(
+ModelInfo generateRingModel(
 	const int meridians,
 	const float near,
-	const float far,
-	vector<Vertex> &vertices, 
-	vector<Index> &indices)
+	const float far)
 {
-	vertices.resize((meridians+1)*2);
-	indices.resize(meridians*6);
+	ModelInfo info{};
+	info.mode = GL_TRIANGLES;
+	info.vertices.resize((meridians+1)*2);
+	info.indices.resize(meridians*6);
 
 	{
 		int offset = 0;
@@ -155,8 +165,8 @@ void generateRingModel(
 		{
 			float angle = (glm::pi<float>()*i)/(float)meridians;
 			vec2 pos = vec2(cos(angle),sin(angle));
-			vertices[offset+0] = {vec4(pos*near, 0.0,1.0), vec4(pos*1.f,0.0,0.0)};
-			vertices[offset+1] = {vec4(pos*far , 0.0,1.0), vec4(pos*2.f,0.0,0.0)};
+			info.vertices[offset+0] = {vec4(pos*near, 0.0,1.0), vec4(pos*1.f,0.0,0.0)};
+			info.vertices[offset+1] = {vec4(pos*far , 0.0,1.0), vec4(pos*2.f,0.0,0.0)};
 			offset += 2;
 		}
 	}
@@ -166,37 +176,37 @@ void generateRingModel(
 		Index vert = 0;
 		for (int i=0;i<meridians;++i)
 		{
-			indices[offset+0] = vert+2;
-			indices[offset+1] = vert+0;
-			indices[offset+2] = vert+1;
-			indices[offset+3] = vert+2;
-			indices[offset+4] = vert+1;
-			indices[offset+5] = vert+3;
+			info.indices[offset+0] = vert+2;
+			info.indices[offset+1] = vert+0;
+			info.indices[offset+2] = vert+1;
+			info.indices[offset+3] = vert+2;
+			info.indices[offset+4] = vert+1;
+			info.indices[offset+5] = vert+3;
 			offset += 6;
 			vert += 2; 
 		}
 	}
+	return info;
 }
 
-template <class V, class I>
 vector<DrawCommand> getCommands(
-	GLuint vao, GLenum mode, GLenum indexType,
+	GLuint vao, 
+	GLenum indexType,
 	Buffer &vertexBuffer,
 	Buffer &indexBuffer,
-	const vector<vector<V>> vertices, 
-	const vector<vector<I>> indices)
+	const vector<ModelInfo> &infos)
 {
-	vector<DrawCommand> commands(vertices.size());
-	vector<pair<BufferRange, BufferRange>> ranges(vertices.size());
+	vector<DrawCommand> commands(infos.size());
+	vector<pair<BufferRange, BufferRange>> ranges(infos.size());
 
-	for (int i=0;i<vertices.size();++i)
+	for (int i=0;i<infos.size();++i)
 	{
 		ranges[i] = make_pair(
-			vertexBuffer.assignVertices(vertices[i].size(), sizeof(V)),
-			indexBuffer.assignIndices(indices[i].size(), sizeof(I)));
+			vertexBuffer.assignVertices(infos[i].vertices.size(), sizeof(Vertex)),
+			indexBuffer.assignIndices(infos[i].indices.size(), sizeof(Index)));
 		commands[i] = DrawCommand(
-			vao, mode, indexType,
-			sizeof(V), sizeof(I),
+			vao, infos[i].mode, indexType,
+			sizeof(Vertex), sizeof(Index),
 			ranges[i].first,
 			ranges[i].second);
 	}
@@ -204,10 +214,10 @@ vector<DrawCommand> getCommands(
 	vertexBuffer.validate();
 	indexBuffer.validate();
 
-	for (int i=0;i<vertices.size();++i)
+	for (int i=0;i<infos.size();++i)
 	{
-		vertexBuffer.write(ranges[i].first, vertices[i].data());
-		indexBuffer.write(ranges[i].second, indices[i].data());
+		vertexBuffer.write(ranges[i].first, infos[i].vertices.data());
+		indexBuffer.write(ranges[i].second, infos[i].indices.data());
 	}
 
 	return commands;
@@ -242,24 +252,27 @@ void RendererGL::init(
 
 	createVertexArray();
 
+	const int modelCount = 3;
+	const int fsTriModelId  = 0;
+	const int flareModelId  = 1;
+	const int sphereModelId = 2;
+
 	// Static vertex & index data
-	vector<vector<Vertex>> vertices(3);
-	vector<vector<Index>> indices(3);
+	vector<ModelInfo> modelInfos(modelCount);
 
 	// Fullscreen tri
-	generateFullscreenTri(vertices[0], indices[0]);
+	modelInfos[fsTriModelId] = generateFullscreenTri();
 
 	// Flare
-	generateFlareModel(vertices[1], indices[1]);
+	modelInfos[flareModelId] = generateFlareModel();
 
 	// Sphere
 	const int planetMeridians = 128;
 	const int planetRings = 128;
-	generateSphere(planetMeridians, planetRings, false, 
-		vertices[2], indices[2]);
+	modelInfos[sphereModelId] = generateSphere(planetMeridians, planetRings);
 
 	// Load custom models
-	vector<int> planetModelId(planetCount, 2);
+	vector<int> planetModelId(planetCount, sphereModelId);
 	vector<int> ringModelId(planetCount, -1);
 	for (uint32_t i=0;i<planetCount;++i)
 	{
@@ -267,27 +280,23 @@ void RendererGL::init(
 		// Rings
 		if (param.hasRing())
 		{
-			ringModelId[i] = vertices.size();
-			vertices.emplace_back();
-			indices.emplace_back();
-			float near = param.getRing().getInnerDistance();
-			float far = param.getRing().getOuterDistance();
+			ringModelId[i] = modelInfos.size();
+			const float near = param.getRing().getInnerDistance();
+			const float far = param.getRing().getOuterDistance();
 			const int ringMeridians = 128;
-			generateRingModel(ringMeridians, near, far, 
-				vertices.back(), indices.back());
+			modelInfos.push_back(generateRingModel(ringMeridians, near, far));
 		}
 	}
 
 	vector<DrawCommand> commands = getCommands(
-		vertexArray, GL_TRIANGLES, indexType(),
+		vertexArray, indexType(),
 		vertexBuffer,
 		indexBuffer,
-		vertices,
-		indices);
+		modelInfos);
 
-	fullscreenTri = commands[0];
-	flareModel    = commands[1];
-	sphere        = commands[2];
+	fullscreenTri = commands[fsTriModelId];
+	flareModel    = commands[flareModelId];
+	sphere        = commands[sphereModelId];
 
 	for (uint32_t i=0;i<planetCount;++i)
 	{
