@@ -246,8 +246,8 @@ void RendererGL::createModels()
 	modelInfos[flareModelId] = generateFlareModel();
 
 	// Sphere
-	const int planetMeridians = 32;
-	const int planetRings = 32;
+	const int planetMeridians = 64;
+	const int planetRings = 64;
 	modelInfos[sphereModelId] = generateSphere(planetMeridians, planetRings);
 
 	// Load custom models
@@ -613,8 +613,23 @@ void RendererGL::createShaders()
 		{headerSource, deferredSource});
 
 	// Tessellation control shader programs
-	shaderTescPlanet = createShader(GL_TESS_CONTROL_SHADER,
+	shaderTescPlanetBare = createShader(GL_TESS_CONTROL_SHADER,
 		{headerSource, planetTescSource});
+
+	shaderTescPlanetAtmo = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, hasAtmo, planetTescSource});
+
+	shaderTescAtmo = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, isAtmo, planetTescSource});
+
+	shaderTescSun = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, isStar, planetTescSource});
+
+	shaderTescRingFar = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, isFarRing, planetTescSource});
+
+	shaderTescRingNear = createShader(GL_TESS_CONTROL_SHADER,
+		{headerSource, isNearRing, planetTescSource});
 
 	// Tessellation evaluation shader programs
 	shaderTesePlanetBare = createShader(GL_TESS_EVALUATION_SHADER,
@@ -703,12 +718,12 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
 	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertTonemap);
 
-	glUseProgramStages(pipelinePlanetBare, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
-	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
-	glUseProgramStages(pipelineAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
-	glUseProgramStages(pipelineSun, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
-	glUseProgramStages(pipelineRingFar, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
-	glUseProgramStages(pipelineRingNear, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanet);
+	glUseProgramStages(pipelinePlanetBare, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetBare);
+	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetAtmo);
+	glUseProgramStages(pipelineAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescAtmo);
+	glUseProgramStages(pipelineSun, GL_TESS_CONTROL_SHADER_BIT, shaderTescSun);
+	glUseProgramStages(pipelineRingFar, GL_TESS_CONTROL_SHADER_BIT, shaderTescRingFar);
+	glUseProgramStages(pipelineRingNear, GL_TESS_CONTROL_SHADER_BIT, shaderTescRingNear);
 
 	glUseProgramStages(pipelinePlanetBare, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetBare);
 	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetAtmo);
@@ -895,6 +910,7 @@ void RendererGL::render(
 		return distI > distJ;
 	});
 
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
 	profiler.end();
@@ -907,6 +923,7 @@ void RendererGL::render(
 	profiler.begin("Flares");
 	renderFlares(farPlanets, currentData);
 	profiler.end();
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Tonemapping");
 	renderTonemap(currentData);
 	profiler.end();

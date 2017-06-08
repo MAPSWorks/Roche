@@ -1,11 +1,11 @@
 ## To Do
-- [ ] Lower res spheres + tesselation (also for rings)
 - [ ] Correct flares
 - [ ] Use BC7 for textures
 - [ ] Specular support
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Lower res spheres + tesselation (also for rings)
 - [x] Better texture streaming management
 - [x] Isolate screenshot and texture streaming functionality
 - [x] Change depth clip control to be from zero to one

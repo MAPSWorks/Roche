@@ -1,4 +1,4 @@
-layout(quads, equal_spacing) in;
+layout(quads, fractional_even_spacing) in;
 
 in vec3 gl_TessCoord;
 
@@ -44,21 +44,24 @@ vec4 lerp(vec4 v[gl_MaxPatchVertices])
 		gl_TessCoord.y);
 }
 
+mat4 getMatrix(PlanetUBO ubo)
+{
+#if defined(IS_ATMO)
+	return ubo.atmoMat;
+#elif defined(IS_FAR_RING)
+	return ubo.ringFarMat;
+#elif defined(IS_NEAR_RING)
+	return ubo.ringNearMat;
+#else
+	return ubo.modelMat;
+#endif
+}
+
 void main()
 {
 	passUv = lerp(inUv);
-	mat4 mMat = planetUBO.modelMat;
-#if defined(IS_ATMO)
-	mMat = planetUBO.atmoMat;
-#endif
-#if defined(IS_FAR_RING)
-	mMat = planetUBO.ringFarMat;
-#endif
-#if defined(IS_NEAR_RING)
-	mMat = planetUBO.ringNearMat;
-#endif
-
-	passNormal = normalize(sceneUBO.viewMat*mMat*lerp(inNormal));
+	mat4 mMat = getMatrix(planetUBO);
+	passNormal = normalize(sceneUBO.viewMat*mMat*normalize(lerp(inNormal)));
 	vec4 pos = lerp(inPosition);
 #if !defined(IS_FAR_RING) && !defined(IS_NEAR_RING)
 	pos = vec4(normalize(pos.xyz),1);
