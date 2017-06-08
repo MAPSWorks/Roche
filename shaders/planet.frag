@@ -1,9 +1,7 @@
 layout (location = 0) in vec4 passUv;
 layout (location = 1) in vec4 passNormal;
 layout (location = 2) in vec4 passPosition;
-#if defined(HAS_ATMO)
 layout (location = 3) in vec4 passScattering;
-#endif
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {

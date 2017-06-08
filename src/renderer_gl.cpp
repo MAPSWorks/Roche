@@ -56,7 +56,7 @@ ModelInfo generateSphere(
 {
 	ModelInfo info{};
 	// Vertices
-	info.mode = GL_TRIANGLES;
+	info.mode = GL_PATCHES;
 	info.vertices.resize((meridians+1)*(rings+1));
 	size_t offset = 0;
 	for (int i=0;i<=rings;++i)
@@ -84,7 +84,7 @@ ModelInfo generateSphere(
 	}
 
 	// Indices
-	info.indices.resize(meridians*rings*6);
+	info.indices.resize(meridians*rings*4);
 	offset = 0;
 	for (int i=0;i<rings;++i)
 	{
@@ -95,14 +95,12 @@ ModelInfo generateSphere(
 			vector<Index> ind = {
 				(Index)(i *(rings+1)+j),
 				(Index)(i *(rings+1)+j1),
-				(Index)(i1*(rings+1)+j1),
-				(Index)(i1*(rings+1)+j1),
 				(Index)(i1*(rings+1)+j),
-				(Index)(i *(rings+1)+j)
+				(Index)(i1*(rings+1)+j1)
 			};
 			// Copy to indices
-			memcpy(&info.indices[offset*6], ind.data(), ind.size()*sizeof(Index));
-			offset++;
+			memcpy(&info.indices[offset], ind.data(), ind.size()*sizeof(Index));
+			offset += 4;
 		}
 	}
 	return info;
@@ -155,9 +153,9 @@ ModelInfo generateRingModel(
 	const float far)
 {
 	ModelInfo info{};
-	info.mode = GL_TRIANGLES;
+	info.mode = GL_PATCHES;
 	info.vertices.resize((meridians+1)*2);
-	info.indices.resize(meridians*6);
+	info.indices.resize(meridians*4);
 
 	{
 		int offset = 0;
@@ -176,13 +174,11 @@ ModelInfo generateRingModel(
 		Index vert = 0;
 		for (int i=0;i<meridians;++i)
 		{
-			info.indices[offset+0] = vert+2;
-			info.indices[offset+1] = vert+0;
-			info.indices[offset+2] = vert+1;
-			info.indices[offset+3] = vert+2;
-			info.indices[offset+4] = vert+1;
-			info.indices[offset+5] = vert+3;
-			offset += 6;
+			info.indices[offset+0] = vert+0;
+			info.indices[offset+1] = vert+1;
+			info.indices[offset+2] = vert+2;
+			info.indices[offset+3] = vert+3;
+			offset += 4;
 			vert += 2; 
 		}
 	}
@@ -223,25 +219,8 @@ vector<DrawCommand> getCommands(
 	return commands;
 }
 
-void RendererGL::init(
-	const vector<Planet> &planetParams,
-	const int msaa,
-	const int maxTexSize,
-	const int windowWidth,
-	const int windowHeight)
+void RendererGL::createModels()
 {
-	this->planetParams = planetParams;
-	this->planetCount = planetParams.size();
-	this->msaaSamples = msaa;
-	this->maxTexSize = maxTexSize;
-	this->windowWidth = windowWidth;
-	this->windowHeight = windowHeight;
-
-	this->bufferFrames = 3; // triple-buffering
-
-	this->planetData.resize(planetCount);
-	this->fences.resize(bufferFrames);
-
 	vertexBuffer = Buffer(
 		Buffer::Usage::STATIC,
 		Buffer::Access::WRITE_ONLY);
@@ -267,8 +246,8 @@ void RendererGL::init(
 	modelInfos[flareModelId] = generateFlareModel();
 
 	// Sphere
-	const int planetMeridians = 128;
-	const int planetRings = 128;
+	const int planetMeridians = 32;
+	const int planetRings = 32;
 	modelInfos[sphereModelId] = generateSphere(planetMeridians, planetRings);
 
 	// Load custom models
@@ -283,7 +262,7 @@ void RendererGL::init(
 			ringModelId[i] = modelInfos.size();
 			const float near = param.getRing().getInnerDistance();
 			const float far = param.getRing().getOuterDistance();
-			const int ringMeridians = 128;
+			const int ringMeridians = 64;
 			modelInfos.push_back(generateRingModel(ringMeridians, near, far));
 		}
 	}
@@ -304,7 +283,10 @@ void RendererGL::init(
 		data.planetModel = commands[planetModelId[i]];
 		data.ringModel   = commands[ringModelId[i]];
 	}
+}
 
+void RendererGL::createUBO()
+{
 	// Dynamic UBO buffer assigning
 	uboBuffer = Buffer(
 		Buffer::Usage::DYNAMIC, 
@@ -330,7 +312,29 @@ void RendererGL::init(
 	}
 
 	uboBuffer.validate();
+}
 
+void RendererGL::init(
+	const vector<Planet> &planetParams,
+	const int msaa,
+	const int maxTexSize,
+	const int windowWidth,
+	const int windowHeight)
+{
+	this->planetParams = planetParams;
+	this->planetCount = planetParams.size();
+	this->msaaSamples = msaa;
+	this->maxTexSize = maxTexSize;
+	this->windowWidth = windowWidth;
+	this->windowHeight = windowHeight;
+
+	this->bufferFrames = 3; // triple-buffering
+
+	this->planetData.resize(planetCount);
+	this->fences.resize(bufferFrames);
+
+	createModels();
+	createUBO();
 	createShaders();
 	createRendertargets();
 	createTextures();
@@ -349,6 +353,15 @@ void RendererGL::init(
 
 	// Blending
 	glEnable(GL_BLEND);
+
+	// Patch primitives
+	
+	glPatchParameteri(GL_PATCH_VERTICES, 4);
+	
+	float outerTess[4] = {4.0,4.0,4.0,4.0};
+	float innerTess[4] = {4.0,4.0};
+	glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, outerTess);
+	glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, innerTess);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -567,6 +580,9 @@ void RendererGL::createShaders()
 	const string planetVertSource{loadSource(folder, "planet.vert")};
 	const string flareVertSource{loadSource(folder, "flare.vert")};
 	const string deferredSource{loadSource(folder, "deferred.vert")};
+
+	// Tese shaders
+	const string planetTeseSource{loadSource(folder, "planet.tese")};
 	
 	// Frag shaders
 	const string planetFragSource{loadSource(folder, "planet.frag")};
@@ -590,29 +606,33 @@ void RendererGL::createShaders()
 	const string isNearRing{"#define IS_NEAR_RING\n"};
 
 	// Vertex shader programs
-	shaderVertPlanetBare = createShader(GL_VERTEX_SHADER, 
+	shaderVertPlanet = createShader(GL_VERTEX_SHADER, 
 		{headerSource, planetVertSource});
-
-	shaderVertPlanetAtmo = createShader(GL_VERTEX_SHADER, 
-		{headerSource, hasAtmo, planetVertSource});
-
-	shaderVertAtmo = createShader(GL_VERTEX_SHADER, 
-		{headerSource, isAtmo, planetVertSource});
-
-	shaderVertSun = createShader(GL_VERTEX_SHADER,
-		{headerSource, isStar, planetVertSource});
-
-	shaderVertRingFar = createShader(GL_VERTEX_SHADER,
-		{headerSource, isFarRing, planetVertSource});
-
-	shaderVertRingNear = createShader(GL_VERTEX_SHADER,
-		{headerSource, isNearRing, planetVertSource});
 
 	shaderVertFlare = createShader(GL_VERTEX_SHADER,
 		{headerSource, flareVertSource});
 
 	shaderVertTonemap = createShader(GL_VERTEX_SHADER,
 		{headerSource, deferredSource});
+
+	// Tesselation evaluation shader programs
+	shaderTesePlanetBare = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, planetTeseSource});
+
+	shaderTesePlanetAtmo = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, hasAtmo, planetTeseSource});
+
+	shaderTeseAtmo = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, isAtmo, planetTeseSource});
+
+	shaderTeseSun = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, isStar, planetTeseSource});
+
+	shaderTeseRingFar = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, isFarRing, planetTeseSource});
+
+	shaderTeseRingNear = createShader(GL_TESS_EVALUATION_SHADER,
+		{headerSource, isNearRing, planetTeseSource});
 
 	// Fragment shader programs
 	shaderFragPlanetBare = createShader(GL_FRAGMENT_SHADER, 
@@ -673,14 +693,21 @@ void RendererGL::createShaders()
 	glCreateProgramPipelines(1, &pipelineBloomAdd);
 
 	// Pipeline use
-	glUseProgramStages(pipelinePlanetBare, GL_VERTEX_SHADER_BIT, shaderVertPlanetBare);
-	glUseProgramStages(pipelinePlanetAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanetAtmo);
-	glUseProgramStages(pipelineAtmo, GL_VERTEX_SHADER_BIT, shaderVertAtmo);
-	glUseProgramStages(pipelineSun, GL_VERTEX_SHADER_BIT, shaderVertSun);
-	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertRingFar);
-	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertRingNear);
+	glUseProgramStages(pipelinePlanetBare, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelinePlanetAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelineAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelineSun, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
 	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertTonemap);
+
+	glUseProgramStages(pipelinePlanetBare, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetBare);
+	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetAtmo);
+	glUseProgramStages(pipelineAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseAtmo);
+	glUseProgramStages(pipelineSun, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseSun);
+	glUseProgramStages(pipelineRingFar, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseRingFar);
+	glUseProgramStages(pipelineRingNear, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseRingNear);
 
 	glUseProgramStages(pipelinePlanetBare, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetBare);
 	glUseProgramStages(pipelinePlanetAtmo, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetAtmo);

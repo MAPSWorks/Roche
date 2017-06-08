@@ -83,6 +83,8 @@ private:
 		float brightness;
 	};
 
+	void createModels();
+	void createUBO();
 	void createTextures();
 	void createFlare();
 	void createVertexArray();
@@ -160,14 +162,17 @@ private:
 	GLuint hdrFbo;
 
 	// Vertex Shaders
-	GLuint shaderVertPlanetBare;
-	GLuint shaderVertPlanetAtmo;
-	GLuint shaderVertAtmo;
-	GLuint shaderVertSun;
-	GLuint shaderVertRingFar;
-	GLuint shaderVertRingNear;
+	GLuint shaderVertPlanet;
 	GLuint shaderVertFlare;
 	GLuint shaderVertTonemap;
+
+	// Tesselation Evaluation Shaders
+	GLuint shaderTesePlanetBare;
+	GLuint shaderTesePlanetAtmo;
+	GLuint shaderTeseAtmo;
+	GLuint shaderTeseSun;
+	GLuint shaderTeseRingFar;
+	GLuint shaderTeseRingNear;
 
 	// Fragment Shaders
 	GLuint shaderFragPlanetBare;
