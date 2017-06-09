@@ -8,7 +8,7 @@ void GPUProfilerGL::begin(const string name)
 	auto &val = queries[id][name].first;
 	if (val == 0)
 	{
-		glGenQueries(1, &val);
+		glCreateQueries(GL_TIMESTAMP, 1, &val);
 	}
 	glQueryCounter(val, GL_TIMESTAMP);
 	names.push(name);

@@ -160,13 +160,14 @@ private:
 	// Rendertarget sampler
 	GLuint rendertargetSampler;
 
-	// HDR framebuffer
-	GLuint hdrFbo;
+	// FBOs
+	GLuint hdrFBO;
+	GLuint highpassFBO;
 
 	// Vertex Shaders
 	GLuint shaderVertPlanet;
 	GLuint shaderVertFlare;
-	GLuint shaderVertTonemap;
+	GLuint shaderVertDeferred;
 
 	// Tessellation Control Shaders
 	GLuint shaderTescPlanetBare;
@@ -191,11 +192,11 @@ private:
 	GLuint shaderFragSun;
 	GLuint shaderFragRingFar;
 	GLuint shaderFragRingNear;
+	GLuint shaderFragHighpass;
 	GLuint shaderFragFlare;
 	GLuint shaderFragTonemap;
 
 	// Compute Shaders
-	GLuint shaderCompHighpass;
 	GLuint shaderCompDownsample;
 	GLuint shaderCompBlurW;
 	GLuint shaderCompBlurH;
@@ -208,11 +209,11 @@ private:
 	GLuint pipelineSun;
 	GLuint pipelineRingFar;
 	GLuint pipelineRingNear;
+	GLuint pipelineHighpass;
 	GLuint pipelineFlare;
 	GLuint pipelineTonemap;
 
 	// Compute pipelines
-	GLuint pipelineHighpass;
 	GLuint pipelineDownsample;
 	GLuint pipelineBlurW;
 	GLuint pipelineBlurH;

@@ -508,9 +508,12 @@ void RendererGL::createRendertargets()
 	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	// Framebuffers
-	glCreateFramebuffers(1, &hdrFbo);
-	glNamedFramebufferTexture(hdrFbo, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
-	glNamedFramebufferTexture(hdrFbo, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+	glCreateFramebuffers(1, &hdrFBO);
+	glNamedFramebufferTexture(hdrFBO, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
+	glNamedFramebufferTexture(hdrFBO, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+
+	glCreateFramebuffers(1, &highpassFBO);
+	glNamedFramebufferTexture(highpassFBO, GL_COLOR_ATTACHMENT0, highpassRendertargets[0], 0);
 
 	// Enable SRGB output
 	glEnable(GL_FRAMEBUFFER_SRGB);
@@ -585,12 +588,12 @@ void RendererGL::createShaders()
 	const string planetFragSource{loadSource(folder, "planet.frag")};
 	const string atmoSource{loadSource(folder, "atmo.frag")};
 	const string ringFragSource{loadSource(folder, "ring.frag")};
+	const string highpassSource{loadSource(folder, "highpass.frag")};
 	const string flareFragSource{loadSource(folder, "flare.frag")};
 	const string tonemapSource{loadSource(folder, "tonemap.frag")};
 
 	// Compute shaders
-	const string downsampleSource{loadSource(folder, "downsample.comp")};
-	const string highpassSource{loadSource(folder, "highpass.comp")};
+	const string downsampleSource{loadSource(folder, "downsample.comp")};;
 	const string blurWSource{loadSource(folder, "blur_w.comp")};
 	const string blurHSource{loadSource(folder, "blur_h.comp")};
 	const string bloomAddSource{loadSource(folder, "bloom_add.comp")};
@@ -609,7 +612,7 @@ void RendererGL::createShaders()
 	shaderVertFlare = createShader(GL_VERTEX_SHADER,
 		{headerSource, flareVertSource});
 
-	shaderVertTonemap = createShader(GL_VERTEX_SHADER,
+	shaderVertDeferred = createShader(GL_VERTEX_SHADER,
 		{headerSource, deferredSource});
 
 	// Tessellation control shader programs
@@ -669,6 +672,9 @@ void RendererGL::createShaders()
 	shaderFragRingNear = createShader(GL_FRAGMENT_SHADER,
 		{headerSource, isNearRing, ringFragSource});
 
+	shaderFragHighpass = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, highpassSource});
+
 	shaderFragFlare = createShader(GL_FRAGMENT_SHADER,
 		{headerSource, flareFragSource});
 
@@ -676,9 +682,6 @@ void RendererGL::createShaders()
 		{headerSource, tonemapSource});
 
 	// Compute shader programs
-	shaderCompHighpass = createShader(GL_COMPUTE_SHADER,
-		{headerSource, highpassSource});
-
 	shaderCompDownsample = createShader(GL_COMPUTE_SHADER,
 		{headerSource, downsampleSource});
 
@@ -715,8 +718,9 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineSun, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
+	glUseProgramStages(pipelineHighpass, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
 	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
-	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertTonemap);
+	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
 
 	glUseProgramStages(pipelinePlanetBare, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetBare);
 	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetAtmo);
@@ -738,10 +742,10 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineSun, GL_FRAGMENT_SHADER_BIT, shaderFragSun);
 	glUseProgramStages(pipelineRingFar, GL_FRAGMENT_SHADER_BIT, shaderFragRingFar);
 	glUseProgramStages(pipelineRingNear, GL_FRAGMENT_SHADER_BIT, shaderFragRingNear);
+	glUseProgramStages(pipelineHighpass, GL_FRAGMENT_SHADER_BIT, shaderFragHighpass);
 	glUseProgramStages(pipelineFlare, GL_FRAGMENT_SHADER_BIT, shaderFragFlare);
 	glUseProgramStages(pipelineTonemap, GL_FRAGMENT_SHADER_BIT, shaderFragTonemap);
 
-	glUseProgramStages(pipelineHighpass, GL_COMPUTE_SHADER_BIT, shaderCompHighpass);
 	glUseProgramStages(pipelineDownsample, GL_COMPUTE_SHADER_BIT, shaderCompDownsample);
 	glUseProgramStages(pipelineBlurW, GL_COMPUTE_SHADER_BIT, shaderCompBlurW);
 	glUseProgramStages(pipelineBlurH, GL_COMPUTE_SHADER_BIT, shaderCompBlurH);
@@ -978,15 +982,15 @@ void RendererGL::renderHdr(
 	const vector<GLenum> attachments = {
 		GL_COLOR_ATTACHMENT0, 
 		GL_DEPTH_STENCIL_ATTACHMENT};
-	glInvalidateNamedFramebufferData(hdrFbo, 
+	glInvalidateNamedFramebufferData(hdrFBO, 
 		attachments.size(), attachments.data());
 	// Clearing
 	vector<float> clearColor = {0.f,0.f,0.f,0.f};
 	vector<float> clearDepth = {1.f};
-	glClearNamedFramebufferfv(hdrFbo, GL_COLOR, 0, clearColor.data());
-	glClearNamedFramebufferfv(hdrFbo, GL_DEPTH, 0, clearDepth.data());
+	glClearNamedFramebufferfv(hdrFBO, GL_COLOR, 0, clearColor.data());
+	glClearNamedFramebufferfv(hdrFBO, GL_DEPTH, 0, clearDepth.data());
 	// Bind FBO for rendering
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
 	// Planet rendering
 	for (uint32_t i : closePlanets)
@@ -1042,7 +1046,7 @@ void RendererGL::renderTranslucent(
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_SRC_ALPHA);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
 	for (uint32_t i : translucentPlanets)
 	{
@@ -1101,19 +1105,27 @@ void RendererGL::renderTranslucent(
 
 void RendererGL::renderHighpass()
 {
-	const int workgroupSize = 16;
-	// Highpass
-	{
-		const GLuint inputTex = hdrMSRendertarget;
-		const GLuint outputTex = highpassRendertargets[0];
-		glInvalidateTexImage(outputTex, 0);
-		glBindProgramPipeline(pipelineHighpass);
-		glBindImageTexture(0, inputTex , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-		glBindImageTexture(1, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-		glDispatchCompute(
-			(int)ceil(windowWidth /(float)workgroupSize), 
-			(int)ceil(windowHeight/(float)workgroupSize), 1);
-	}
+	// No depth test/write
+	glDepthFunc(GL_ALWAYS);
+	glDepthMask(GL_FALSE);
+
+	// No blending
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ZERO);
+
+	const vector<GLuint> attachments = {GL_COLOR_ATTACHMENT0};
+	glInvalidateNamedFramebufferData(highpassFBO, attachments.size(), attachments.data());
+
+	glBindFramebuffer(GL_FRAMEBUFFER, highpassFBO);
+
+	glBindProgramPipeline(pipelineHighpass);
+
+	const vector<GLuint> samplers = {rendertargetSampler};
+	const vector<GLuint> texs = {hdrMSRendertarget};
+	glBindSamplers(1, samplers.size(), samplers.data());
+	glBindTextures(1, texs.size(), texs.data());
+
+	fullscreenTri.draw();
 }
 	
 void RendererGL::renderDownsample()
@@ -1208,7 +1220,7 @@ void RendererGL::renderFlares(
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
 	glBindProgramPipeline(pipelineFlare);
 
@@ -1247,7 +1259,7 @@ void RendererGL::renderTonemap(const DynamicData &data)
 	glBlendFunc(GL_ONE, GL_ZERO);
 
 	// Invalidate
-	vector<GLuint> attachments = {GL_COLOR};
+	const vector<GLuint> attachments = {GL_COLOR};
 	glInvalidateNamedFramebufferData(0, attachments.size(), attachments.data());
 
 	// Bind default FBO
