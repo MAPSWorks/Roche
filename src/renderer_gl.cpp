@@ -917,6 +917,12 @@ void RendererGL::render(
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
+	profiler.begin("Highpass");
+	renderHighpass();
+	profiler.end();
+	profiler.begin("Downsample");
+	renderDownsample();
+	profiler.end();
 	profiler.begin("Bloom");
 	renderBloom();
 	profiler.end();
@@ -1093,7 +1099,7 @@ void RendererGL::renderTranslucent(
 	}
 }
 
-void RendererGL::renderBloom()
+void RendererGL::renderHighpass()
 {
 	const int workgroupSize = 16;
 	// Highpass
@@ -1108,9 +1114,14 @@ void RendererGL::renderBloom()
 			(int)ceil(windowWidth /(float)workgroupSize), 
 			(int)ceil(windowHeight/(float)workgroupSize), 1);
 	}
+}
+	
+void RendererGL::renderDownsample()
+{
+	const int workgroupSize = 16;
 
-	glBindProgramPipeline(pipelineDownsample);
 	// Downsample to 16x
+	glBindProgramPipeline(pipelineDownsample);
 	for (int i=0;i<4;++i)
 	{
 		const GLuint inputTex = highpassRendertargets[i];
@@ -1123,6 +1134,11 @@ void RendererGL::renderBloom()
 			(int)ceil(windowWidth /(float)(workgroupSize<<(i+1))), 
 			(int)ceil(windowHeight/(float)(workgroupSize<<(i+1))), 1);
 	}
+}
+
+void RendererGL::renderBloom()
+{
+	const int workgroupSize = 16;
 
 	const GLuint bloomImages[] = {
 		highpassRendertargets[4], // Blur x input  - 16x
