@@ -95,8 +95,8 @@ private:
 	void renderHdr(
 		const std::vector<uint32_t> &closePlanets, 
 		const DynamicData &data);
-	void renderAtmo(
-		const std::vector<uint32_t> &atmoPlanets,
+	void renderTranslucent(
+		const std::vector<uint32_t> &translucentPlanets,
 		const DynamicData &data);
 	void renderBloom();
 	void renderFlares(

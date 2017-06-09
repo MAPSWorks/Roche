@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Invalidate framebuffers
 - [ ] Better log depth buffer
 - [ ] Correct flares
 - [ ] Use BC7 for textures
@@ -7,6 +6,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Invalidate framebuffers
 - [x] Lower res spheres + tesselation (also for rings)
 - [x] Better texture streaming management
 - [x] Isolate screenshot and texture streaming functionality

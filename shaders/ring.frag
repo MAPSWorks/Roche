@@ -12,8 +12,8 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 	PlanetUBO planetUBO;
 };
 
-layout (binding = 2) uniform sampler1D tex1;
-layout (binding = 3) uniform sampler1D tex2;
+layout (binding = 3) uniform sampler1D tex1;
+layout (binding = 4) uniform sampler1D tex2;
 
 layout (location = 0) out vec4 outColor;
 

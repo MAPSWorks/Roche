@@ -800,7 +800,7 @@ void RendererGL::render(
 	// Planet classification
 	vector<uint32_t> closePlanets;
 	vector<uint32_t> farPlanets;
-	vector<uint32_t> atmoPlanets;
+	vector<uint32_t> translucentPlanets;
 
 	vector<uint32_t> texLoadPlanets;
 	vector<uint32_t> texUnloadPlanets;
@@ -834,9 +834,9 @@ void RendererGL::render(
 				// Detailed model
 				closePlanets.push_back(i);
 				// Planet atmospheres
-				if (param.hasAtmo())
+				if (param.hasAtmo() || param.hasRing())
 				{
-					atmoPlanets.push_back(i);
+					translucentPlanets.push_back(i);
 				}
 			}
 			if (dist > farPlanetMinDistance || param.isStar())
@@ -903,7 +903,7 @@ void RendererGL::render(
 	});
 
 	// Atmosphere sorting from back to front
-	sort(atmoPlanets.begin(), atmoPlanets.end(), [&](int i, int j)
+	sort(translucentPlanets.begin(), translucentPlanets.end(), [&](int i, int j)
 	{
 		const float distI = distance(planetStates[i].getPosition(), viewPos);
 		const float distJ = distance(planetStates[j].getPosition(), viewPos);
@@ -914,8 +914,8 @@ void RendererGL::render(
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
 	profiler.end();
-	profiler.begin("Atmospheres");
-	renderAtmo(atmoPlanets, currentData);
+	profiler.begin("Translucent objects");
+	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
 	profiler.begin("Bloom");
 	renderBloom();
@@ -968,17 +968,19 @@ void RendererGL::renderHdr(
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ZERO);
 
+	// Invalidating
+	const vector<GLenum> attachments = {
+		GL_COLOR_ATTACHMENT0, 
+		GL_DEPTH_STENCIL_ATTACHMENT};
+	glInvalidateNamedFramebufferData(hdrFbo, 
+		attachments.size(), attachments.data());
 	// Clearing
+	vector<float> clearColor = {0.f,0.f,0.f,0.f};
+	vector<float> clearDepth = {1.f};
+	glClearNamedFramebufferfv(hdrFbo, GL_COLOR, 0, clearColor.data());
+	glClearNamedFramebufferfv(hdrFbo, GL_DEPTH, 0, clearDepth.data());
+	// Bind FBO for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
-	float clearColor[] = {0.f,0.f,0.f,0.f};
-	float clearDepth[] = {1.f};
-	glClearNamedFramebufferfv(hdrFbo, GL_COLOR, 0, clearColor);
-	glClearNamedFramebufferfv(hdrFbo, GL_DEPTH, 0, clearDepth);
-
-	// Chose default or custom textures
-	vector<GLuint> diffuseTextures(planetCount);
-	vector<GLuint> cloudTextures(planetCount);
-	vector<GLuint> nightTextures(planetCount);
 
 	// Planet rendering
 	for (uint32_t i : closePlanets)
@@ -1001,30 +1003,30 @@ void RendererGL::renderHdr(
 			ddata.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
+		// Bind samplers
+		const vector<GLuint> samplers = {
+			planetTexSampler,
+			planetTexSampler,
+			planetTexSampler,
+			atmoSampler
+		};
 		// Bind textures
-		GLuint samplers[] = {
-			planetTexSampler,
-			planetTexSampler,
-			planetTexSampler};
-		GLuint texs[] = {
+		const vector<GLuint> texs = {
 			data.diffuse.getId(diffuseTexDefault),
 			data.cloud.getId(cloudTexDefault),
-			data.night.getId(nightTexDefault)};
-		glBindSamplers(2, 3, samplers);
-		glBindTextures(2, 3, texs);
+			data.night.getId(nightTexDefault),
+			data.atmoLookupTable
+		};
 
-		if (hasAtmo)
-		{
-			glBindSampler(5, atmoSampler);
-			glBindTextureUnit(5, data.atmoLookupTable);
-		}
-
+		glBindSamplers(2, samplers.size(), samplers.data());
+		glBindTextures(2, texs.size(), texs.data());
+		
 		data.planetModel.draw();
 	}
 }
 
-void RendererGL::renderAtmo(
-	const vector<uint32_t> &atmoPlanets,
+void RendererGL::renderTranslucent(
+	const vector<uint32_t> &translucentPlanets,
 	const DynamicData &data)
 {
 	// Only depth test
@@ -1036,46 +1038,56 @@ void RendererGL::renderAtmo(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 
-	for (uint32_t i : atmoPlanets)
+	for (uint32_t i : translucentPlanets)
 	{
+		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
 			sizeof(SceneDynamicUBO));
+		// Bind Planet UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
 			data.planetUBOs[i].getOffset(),
 			sizeof(PlanetDynamicUBO));
 
-		bool hasRings = planetParams[i].hasRing();
+		bool hasRing = planetParams[i].hasRing();
+		bool hasAtmo = planetParams[i].hasAtmo();
 
 		auto &data = planetData[i];
 		DrawCommand ringModel = data.ringModel;
 
+		const vector<GLuint> samplers = {
+			atmoSampler,
+			ringSampler,
+			ringSampler
+		};
+
+		const vector<GLuint> texs = {
+			data.atmoLookupTable,
+			data.ringTex1,
+			data.ringTex2
+		};
+
+		glBindSamplers(2, samplers.size(), samplers.data());
+		glBindTextures(2, texs.size(), texs.data());
+
 		// Far rings
-		if (hasRings)
+		if (hasRing)
 		{
 			glBindProgramPipeline(pipelineRingFar);
-			glBindSampler(2, ringSampler);
-			glBindTextureUnit(2, data.ringTex1);
-			glBindSampler(3, ringSampler);
-			glBindTextureUnit(3, data.ringTex2);
 			ringModel.draw();
 		}
 
 		// Atmosphere
-		glBindProgramPipeline(pipelineAtmo);
-		
-		glBindSampler(2, atmoSampler);
-		glBindTextureUnit(2, data.atmoLookupTable);
-		data.planetModel.draw();
+		if (hasAtmo)
+		{
+			glBindProgramPipeline(pipelineAtmo);
+			data.planetModel.draw();
+		}
 
 		// Near rings
-		if (hasRings)
+		if (hasRing)
 		{
 			glBindProgramPipeline(pipelineRingNear);
-			glBindSampler(2, ringSampler);
-			glBindTextureUnit(2, data.ringTex1);
-			glBindSampler(3, ringSampler);
-			glBindTextureUnit(3, data.ringTex2);
 			ringModel.draw();
 		}
 	}
@@ -1085,20 +1097,28 @@ void RendererGL::renderBloom()
 {
 	const int workgroupSize = 16;
 	// Highpass
-	glBindProgramPipeline(pipelineHighpass);
-	glBindImageTexture(0, hdrMSRendertarget       , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-	glBindImageTexture(1, highpassRendertargets[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-	glDispatchCompute(
-		(int)ceil(windowWidth/(float)workgroupSize), 
-		(int)ceil(windowHeight/(float)workgroupSize), 1);
+	{
+		const GLuint inputTex = hdrMSRendertarget;
+		const GLuint outputTex = highpassRendertargets[0];
+		glInvalidateTexImage(outputTex, 0);
+		glBindProgramPipeline(pipelineHighpass);
+		glBindImageTexture(0, inputTex , 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
+		glBindImageTexture(1, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+		glDispatchCompute(
+			(int)ceil(windowWidth /(float)workgroupSize), 
+			(int)ceil(windowHeight/(float)workgroupSize), 1);
+	}
 
 	glBindProgramPipeline(pipelineDownsample);
 	// Downsample to 16x
 	for (int i=0;i<4;++i)
 	{
+		const GLuint inputTex = highpassRendertargets[i];
+		const GLuint outputTex = highpassRendertargets[i+1];
+		glInvalidateTexImage(outputTex, 0);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		glBindImageTexture(0, highpassRendertargets[i]  , 0, GL_FALSE, 0, GL_READ_ONLY, GL_R11F_G11F_B10F);
-		glBindImageTexture(1, highpassRendertargets[i+1], 0, GL_FALSE, 0, GL_WRITE_ONLY,GL_R11F_G11F_B10F);
+		glBindImageTexture(0, inputTex , 0, GL_FALSE, 0, GL_READ_ONLY, GL_R11F_G11F_B10F);
+		glBindImageTexture(1, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,GL_R11F_G11F_B10F);
 		glDispatchCompute(
 			(int)ceil(windowWidth /(float)(workgroupSize<<(i+1))), 
 			(int)ceil(windowHeight/(float)(workgroupSize<<(i+1))), 1);
@@ -1132,6 +1152,7 @@ void RendererGL::renderBloom()
 			{
 				const int ping = (j*blurPasses+k)%2;
 				const int pong = (ping+1)%2;
+				glInvalidateTexImage(blurImages[pong], 0);
 				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 				glBindImageTexture(0, blurImages[ping], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
 				glBindImageTexture(1, blurImages[pong], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
@@ -1145,6 +1166,7 @@ void RendererGL::renderBloom()
 		if (i!=3)
 		{
 			glBindProgramPipeline(pipelineBloomAdd);
+			glInvalidateTexImage(bloomImages[i*3+3], 0);
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 			glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 			glBindSampler(0, rendertargetSampler);
@@ -1187,11 +1209,12 @@ void RendererGL::renderFlares(
 			sizeof(PlanetDynamicUBO));
 
 		// Bind textures
-		GLuint samplers[] = {0,0,0};
-		glBindSamplers(2, 3, samplers);
-		glBindTextureUnit(2, flareIntensityTex);
-		glBindTextureUnit(3, flareLinesTex);
-		glBindTextureUnit(4, flareHaloTex);
+		const vector<GLuint> samplers = {0,0,0};
+		const vector<GLuint> texs = {
+			flareIntensityTex, flareLinesTex, flareHaloTex
+		};
+		glBindSamplers(2, samplers.size(), samplers.data());
+		glBindTextures(2, texs.size(), texs.data());
 
 		flareModel.draw();
 	}
@@ -1207,6 +1230,11 @@ void RendererGL::renderTonemap(const DynamicData &data)
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ZERO);
 
+	// Invalidate
+	vector<GLuint> attachments = {GL_COLOR};
+	glInvalidateNamedFramebufferData(0, attachments.size(), attachments.data());
+
+	// Bind default FBO
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glBindProgramPipeline(pipelineTonemap);
@@ -1217,10 +1245,10 @@ void RendererGL::renderTonemap(const DynamicData &data)
 			sizeof(SceneDynamicUBO));
 
 	// Bind image after bloom is done
-	glBindSampler(1, rendertargetSampler);
-	glBindTextureUnit(1, hdrMSRendertarget);
-	glBindSampler(2, rendertargetSampler);
-	glBindTextureUnit(2, bloomRendertargets[0]);
+	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
+	const vector<GLuint> texs = {hdrMSRendertarget, bloomRendertargets[0]};
+	glBindSamplers(1, samplers.size(), samplers.data());
+	glBindTextures(1, texs.size(), texs.data());
 
 	fullscreenTri.draw();
 }
