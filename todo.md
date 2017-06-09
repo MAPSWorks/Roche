@@ -1,4 +1,6 @@
 ## To Do
+- [ ] Invalidate framebuffers
+- [ ] Better log depth buffer
 - [ ] Correct flares
 - [ ] Use BC7 for textures
 - [ ] Specular support
