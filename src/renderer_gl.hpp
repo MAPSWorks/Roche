@@ -57,7 +57,8 @@ private:
 		glm::vec4 viewPos;
 		float ambientColor;
 		float exposure;
-		float logDepthCoef;
+		float logDepthFarPlane;
+		float logDepthC;
 	};
 
 	struct PlanetDynamicUBO
@@ -124,9 +125,10 @@ private:
 	uint32_t planetCount = 0;
 	int msaaSamples = 1;
 	int maxTexSize = -1;
-	int windowWidth = 0;
-	int windowHeight = 0;
-	float farPlane = 5e10;
+	int windowWidth = 1;
+	int windowHeight = 1;
+	float logDepthFarPlane = 5e10;
+	float logDepthC = 1.0;
 
 	// Constants for distance based loading
 	float closePlanetMaxDistance;
@@ -154,15 +156,22 @@ private:
 	GLuint gbufferFbo;
 	// HDR rendertarget
 	GLuint hdrMSRendertarget;
-	GLuint highpassRendertargets[5];
-	GLuint bloomRendertargets[4];
+	GLuint highpassRendertargets;
+	GLuint bloomRendertargets;
+
+	// Number of bloom steps
+	int bloomDepth = 4;
+	// Texture views to mipmaps
+	std::vector<GLuint> highpassViews;
+	std::vector<GLuint> bloomViews;
 
 	// Rendertarget sampler
 	GLuint rendertargetSampler;
 
 	// FBOs
 	GLuint hdrFBO;
-	GLuint highpassFBO;
+	std::vector<GLuint> highpassFBOs;
+	std::vector<GLuint> bloomFBOs;
 
 	// Vertex Shaders
 	GLuint shaderVertPlanet;
@@ -193,14 +202,11 @@ private:
 	GLuint shaderFragRingFar;
 	GLuint shaderFragRingNear;
 	GLuint shaderFragHighpass;
+	GLuint shaderFragBlurW;
+	GLuint shaderFragBlurH;
+	GLuint shaderFragBloomAdd;
 	GLuint shaderFragFlare;
 	GLuint shaderFragTonemap;
-
-	// Compute Shaders
-	GLuint shaderCompDownsample;
-	GLuint shaderCompBlurW;
-	GLuint shaderCompBlurH;
-	GLuint shaderCompBloomAdd;
 
 	// Pipelines
 	GLuint pipelinePlanetBare;
@@ -210,14 +216,11 @@ private:
 	GLuint pipelineRingFar;
 	GLuint pipelineRingNear;
 	GLuint pipelineHighpass;
-	GLuint pipelineFlare;
-	GLuint pipelineTonemap;
-
-	// Compute pipelines
-	GLuint pipelineDownsample;
 	GLuint pipelineBlurW;
 	GLuint pipelineBlurH;
 	GLuint pipelineBloomAdd;
+	GLuint pipelineFlare;
+	GLuint pipelineTonemap;
 
 	// Multiple buffering
 	uint32_t frameId;

@@ -1,14 +1,10 @@
 #include "tex_stream.hpp"
 
+#include "gl_util.hpp"
+
 #include <iostream>
-#include <cmath>
 
 using namespace std;
-
-int mipmapCount(int size)
-{
-	return 1 +std::floor(std::log2(size));
-}
 
 GLenum DDSFormatToGL(DDSLoader::Format format)
 {

@@ -478,26 +478,39 @@ void RendererGL::createRendertargets()
 	glTextureStorage2DMultisample(
 		depthStencilTex, msaaSamples, GL_DEPTH24_STENCIL8, windowWidth, windowHeight, GL_FALSE);
 
+	const GLenum hdrFormat = GL_RGB16F;
+
 	// HDR MSAA Rendertarget
 	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &hdrMSRendertarget);
-	glTextureStorage2DMultisample(hdrMSRendertarget, msaaSamples, GL_R11F_G11F_B10F,
+	glTextureStorage2DMultisample(hdrMSRendertarget, msaaSamples, hdrFormat,
 		windowWidth, windowHeight, GL_FALSE);
 
 	// Highpass rendertargets
-	glCreateTextures(GL_TEXTURE_2D, 5, highpassRendertargets);
-	for (int i=0;i<5;++i)
+	glCreateTextures(GL_TEXTURE_2D, 1, &highpassRendertargets);
+	glTextureStorage2D(highpassRendertargets, bloomDepth+1, 
+		hdrFormat, windowWidth, windowHeight);
+
+	// Highpass views
+	highpassViews.resize(bloomDepth+1);
+	glGenTextures(highpassViews.size(), highpassViews.data());
+	for (int i=0;i<highpassViews.size();++i)
 	{
-		glTextureStorage2D(highpassRendertargets[i], 
-			1, GL_R11F_G11F_B10F, windowWidth>>i, windowHeight>>i);
+		glTextureView(highpassViews[i], GL_TEXTURE_2D, highpassRendertargets, 
+			hdrFormat, i, 1, 0, 1);
 	}
 
 	// Bloom rendertargets
-	glCreateTextures(GL_TEXTURE_2D, 4, bloomRendertargets);
-	for (int i=0;i<4;++i)
-	{
-		glTextureStorage2D(bloomRendertargets[i], 
-			1, GL_R11F_G11F_B10F, windowWidth>>(i+1), windowHeight>>(i+1));
+	glCreateTextures(GL_TEXTURE_2D, 1, &bloomRendertargets);
+	glTextureStorage2D(bloomRendertargets, bloomDepth,
+		hdrFormat, windowWidth/2, windowHeight/2);
 
+	// Bloom views
+	bloomViews.resize(bloomDepth);
+	glGenTextures(bloomViews.size(), bloomViews.data());
+	for (int i=0;i<bloomViews.size();++i)
+	{
+		glTextureView(bloomViews[i], GL_TEXTURE_2D, bloomRendertargets,
+			hdrFormat, i, 1, 0, 1);
 	}
 
 	// Sampler
@@ -512,8 +525,15 @@ void RendererGL::createRendertargets()
 	glNamedFramebufferTexture(hdrFBO, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
 	glNamedFramebufferTexture(hdrFBO, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
 
-	glCreateFramebuffers(1, &highpassFBO);
-	glNamedFramebufferTexture(highpassFBO, GL_COLOR_ATTACHMENT0, highpassRendertargets[0], 0);
+	highpassFBOs.resize(bloomDepth+1);
+	glCreateFramebuffers(highpassFBOs.size(), highpassFBOs.data());
+	for (int i=0;i<highpassFBOs.size();++i)
+		glNamedFramebufferTexture(highpassFBOs[i], GL_COLOR_ATTACHMENT0, highpassViews[i], 0);
+
+	bloomFBOs.resize(bloomDepth);
+	glCreateFramebuffers(bloomFBOs.size(), bloomFBOs.data());
+	for (int i=0;i<bloomFBOs.size();++i)
+		glNamedFramebufferTexture(bloomFBOs[i], GL_COLOR_ATTACHMENT0, bloomViews[i], 0);
 
 	// Enable SRGB output
 	glEnable(GL_FRAMEBUFFER_SRGB);
@@ -589,14 +609,10 @@ void RendererGL::createShaders()
 	const string atmoSource{loadSource(folder, "atmo.frag")};
 	const string ringFragSource{loadSource(folder, "ring.frag")};
 	const string highpassSource{loadSource(folder, "highpass.frag")};
+	const string blurSource{loadSource(folder, "blur.frag")};
+	const string bloomAddSource{loadSource(folder, "bloom_add.frag")};
 	const string flareFragSource{loadSource(folder, "flare.frag")};
 	const string tonemapSource{loadSource(folder, "tonemap.frag")};
-
-	// Compute shaders
-	const string downsampleSource{loadSource(folder, "downsample.comp")};;
-	const string blurWSource{loadSource(folder, "blur_w.comp")};
-	const string blurHSource{loadSource(folder, "blur_h.comp")};
-	const string bloomAddSource{loadSource(folder, "bloom_add.comp")};
 
 	// Defines
 	const string isStar{"#define IS_STAR\n"};
@@ -604,6 +620,10 @@ void RendererGL::createShaders()
 	const string isAtmo{"#define IS_ATMO\n"};
 	const string isFarRing{"#define IS_FAR_RING\n"};
 	const string isNearRing{"#define IS_NEAR_RING\n"};
+
+	const string blurW{"#define BLUR_W\n"};
+	const string blurH{"#define BLUR_H\n"};
+
 
 	// Vertex shader programs
 	shaderVertPlanet = createShader(GL_VERTEX_SHADER, 
@@ -675,24 +695,21 @@ void RendererGL::createShaders()
 	shaderFragHighpass = createShader(GL_FRAGMENT_SHADER,
 		{headerSource, highpassSource});
 
+	shaderFragBlurW = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, blurW, blurSource});
+
+	shaderFragBlurH = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, blurH, blurSource});
+
+	shaderFragBloomAdd = createShader(GL_FRAGMENT_SHADER,
+		{headerSource, bloomAddSource});
+
 	shaderFragFlare = createShader(GL_FRAGMENT_SHADER,
 		{headerSource, flareFragSource});
 
 	shaderFragTonemap = createShader(GL_FRAGMENT_SHADER,
 		{headerSource, tonemapSource});
 
-	// Compute shader programs
-	shaderCompDownsample = createShader(GL_COMPUTE_SHADER,
-		{headerSource, downsampleSource});
-
-	shaderCompBlurW = createShader(GL_COMPUTE_SHADER,
-		{headerSource, blurWSource});
-
-	shaderCompBlurH = createShader(GL_COMPUTE_SHADER,
-		{headerSource, blurHSource});
-
-	shaderCompBloomAdd = createShader(GL_COMPUTE_SHADER,
-		{headerSource, bloomAddSource});
 
 	// Pipelines
 	glCreateProgramPipelines(1, &pipelinePlanetBare);
@@ -701,12 +718,9 @@ void RendererGL::createShaders()
 	glCreateProgramPipelines(1, &pipelineSun);
 	glCreateProgramPipelines(1, &pipelineRingFar);
 	glCreateProgramPipelines(1, &pipelineRingNear);
+	glCreateProgramPipelines(1, &pipelineHighpass);
 	glCreateProgramPipelines(1, &pipelineFlare);
 	glCreateProgramPipelines(1, &pipelineTonemap);
-
-	// Compute pipelines
-	glCreateProgramPipelines(1, &pipelineHighpass);
-	glCreateProgramPipelines(1, &pipelineDownsample);
 	glCreateProgramPipelines(1, &pipelineBlurW);
 	glCreateProgramPipelines(1, &pipelineBlurH);
 	glCreateProgramPipelines(1, &pipelineBloomAdd);
@@ -719,6 +733,9 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
 	glUseProgramStages(pipelineHighpass, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
+	glUseProgramStages(pipelineBlurW, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
+	glUseProgramStages(pipelineBlurH, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
+	glUseProgramStages(pipelineBloomAdd, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
 	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
 	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
 
@@ -743,13 +760,11 @@ void RendererGL::createShaders()
 	glUseProgramStages(pipelineRingFar, GL_FRAGMENT_SHADER_BIT, shaderFragRingFar);
 	glUseProgramStages(pipelineRingNear, GL_FRAGMENT_SHADER_BIT, shaderFragRingNear);
 	glUseProgramStages(pipelineHighpass, GL_FRAGMENT_SHADER_BIT, shaderFragHighpass);
+	glUseProgramStages(pipelineBlurW, GL_FRAGMENT_SHADER_BIT, shaderFragBlurW);
+	glUseProgramStages(pipelineBlurH, GL_FRAGMENT_SHADER_BIT, shaderFragBlurH);
+	glUseProgramStages(pipelineBloomAdd, GL_FRAGMENT_SHADER_BIT, shaderFragBloomAdd);
 	glUseProgramStages(pipelineFlare, GL_FRAGMENT_SHADER_BIT, shaderFragFlare);
 	glUseProgramStages(pipelineTonemap, GL_FRAGMENT_SHADER_BIT, shaderFragTonemap);
-
-	glUseProgramStages(pipelineDownsample, GL_COMPUTE_SHADER_BIT, shaderCompDownsample);
-	glUseProgramStages(pipelineBlurW, GL_COMPUTE_SHADER_BIT, shaderCompBlurW);
-	glUseProgramStages(pipelineBlurH, GL_COMPUTE_SHADER_BIT, shaderCompBlurH);
-	glUseProgramStages(pipelineBloomAdd, GL_COMPUTE_SHADER_BIT, shaderCompBloomAdd);
 }
 
 void RendererGL::createScreenshot()
@@ -798,7 +813,7 @@ void RendererGL::render(
 	auto &currentData = dynamicData[frameId];
 
 	// Projection and view matrices
-	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 0.001f, farPlane);
+	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 0.f,1.f);
 	const mat4 viewMat = lookAt(vec3(0), (vec3)(viewCenter-viewPos), viewUp);
 
 	// Planet classification
@@ -865,7 +880,8 @@ void RendererGL::render(
 	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = ambientColor;
 	sceneUBO.exposure = exp;
-	sceneUBO.logDepthCoef = (1.0/log2(farPlane + 1.0));
+	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));
+	sceneUBO.logDepthC = logDepthC;
 
 	// Planet uniform update
 	// Close planets (detailed model)
@@ -1114,9 +1130,9 @@ void RendererGL::renderHighpass()
 	glBlendFunc(GL_ONE, GL_ZERO);
 
 	const vector<GLuint> attachments = {GL_COLOR_ATTACHMENT0};
-	glInvalidateNamedFramebufferData(highpassFBO, attachments.size(), attachments.data());
+	glInvalidateNamedFramebufferData(highpassFBOs[0], attachments.size(), attachments.data());
 
-	glBindFramebuffer(GL_FRAMEBUFFER, highpassFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[0]);
 
 	glBindProgramPipeline(pipelineHighpass);
 
@@ -1130,80 +1146,48 @@ void RendererGL::renderHighpass()
 	
 void RendererGL::renderDownsample()
 {
-	const int workgroupSize = 16;
-
-	// Downsample to 16x
-	glBindProgramPipeline(pipelineDownsample);
-	for (int i=0;i<4;++i)
-	{
-		const GLuint inputTex = highpassRendertargets[i];
-		const GLuint outputTex = highpassRendertargets[i+1];
-		glInvalidateTexImage(outputTex, 0);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		glBindImageTexture(0, inputTex , 0, GL_FALSE, 0, GL_READ_ONLY, GL_R11F_G11F_B10F);
-		glBindImageTexture(1, outputTex, 0, GL_FALSE, 0, GL_WRITE_ONLY,GL_R11F_G11F_B10F);
-		glDispatchCompute(
-			(int)ceil(windowWidth /(float)(workgroupSize<<(i+1))), 
-			(int)ceil(windowHeight/(float)(workgroupSize<<(i+1))), 1);
-	}
+	glGenerateTextureMipmap(highpassRendertargets);
 }
 
 void RendererGL::renderBloom()
 {
-	const int workgroupSize = 16;
+	const vector<GLenum> invalidateAttach = {GL_COLOR_ATTACHMENT0};
+	glCopyImageSubData(
+		highpassViews[bloomDepth], GL_TEXTURE_2D, 0,
+		0, 0, 0, 
+		bloomViews[bloomDepth-1], GL_TEXTURE_2D, 0,
+		0, 0, 0,
+		mipmapSize(windowWidth,  bloomDepth),
+		mipmapSize(windowHeight, bloomDepth),
+		1);
 
-	const GLuint bloomImages[] = {
-		highpassRendertargets[4], // Blur x input  - 16x
-		bloomRendertargets[3],    // Blur y input
-		highpassRendertargets[3], // Add image input
-		bloomRendertargets[2],    // ...           - 8x
-		highpassRendertargets[3],
-		highpassRendertargets[2],
-		bloomRendertargets[1],    // ...           - 4x
-		highpassRendertargets[2],
-		highpassRendertargets[1],
-		bloomRendertargets[0],   // Only blur      - 2x
-		highpassRendertargets[1]
-	};
-
-	for (int i=0;i<4;++i)
+	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
+	glBindSamplers(0, samplers.size(), samplers.data());
+	for (int i=bloomDepth;i>=1;--i)
 	{
-		const int dispatchSize = workgroupSize<<(4-i);
+		// Blur horizontally
+		glBindProgramPipeline(pipelineBlurW);
+		glInvalidateNamedFramebufferData(highpassFBOs[i], invalidateAttach.size(), invalidateAttach.data());
+		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i]);
+		glBindTextureUnit(0, bloomViews[i-1]);
+		fullscreenTri.draw();
 
-		// Blur horizontally & vertically
-		const GLuint blurImages[] = {bloomImages[i*3+0], bloomImages[i*3+1]};
-		const int blurPasses = 2;
-		for (int j=0;j<2;++j)
-		{
-			glBindProgramPipeline(j?pipelineBlurW:pipelineBlurH);
-			for (int k=0;k<blurPasses;++k)
-			{
-				const int ping = (j*blurPasses+k)%2;
-				const int pong = (ping+1)%2;
-				glInvalidateTexImage(blurImages[pong], 0);
-				glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-				glBindImageTexture(0, blurImages[ping], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-				glBindImageTexture(1, blurImages[pong], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-				glDispatchCompute(
-					(int)ceil(windowWidth /(float)dispatchSize),
-					(int)ceil(windowHeight/(float)dispatchSize), 1);
-			}
-		}
+		// Blur vertically
+		glBindProgramPipeline(pipelineBlurH);
+		glInvalidateNamedFramebufferData(bloomFBOs[i-1], invalidateAttach.size(), invalidateAttach.data());
+		glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-1]);
+		glBindTextureUnit(0, highpassViews[i]);
+		fullscreenTri.draw();
 
 		// Add blur with higher res
-		if (i!=3)
+		if (i>1)
 		{
 			glBindProgramPipeline(pipelineBloomAdd);
-			glInvalidateTexImage(bloomImages[i*3+3], 0);
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-			glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-			glBindSampler(0, rendertargetSampler);
-			glBindTextureUnit(0, bloomImages[i*3+0]);
-			glBindImageTexture(1, bloomImages[i*3+2], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R11F_G11F_B10F);
-			glBindImageTexture(2, bloomImages[i*3+3], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-			glDispatchCompute(
-				(int)ceil(2*windowWidth /(float)dispatchSize),
-				(int)ceil(2*windowHeight/(float)dispatchSize), 1);
+			glInvalidateNamedFramebufferData(bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
+			glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-2]);
+			const vector<GLuint> texs = {bloomViews[i-1], highpassViews[i-1]};
+			glBindTextures(0, texs.size(), texs.data());
+			fullscreenTri.draw();
 		}
 	}
 }
@@ -1274,7 +1258,7 @@ void RendererGL::renderTonemap(const DynamicData &data)
 
 	// Bind image after bloom is done
 	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
-	const vector<GLuint> texs = {hdrMSRendertarget, bloomRendertargets[0]};
+	const vector<GLuint> texs = {hdrMSRendertarget, bloomViews[0]};
 	glBindSamplers(1, samplers.size(), samplers.data());
 	glBindTextures(1, texs.size(), texs.data());
 

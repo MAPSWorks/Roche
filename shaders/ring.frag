@@ -47,5 +47,5 @@ void main(void)
 	float aaf = fwidth(abs(len-1.5));
 	float alpha = smoothstep(0.5-aaf,0.5,abs(len-1.5));
 	outColor = mix(vec4(0,0,0,1), shadowed, 1-alpha);
-	outColor.rgb *= (1-outColor.a)*sceneUBO.exposure;
+	outColor.rgb *= (1-outColor.a);
 }

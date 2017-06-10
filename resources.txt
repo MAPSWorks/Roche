@@ -5,3 +5,6 @@ http://simonwinder.com/projects/simulation-of-lens-flare-in-the-human-eye/
 http://luthuli.cs.uiuc.edu/~daf/courses/rendering/papers3/spencer95.pdf
 http://http.developer.nvidia.com/GPUGems2/gpugems2_chapter16.html
 https://community.eveonline.com/news/dev-blogs/awesome-looking-planets/
+https://kosmonautblog.wordpress.com/2017/03/26/designing-a-linear-hdr-pipeline/
+https://mynameismjp.wordpress.com/2010/04/30/a-closer-look-at-tone-mapping/
+http://advances.realtimerendering.com/s2014/index.html

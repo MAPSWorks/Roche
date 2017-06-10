@@ -3,7 +3,6 @@
 #include "graphics_api.hpp"
 #include "dds_stream.hpp"
 
-int mipmapCount(int size);
 GLenum DDSFormatToGL(DDSLoader::Format format);
 
 class StreamTex

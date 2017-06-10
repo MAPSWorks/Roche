@@ -378,16 +378,28 @@ void Game::update(const double dt)
 		if (timeWarpIndex < (int)timeWarpValues.size()-1) timeWarpIndex++;
 	}
 
+	// Exposure adjustement
+	if (isPressedOnce(GLFW_KEY_I))
+	{
+		exposure = std::max(-8.f,exposure-0.1f);
+	}
+	if (isPressedOnce(GLFW_KEY_O))
+	{
+		exposure = std::min(+8.f, exposure+0.1f);
+	}
+
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
 		if (isSwitching)
 		{
+			// Instant switch
 			isSwitching = false;
 			cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
 		}
 		else
 		{
+			// Slow switch
 			switchPreviousPlanet = focusedPlanetId;
 			focusedPlanetId = (focusedPlanetId+1)%planetCount;
 			switchPreviousDist = cameraPolar.z;
@@ -425,7 +437,6 @@ void Game::update(const double dt)
 	bool mouseButton1 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1);
 	bool mouseButton2 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2);
 
-	// Check if we are not clicking on a gui
 	if ((mouseButton1 || mouseButton2) && !dragging)
 	{
 		dragging = true;
@@ -435,6 +446,7 @@ void Game::update(const double dt)
 		dragging = false;
 	}
 
+	// Drag view around
 	if (dragging)
 	{
 		if (mouseButton1)
@@ -476,6 +488,7 @@ void Game::update(const double dt)
 	preMousePosX = posX;
 	preMousePosY = posY;
 
+	// Screenshot
 	if (isPressedOnce(GLFW_KEY_F12))
 	{
 		renderer->takeScreenshot(generateScreenshotName());

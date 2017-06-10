@@ -6,6 +6,8 @@
 
 #include "graphics_api.hpp"
 
+int mipmapCount(int size);
+int mipmapSize(int size, int level);
 
 /**
  * The half range [offset, offset+size) in bytes in a buffer

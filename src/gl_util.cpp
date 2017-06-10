@@ -3,8 +3,19 @@
 #include <utility>
 #include <stdexcept>
 #include <cstring>
+#include <cmath>
 
 using namespace std;
+
+int mipmapCount(int size)
+{
+	return 1 +floor(log2(size));
+}
+
+int mipmapSize(int size, int level)
+{
+	return size>>level;
+}
 
 uint32_t Buffer::_alignUBO = 256;
 uint32_t Buffer::_alignSSBO = 32;

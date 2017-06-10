@@ -2,6 +2,12 @@ layout (binding = 1) uniform sampler2DMS hdr;
 
 layout (location = 0) out vec3 outColor;
 
+float bloomCurve(vec3 hdr)
+{
+	float lum = dot(vec3(0.2126,0.7152,0.0722), hdr);
+	return (lum>1)?(lum-1)*1.4+0.2:lum*0.2;
+}
+
 void main()
 {
 	const int SAMPLES = textureSamples(hdr);
@@ -14,7 +20,6 @@ void main()
 	{
 		sum += texelFetch(hdr, coord, i).rgb;
 	}
-	const vec3 value = sum*SAMPLES_MUL;
-	const float lum = dot(vec3(0.2126, 0.7152, 0.0722), value);
-	outColor = (lum>1.0)?value:vec3(0);
+	const vec3 hdr = sum*SAMPLES_MUL;
+	outColor = bloomCurve(hdr)*hdr;
 }

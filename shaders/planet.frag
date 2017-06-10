@@ -62,6 +62,5 @@ void main()
 		exp(-texture(atmo, vec2(angle_light,0)).g*(planetUBO.K.xyz+planetUBO.K.www))+scat+night;
 #endif
 
-	color *= sceneUBO.exposure;
 	outColor = vec4(color, 1.0);
 } 

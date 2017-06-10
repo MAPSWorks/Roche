@@ -1,11 +1,13 @@
 ## To Do
-- [ ] Better log depth buffer
+- [ ] Compute log average luminance for auto exposure
+- [ ] Correct luminance values
 - [ ] Correct flares
 - [ ] Use BC7 for textures
 - [ ] Specular support
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better log depth buffer
 - [x] Invalidate framebuffers
 - [x] Lower res spheres + tesselation (also for rings)
 - [x] Better texture streaming management
