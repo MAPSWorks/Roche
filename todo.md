@@ -1,6 +1,7 @@
 ## To Do
 - [ ] Compute log average luminance for auto exposure
 - [ ] Better upscale & downscale for bloom (tent filter)
+- [ ] Remove fovy as global var in game.cpp
 - [ ] Correct luminance values
 - [ ] Correct flares
 - [ ] Use BC7 for textures
