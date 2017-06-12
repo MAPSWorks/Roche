@@ -8,7 +8,14 @@ class DDSLoader
 public:
 	enum class Format
 	{
-		Undefined, BC1, BC2, BC3
+		Undefined, 
+		BC1, BC1_SRGB, 
+		BC2, BC2_SRGB,
+		BC3, BC3_SRGB,
+		BC4, BC4_SIGNED,
+		BC5, BC5_SIGNED,
+		BC6, BC6_SIGNED,
+		BC7, BC7_SRGB
 	};
 
 	explicit DDSLoader(int maxSize=-1);

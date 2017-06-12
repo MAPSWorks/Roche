@@ -1,14 +1,16 @@
 ## To Do
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
-- [ ] Better upscale & downscale for bloom (tent filter)
 - [ ] Correct luminance values
 - [ ] Correct flares
+- [ ] PBOs
+- [ ] Split textures
 - [ ] Use BC7 for textures
 - [ ] Specular support
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better upscale & downscale for bloom
 - [x] Remove fovy as global var in game.cpp
 - [x] Better log depth buffer
 - [x] Invalidate framebuffers

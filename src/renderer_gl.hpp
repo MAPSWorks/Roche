@@ -202,6 +202,7 @@ private:
 	GLuint shaderFragRingFar;
 	GLuint shaderFragRingNear;
 	GLuint shaderFragHighpass;
+	GLuint shaderFragDownsample;
 	GLuint shaderFragBlurW;
 	GLuint shaderFragBlurH;
 	GLuint shaderFragBloomAdd;
@@ -216,6 +217,7 @@ private:
 	GLuint pipelineRingFar;
 	GLuint pipelineRingNear;
 	GLuint pipelineHighpass;
+	GLuint pipelineDownsample;
 	GLuint pipelineBlurW;
 	GLuint pipelineBlurH;
 	GLuint pipelineBloomAdd;

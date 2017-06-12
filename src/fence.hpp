@@ -12,7 +12,7 @@ public:
 	Fence& operator=(Fence &&);
 	~Fence();
 	void wait();
-	void waitClient();
+	bool waitClient(uint64_t timeout=0);
 	void lock();
 
 private:

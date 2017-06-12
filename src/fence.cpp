@@ -26,11 +26,16 @@ void Fence::wait()
 	glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
 }
 
-void Fence::waitClient()
+bool Fence::waitClient(uint64_t timeout)
 {
-	if (!sync) return;
+	if (!sync) return true;
 
 	const GLenum ret = glClientWaitSync(sync, 0, 0);
+
+	if (ret == GL_CONDITION_SATISFIED ||
+		ret == GL_ALREADY_SIGNALED) return true;
+
+	if (ret == GL_TIMEOUT_EXPIRED) return false;
 
 	if (ret == GL_WAIT_FAILED)
 	{
