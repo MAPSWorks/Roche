@@ -867,9 +867,11 @@ void RendererGL::render(
 	}
 
 	// Manage stream textures
+	profiler.begin("Texture management");
 	loadTextures(texLoadPlanets);
 	unloadTextures(texUnloadPlanets);
 	uploadLoadedTextures();
+	profiler.end();
 
 	const float exp = pow(2, exposure);
 
@@ -1474,12 +1476,11 @@ RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
 	const vec3 planetPos = vec3(state.getPosition() - viewPos);
 	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
 	const vec2 screen = vec2(clip)/clip.w;
-	const float FLARE_SIZE_DEGREES = 20.0;
+	const float FLARE_SIZE_SCREEN = 0.5;
 	const mat4 modelMat = 
 		translate(mat4(), vec3(screen, 0.999))*
 		scale(mat4(), 
-			vec3(windowHeight/(float)windowWidth,1.0,0.0)*
-			FLARE_SIZE_DEGREES*(float)glm::pi<float>()/(fovy*180.0f));
+			vec3(windowHeight/(float)windowWidth,1.0,0.0)*FLARE_SIZE_SCREEN);
 
 	const float phaseAngle = acos(dot(
 		(vec3)normalize(state.getPosition()), 

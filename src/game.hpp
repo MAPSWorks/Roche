@@ -62,6 +62,7 @@ private:
 	glm::vec3 cameraPolar; // polar coordinates (theta, phi, distance)
 	glm::dvec3 cameraCenter; // where the camera is looking at
 	glm::dvec3 cameraPos; // actual cartesian coordinates
+	float cameraFovy = glm::radians(40.f);
 
 	GLFWwindow *win = nullptr;
 	std::bitset<512> keysHeld;

@@ -26,8 +26,6 @@
 
 #include <glm/ext.hpp>
 
-const float CAMERA_FOVY = 40.0;
-
 std::string generateScreenshotName();
 
 Game::Game()
@@ -379,13 +377,23 @@ void Game::update(const double dt)
 	}
 
 	// Exposure adjustement
-	if (isPressedOnce(GLFW_KEY_I))
+	if (glfwGetKey(win, GLFW_KEY_I))
 	{
 		exposure = std::max(-8.f,exposure-0.1f);
 	}
-	if (isPressedOnce(GLFW_KEY_O))
+	if (glfwGetKey(win, GLFW_KEY_O))
 	{
 		exposure = std::min(+8.f, exposure+0.1f);
+	}
+
+	// Fovy adjustement
+	if (glfwGetKey(win, GLFW_KEY_Y))
+	{
+		cameraFovy = std::max(glm::radians(5.f), cameraFovy/1.1f);
+	}
+	if (glfwGetKey(win, GLFW_KEY_U))
+	{
+		cameraFovy = std::min(glm::radians(60.f), cameraFovy*1.1f);
 	}
 
 	// Switching
@@ -395,7 +403,8 @@ void Game::update(const double dt)
 		{
 			// Instant switch
 			isSwitching = false;
-			cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
+			cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*0.04
+				/tan(glm::radians(cameraFovy)/2.f);
 		}
 		else
 		{
@@ -503,7 +512,7 @@ void Game::update(const double dt)
 		
 	// Scene rendering
 	renderer->render(
-		cameraPos, glm::radians(CAMERA_FOVY), cameraCenter, glm::vec3(0,0,1),
+		cameraPos, cameraFovy, cameraCenter, glm::vec3(0,0,1),
 		exposure, ambientColor,
 		planetStates);
 

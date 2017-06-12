@@ -127,7 +127,7 @@ private:
 	int maxTexSize = -1;
 	int windowWidth = 1;
 	int windowHeight = 1;
-	float logDepthFarPlane = 5e10;
+	float logDepthFarPlane = 5e9;
 	float logDepthC = 1.0;
 
 	// Constants for distance based loading
