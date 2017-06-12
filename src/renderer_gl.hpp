@@ -99,9 +99,9 @@ private:
 	void renderTranslucent(
 		const std::vector<uint32_t> &translucentPlanets,
 		const DynamicData &data);
-	void renderHighpass();
-	void renderDownsample();
-	void renderBloom();
+	void renderHighpass(const DynamicData &data);
+	void renderDownsample(const DynamicData &data);
+	void renderBloom(const DynamicData &data);
 	void renderFlares(
 		const std::vector<uint32_t> &farPlanets, 
 		const DynamicData &data);

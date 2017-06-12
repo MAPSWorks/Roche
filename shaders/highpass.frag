@@ -1,3 +1,8 @@
+layout (binding = 0, std140) uniform sceneDynamicUBO
+{
+	SceneUBO sceneUBO;
+};
+
 layout (binding = 1) uniform sampler2DMS hdr;
 
 layout (location = 0) out vec3 outColor;
@@ -20,6 +25,6 @@ void main()
 	{
 		sum += texelFetch(hdr, coord, i).rgb;
 	}
-	const vec3 hdr = sum*SAMPLES_MUL;
+	const vec3 hdr = sum*SAMPLES_MUL*sceneUBO.exposure;
 	outColor = bloomCurve(hdr)*hdr;
 }

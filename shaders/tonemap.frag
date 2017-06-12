@@ -27,7 +27,7 @@ void main()
 		// tonemap
 		sum += reinhard(color);
 	}
-	vec3 bloom = texture(bloom, texCoord).rgb*sceneUBO.exposure;
+	vec3 bloom = texture(bloom, texCoord).rgb;
 	vec3 finalColor = sum*SAMPLES_MUL+bloom;
 	outColor = vec4(finalColor, 1.0);
 }

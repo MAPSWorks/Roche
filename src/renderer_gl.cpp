@@ -940,13 +940,13 @@ void RendererGL::render(
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
 	profiler.begin("Highpass");
-	renderHighpass();
+	renderHighpass(currentData);
 	profiler.end();
 	profiler.begin("Downsample");
-	renderDownsample();
+	renderDownsample(currentData);
 	profiler.end();
 	profiler.begin("Bloom");
-	renderBloom();
+	renderBloom(currentData);
 	profiler.end();
 	profiler.begin("Flares");
 	renderFlares(farPlanets, currentData);
@@ -1121,7 +1121,7 @@ void RendererGL::renderTranslucent(
 	}
 }
 
-void RendererGL::renderHighpass()
+void RendererGL::renderHighpass(const DynamicData &data)
 {
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
@@ -1143,15 +1143,20 @@ void RendererGL::renderHighpass()
 	glBindSamplers(1, samplers.size(), samplers.data());
 	glBindTextures(1, texs.size(), texs.data());
 
+	// Bind scene UBO
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.sceneUBO.getOffset(),
+			sizeof(SceneDynamicUBO));
+
 	fullscreenTri.draw();
 }
 	
-void RendererGL::renderDownsample()
+void RendererGL::renderDownsample(const DynamicData &data)
 {
 	glGenerateTextureMipmap(highpassRendertargets);
 }
 
-void RendererGL::renderBloom()
+void RendererGL::renderBloom(const DynamicData &data)
 {
 	const vector<GLenum> invalidateAttach = {GL_COLOR_ATTACHMENT0};
 	glCopyImageSubData(
