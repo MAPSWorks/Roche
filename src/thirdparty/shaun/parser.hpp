@@ -37,14 +37,14 @@ private:
 };
 
 
-    std::ostream& operator<<(std::ostream& out, parse_error& err)
-    {
-        out << "parse error at line: " << err.line_
-            << " column: " << err.column_
-            << " (" << err.error_ << ")";
+inline std::ostream& operator<<(std::ostream& out, parse_error& err)
+{
+    out << "parse error at line: " << err.line_
+        << " column: " << err.column_
+        << " (" << err.error_ << ")";
 
-        return out;
-    }
+    return out;
+}
 
 class parser
 {

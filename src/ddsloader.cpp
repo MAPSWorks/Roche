@@ -179,11 +179,6 @@ struct DDS_HEADER_DXT10 {
 	UINT                     miscFlags2;
 };
 
-DDSLoader::DDSLoader(int maxSize) : _maxSize(maxSize)
-{
-
-}
-
 int getFormatBytesPerBlock(const DDSLoader::Format format)
 {
 	switch (format)
@@ -286,11 +281,11 @@ DDSLoader::Format getDX10Format(const DDS_HEADER_DXT10 &header)
 	return DDSLoader::Format::Undefined;
 }
 
-bool DDSLoader::open(const string &filename)
+DDSLoader::DDSLoader(const string &filename)
 {
 	_filename = filename;
 	ifstream in(_filename.c_str(), ios::in | ios::binary);
-	if (!in) return false;
+	if (!in) return;
 
 	// Magic number
 	in.seekg(0, ios::beg);
@@ -298,7 +293,7 @@ bool DDSLoader::open(const string &filename)
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
 	{
-		return false;
+		return;
 	}
 
 	// DDS header
@@ -309,7 +304,7 @@ bool DDSLoader::open(const string &filename)
 	{
 		hasDX10Header = true;
 		DDS_HEADER_DXT10 dx10Header;
-		in.read((char*)&header + sizeof(DDS_HEADER), sizeof(DDS_HEADER_DXT10));
+		in.read((char*)&dx10Header, sizeof(DDS_HEADER_DXT10));
 		_format = getDX10Format(dx10Header);
 	}
 	else
@@ -321,19 +316,6 @@ bool DDSLoader::open(const string &filename)
 	_height = header.dwHeight;
 	_mipmapCount = (header.dwFlags&0x20000)?header.dwMipMapCount:1;
 
-	// Compute which mipmaps to skip
-	const int maxDim = max(_width, _height);
-	_skipMipmap = [&]{
-		int skipMipmap = 0;
-		if (_maxSize != -1)
-		{
-			for (int i=maxDim;i>_maxSize;i=i/2)
-				skipMipmap++;
-		}
-		return skipMipmap;
-	}();
-
-	// Skip mipmaps
 	size_t offset = 128+(hasDX10Header?sizeof(DDS_HEADER_DXT10):0);
 	// Compute mipmap offsets & sizes
 	for (int i=0;i<_mipmapCount;++i)
@@ -346,7 +328,6 @@ bool DDSLoader::open(const string &filename)
 		_sizes.push_back(size);
 		offset += size;
 	}
-	return true;
 }
 
 DDSLoader::Format DDSLoader::getFormat() const
@@ -356,38 +337,41 @@ DDSLoader::Format DDSLoader::getFormat() const
 
 int DDSLoader::getMipmapCount() const
 {
-	return _mipmapCount-_skipMipmap;
+	return _mipmapCount;
 }
 
 int DDSLoader::getWidth(const int mipmapLevel) const
 {
-	return getMipSize(_width, _skipMipmap+mipmapLevel);
+	return getMipSize(_width, mipmapLevel);
 }
 
 int DDSLoader::getHeight(const int mipmapLevel) const
 {
-	return getMipSize(_height, _skipMipmap+mipmapLevel);
+	return getMipSize(_height, mipmapLevel);
 }
 
 size_t DDSLoader::getImageSize(const int mipmapLevel) const
 {
 	if (mipmapLevel >= getMipmapCount() ||
-		mipmapLevel+_skipMipmap<0)
+		mipmapLevel<0)
 	{
 		throw runtime_error("Mipmap level out of range");
 	}
 
-	return _sizes[mipmapLevel+_skipMipmap];
+	return _sizes[mipmapLevel];
 }
 
 vector<uint8_t> DDSLoader::getImageData(const int mipmapLevel) const
 {
 	vector<uint8_t> data(getImageSize(mipmapLevel));
+	writeImageData(mipmapLevel, data.data());
+	return data;
+}
 
+void DDSLoader::writeImageData(const int mipmapLevel, void* ptr) const
+{
 	ifstream in(_filename.c_str(), ios::in | ios::binary);
 	if (!in) throw runtime_error(string("Can't open file ") + _filename);
-	in.seekg(_offsets[mipmapLevel+_skipMipmap], ios::beg);
-	in.read((char*)data.data(), data.size());
-
-	return data;
+	in.seekg(_offsets[mipmapLevel], ios::beg);
+	in.read((char*)ptr, getImageSize(mipmapLevel));
 }

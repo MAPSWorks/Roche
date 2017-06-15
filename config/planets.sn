@@ -85,7 +85,7 @@ planets: [
 		meanColor:[0.94,0.97,1.0]
 		albedo:0.367
 		GM:398600.440
-		diffuse:"tex/earth/diffuse.dds"
+		diffuse:"tex/earth/albedo"
 	}
 	atmo:{
 		maxHeight:130

@@ -356,6 +356,9 @@ void RendererGL::init(
 
 	// Patch primitives
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+	// Streamer init
+	streamer.init(2048, 40);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -1047,9 +1050,9 @@ void RendererGL::renderHdr(
 		};
 		// Bind textures
 		const vector<GLuint> texs = {
-			data.diffuse.getId(diffuseTexDefault),
-			data.cloud.getId(cloudTexDefault),
-			data.night.getId(nightTexDefault),
+			streamer.getTex(data.diffuse).getId(diffuseTexDefault),
+			streamer.getTex(data.cloud).getId(cloudTexDefault),
+			streamer.getTex(data.night).getId(nightTexDefault),
 			data.atmoLookupTable
 		};
 
@@ -1296,11 +1299,11 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 		const Planet param = planetParams[i];
 		auto &data = planetData[i];
 		// Textures & samplers
-		data.diffuse = StreamTex(param.getBody().getDiffuseFilename(), streamer, maxTexSize);
+		data.diffuse = streamer.createTex(param.getBody().getDiffuseFilename());
 		if (param.hasClouds())
-			data.cloud = StreamTex(param.getClouds().getFilename(), streamer, maxTexSize);
+			data.cloud = streamer.createTex(param.getClouds().getFilename());
 		if (param.hasNight())
-			data.night = StreamTex(param.getNight().getFilename(), streamer, maxTexSize);
+			data.night = streamer.createTex(param.getNight().getFilename());
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
@@ -1392,9 +1395,9 @@ void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 
 		// Reset variables
 		data.texLoaded = false;
-		data.diffuse.destroy();
-		data.cloud.destroy();
-		data.night.destroy();
+		streamer.deleteTex(data.diffuse);
+		streamer.deleteTex(data.cloud);
+		streamer.deleteTex(data.night);
 		data.atmoLookupTable = 0;
 		data.ringTex1 = 0;
 		data.ringTex2 = 0;
@@ -1404,12 +1407,7 @@ void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 void RendererGL::uploadLoadedTextures()
 {
 	// Texture uploading
-	for (uint32_t i=0;i<planetData.size();++i)
-	{
-		planetData[i].diffuse.update(streamer);
-		planetData[i].cloud.update(streamer);
-		planetData[i].night.update(streamer);
-	}
+	streamer.update();
 }
 
 RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(

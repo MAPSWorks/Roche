@@ -1,10 +1,8 @@
 assets/
 build/
 screenshots/
+tex/
 *.trace
-gl_log.txt
-*.dds
-rings_*.txt
 *.dll
 *.exe
 roche

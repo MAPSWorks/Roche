@@ -8,7 +8,6 @@ set(SOURCE
 	main.cpp
 	planet.cpp
 	ddsloader.cpp
-	dds_stream.cpp
 	screenshot.cpp
 	flare.cpp
 	thirdparty/shaun/shaun.cpp
@@ -19,7 +18,7 @@ set(SOURCE_GL
 	fence.cpp
 	gl_util.cpp
 	gl_profiler.cpp
-	tex_stream.cpp)
+	dds_stream.cpp)
 
 project (roche)
 

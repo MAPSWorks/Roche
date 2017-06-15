@@ -6,8 +6,8 @@
 #include "ddsloader.hpp"
 #include "gl_util.hpp"
 #include "gl_profiler.hpp"
+#include "dds_stream.hpp"
 #include "screenshot.hpp"
-#include "tex_stream.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -236,9 +236,9 @@ private:
 		DrawCommand ringModel;
 		bool texLoaded = false;
 
-		StreamTex diffuse{};
-		StreamTex cloud{};
-		StreamTex night{};
+		DDSStreamer::Handle diffuse{};
+		DDSStreamer::Handle cloud{};
+		DDSStreamer::Handle night{};
 
 		GLuint atmoLookupTable = 0;
 		GLuint ringTex1 = 0;
