@@ -1,36 +1,15 @@
 ## To Do
+- [ ] Set max tex size in DDS Streamer
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
 - [ ] Correct flares
-- [ ] PBOs
-- [ ] Split textures
-- [ ] Use BC7 for textures
 - [ ] Specular support
 - [ ] Vulkan implementation, one day
 
 ## Done
-- [x] Better upscale & downscale for bloom
-- [x] Remove fovy as global var in game.cpp
-- [x] Better log depth buffer
-- [x] Invalidate framebuffers
-- [x] Lower res spheres + tesselation (also for rings)
-- [x] Better texture streaming management
-- [x] Isolate screenshot and texture streaming functionality
-- [x] Change depth clip control to be from zero to one
-- [x] Clean up planet structures
-- [x] Better ddsloader API
-- [x] Remove grouped mipmap loading from ddsloader
-- [x] Load highest mipmap instead of default color for stream textures
-- [x] Better screenshot thread
-- [x] Move screenshot functionality into renderer
-- [x] Use lambdas for complex initialization
-- [x] Separate shaders & shader pipelines
-- [x] Proper move semantics & const ref params
-- [x] Change skipMipmap with maxSize
-- [x] Proper CMake compile features
-- [x] Move profiler to own file
-- [x] Tell GL to do gamma correction itself
-- [x] Override wherever possible
-- [x] Remove SSAA option
-- [x] Change gl_util to avoid memory copying (write/read directly)
+- [x] Texture streaming w/ PBOs, split files and BC7
+- [x] Better performance bloom, w/ reduction of fireflies, true bloom curve
+- [x] More parametrizable log depth, more precision
+- [x] Tessellation
+- [x] Misc design improvements
