@@ -1,4 +1,5 @@
 ## To Do
+- [ ] Better DDS Streamer partitioning
 - [ ] Set max tex size in DDS Streamer
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
