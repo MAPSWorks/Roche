@@ -34,11 +34,11 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 	return 0;
 }
 
-void DDSStreamer::init(int sliceSize, int numSlices)
+void DDSStreamer::init(int pageSize, int numPages)
 {
-	_sliceSize = sliceSize;
-	_numSlices = numSlices;
-	int pboSize = getSlicePtrOffset(numSlices);
+	_pageSize = pageSize;
+	_numPages = numPages;
+	int pboSize = pageSize*numPages;
 	glCreateBuffers(1, &_pbo);
 	GLbitfield storageFlags = GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT;
 #ifdef USE_COHERENT_MAPPING
@@ -52,26 +52,26 @@ void DDSStreamer::init(int sliceSize, int numSlices)
 	_pboPtr = glMapNamedBufferRange(
 		_pbo, 0, pboSize, mapFlags);
 
-	_usedSlices.resize(numSlices, false);
-	_sliceFences.resize(numSlices);
+	_usedPages.resize(numPages, false);
+	_pageFences.resize(numPages);
 
 	_t = thread([this]{
 		while (true)
 		{
-			SliceInfo info{};
+			LoadInfo info{};
 			{
 				unique_lock<mutex> lk(_mtx);
-				_cond.wait(lk, [this]{ return _killThread || !_sliceInfoQueue.empty();});
+				_cond.wait(lk, [this]{ return _killThread || !_loadInfoQueue.empty();});
 				if (_killThread) return;
-				info = _sliceInfoQueue[0];
-				_sliceInfoQueue.erase(_sliceInfoQueue.begin());
+				info = _loadInfoQueue[0];
+				_loadInfoQueue.erase(_loadInfoQueue.begin());
 			}
 
-			SliceData data = load(info);
+			LoadData data = load(info);
 
 			{
 				lock_guard<mutex> lk(_dataMtx);
-				_sliceData.push_back(data);
+				_loadData.push_back(data);
 			}
 		}
 	});
@@ -141,14 +141,6 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	// Check if file exists or is valid
 	if (info.levels == 0) return 0;
 
-	// Check slice size is smaller or equal
-	if (info.size > _sliceSize)
-	{
-		cout << "Warning: " << filename << " has slices of size " << info.size
-			<< " (max " << _sliceSize << ")" << endl;
-		return 0;
-	}
-
 	const string tailFile = "/level0/0_0.DDS";
 
 	// Gen texture
@@ -167,27 +159,28 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	glTextureStorage2D(id, mipmapCount(width), format, width, height);
 
 	// Gen jobs
-	vector<SliceInfo> jobs;
+	vector<LoadInfo> jobs;
 
 	// Tail mipmaps (level0)
-	int tailMips = mipmapCount(info.size);
+	const int tailMips = mipmapCount(info.size);
 	for (int i=tailMips-1;i>=0;--i)
 	{
-		SliceInfo tailInfo{};
+		LoadInfo tailInfo{};
 		tailInfo.handle = h;
 		tailInfo.loader = tailLoader;
 		tailInfo.fileLevel = i;
 		tailInfo.offsetX = 0;
 		tailInfo.offsetY = 0;
 		tailInfo.level = info.levels-1+i;
+		tailInfo.imageSize = tailLoader.getImageSize(i);
 		jobs.push_back(tailInfo);
 	}
 
 	for (int i=1;i<info.levels;++i)
 	{
 		const string levelFolder = filename + "/level" + to_string(i) + "/";
-		const int columns = 2*i;
-		const int rows = 1*i;
+		const int rows = 1<<(i-1);
+		const int columns = 2*rows;
 
 		for (int x=0;x<columns;++x)
 		{
@@ -195,19 +188,24 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 			{
 				const string ddsFile = to_string(x)+"_"+to_string(y)+".DDS";
 				const string fullFilename = levelFolder+ddsFile;
-				SliceInfo sliceInfo{};
-				sliceInfo.handle = h;
-				sliceInfo.loader = DDSLoader(fullFilename);
-				sliceInfo.fileLevel = 0;
-				sliceInfo.offsetX = x*info.size;
-				sliceInfo.offsetY = y*info.size;
-				sliceInfo.level = info.levels-i-1;
-				jobs.push_back(sliceInfo);
+				const DDSLoader loader(fullFilename);
+				const int fileLevel = 0;
+				const int imageSize = loader.getImageSize(fileLevel);
+
+				LoadInfo loadInfo{};
+				loadInfo.handle = h;
+				loadInfo.loader = std::move(loader);
+				loadInfo.fileLevel = fileLevel;
+				loadInfo.offsetX = x*info.size;
+				loadInfo.offsetY = y*info.size;
+				loadInfo.level = info.levels-i-1;
+				loadInfo.imageSize = imageSize;
+				jobs.push_back(loadInfo);
 			}
 		}
 	}
 
-	_sliceInfoWaiting.insert(_sliceInfoWaiting.end(), jobs.begin(), jobs.end());
+	_loadInfoWaiting.insert(_loadInfoWaiting.end(), jobs.begin(), jobs.end());
 
 	return h;
 }
@@ -229,54 +227,63 @@ void DDSStreamer::deleteTex(Handle handle)
 void DDSStreamer::update()
 {
 	// Invalidate deleted textures from pre-queue
-	auto isDeleted = [this](const SliceInfo &info)
+	auto isDeleted = [this](const LoadInfo &info)
 	{
 		for (Handle h : _texDeleted)
 		{
 			if (h == info.handle)
 			{
-				if (info.slice != -1) releaseSlice(info.slice);
+				if (info.ptrOffset != -1) releasePages(info.ptrOffset, info.imageSize);
 				return true;
 			}
 		}
 		return false;
 	};
-	remove_if(_sliceInfoWaiting.begin(), _sliceInfoWaiting.end(), isDeleted);
+	remove_if(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), isDeleted);
 
-	// Assign slices to new jobs
-	transform(_sliceInfoWaiting.begin(), _sliceInfoWaiting.end(),
-		_sliceInfoWaiting.begin(),
-		[this](const SliceInfo &info)
-		{
-			SliceInfo s = info;
-			s.slice = acquireSlice();
-			return s;
+	// Assign offsets
+	std::vector<LoadInfo> assigned;
+	std::vector<LoadInfo> nonAssigned;
+
+	for_each(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), 
+		[&assigned, &nonAssigned, this](const LoadInfo &info) {
+			int ptrOffset = acquirePages(info.imageSize);
+			if (ptrOffset == -1)
+			{
+				nonAssigned.push_back(info);
+			}
+			else
+			{
+				LoadInfo s = info;
+				s.ptrOffset = ptrOffset;
+				assigned.push_back(s);
+			}
 		});
 
 	{
 		lock_guard<mutex> lk(_mtx);
 		// Invalidate deleted textures from queue
-		remove_if(_sliceInfoQueue.begin(), _sliceInfoQueue.end(), isDeleted);
+		remove_if(_loadInfoQueue.begin(), _loadInfoQueue.end(), isDeleted);
 		// Submit created textures
-		_sliceInfoQueue.insert(
-			_sliceInfoQueue.end(),
-			_sliceInfoWaiting.begin(),
-			_sliceInfoWaiting.end());
+		_loadInfoQueue.insert(
+			_loadInfoQueue.end(),
+			assigned.begin(),
+			assigned.end());
 	}
 	_cond.notify_one();
-	_sliceInfoWaiting.clear();
+	_loadInfoWaiting = nonAssigned;
 	_texDeleted.clear();
 
 	// Get loaded slices
-	vector<SliceData> data;
+	vector<LoadData> data;
 	{
 		lock_guard<mutex> lk(_dataMtx);
-		data = _sliceData;
-		_sliceData.clear();
+		data = _loadData;
+		_loadData.clear();
 	}
 	// Update
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo);
-	for (SliceData d : data)
+	for (LoadData d : data)
 	{
 #ifndef USE_COHERENT_MAPPING
 		glFlushMappedNamedBufferRange(_pbo, d.ptrOffset, d.imageSize);
@@ -294,39 +301,56 @@ void DDSStreamer::update()
 				d.imageSize,
 				(void*)(intptr_t)d.ptrOffset);
 		}
-		releaseSlice(d.slice);
+		releasePages(d.ptrOffset, d.imageSize);
 	}
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
-int DDSStreamer::acquireSlice()
+int DDSStreamer::acquirePages(int size)
 {
-	while (true)
+	const int pages = ((size-1)/_pageSize)+1;
+	if (pages > _numPages)
 	{
-		for (int i=0;i<_usedSlices.size();++i)
+		throw runtime_error("Not enough pages");
+	}
+
+	int start = 0;
+	for (int i=0;i<_usedPages.size();++i)
+	{
+		if (_usedPages[i] || !_pageFences[i].waitClient(1000))
 		{
-			if (!_usedSlices[i])
+			start = i+1;
+		}
+		else
+		{
+			if (i-start+1 == pages)
 			{
-				if (_sliceFences[i].waitClient(1000))
+				for (int j=start;j<start+pages;++j)
 				{
-					_usedSlices[i] = true;
-					return i;
+					_usedPages[j] = true;
 				}
+				return start*_pageSize;
 			}
 		}
 	}
+	return -1;
 }
-void DDSStreamer::releaseSlice(int slice)
+void DDSStreamer::releasePages(int offset, int size)
 {
-	_sliceFences[slice].lock();
-	_usedSlices[slice] = false;
+	const int pageStart = offset/_pageSize;
+	const int pages = ((size-1)/_pageSize)+1;
+	for (int i=pageStart;i<pageStart+pages;++i)
+	{
+		_pageFences[i].lock();
+		_usedPages[i] = false;
+	}
 }
 
-DDSStreamer::SliceData DDSStreamer::load(const SliceInfo &info)
+DDSStreamer::LoadData DDSStreamer::load(const LoadInfo &info)
 {
-	SliceData s{};
+	LoadData s{};
 	int level = info.fileLevel;
-	int ptrOffset = getSlicePtrOffset(info.slice);
+	int ptrOffset = info.ptrOffset;
 	s.handle = info.handle;
 	s.level = info.level;
 	s.offsetX = info.offsetX;
@@ -334,17 +358,12 @@ DDSStreamer::SliceData DDSStreamer::load(const SliceInfo &info)
 	s.width = info.loader.getWidth(level);
 	s.height = info.loader.getHeight(level);
 	s.format  = DDSFormatToGL(info.loader.getFormat());
-	s.imageSize = info.loader.getImageSize(level);
+	s.imageSize = info.imageSize;
 	s.ptrOffset = ptrOffset;
 
 	info.loader.writeImageData(level, (char*)_pboPtr+ptrOffset);
 
 	return s;
-}
-
-int DDSStreamer::getSlicePtrOffset(int slice)
-{
-	return slice*_sliceSize*_sliceSize;
 }
 
 DDSStreamer::Handle DDSStreamer::genHandle()

@@ -36,7 +36,7 @@ public:
 	typedef uint32_t Handle;
 
 	DDSStreamer() = default;
-	void init(int sliceSize, int numSlices);
+	void init(int pageSize, int numPages);
 	~DDSStreamer();
 
 	Handle createTex(const std::string &filename);
@@ -46,7 +46,7 @@ public:
 	void update();
 
 private:
-	struct SliceInfo
+	struct LoadInfo
 	{
 		Handle handle;
 		DDSLoader loader;
@@ -54,10 +54,11 @@ private:
 		int offsetX;
 		int offsetY;
 		int level;
-		int slice = -1;
+		int imageSize;
+		int ptrOffset = -1;
 	};
 
-	struct SliceData
+	struct LoadData
 	{
 		Handle handle;
 		int level;
@@ -68,27 +69,24 @@ private:
 		GLenum format;
 		int imageSize;
 		int ptrOffset;
-		int slice;
 	};
 
-	int acquireSlice();
-	void releaseSlice(int slice);
-	SliceData load(const SliceInfo &info);
-
-	int getSlicePtrOffset(int slice);
+	int acquirePages(int size);
+	void releasePages(int offset, int size);
+	LoadData load(const LoadInfo &info);
 
 	Handle genHandle();
 
-	int _sliceSize = 0;
-	int _numSlices = 0;
+	int _pageSize = 0;
+	int _numPages = 0;
 	GLuint _pbo = 0;
 	void *_pboPtr = nullptr;
-	std::vector<bool> _usedSlices;
-	std::vector<Fence> _sliceFences;
+	std::vector<bool> _usedPages;
+	std::vector<Fence> _pageFences;
 
-	std::vector<SliceInfo> _sliceInfoWaiting; // To be added to queue
-	std::vector<SliceInfo> _sliceInfoQueue; // Currently loading
-	std::vector<SliceData> _sliceData; // Finished loading
+	std::vector<LoadInfo> _loadInfoWaiting; // To be added to queue
+	std::vector<LoadInfo> _loadInfoQueue; // Currently loading
+	std::vector<LoadData> _loadData; // Finished loading
 
 	std::map<Handle, StreamTexture> _texs;
 	std::vector<Handle> _texDeleted;
