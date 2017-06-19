@@ -36,7 +36,7 @@ public:
 	typedef uint32_t Handle;
 
 	DDSStreamer() = default;
-	void init(int pageSize, int numPages);
+	void init(int pageSize, int numPages, int maxSize=0);
 	~DDSStreamer();
 
 	Handle createTex(const std::string &filename);
@@ -77,6 +77,7 @@ private:
 
 	Handle genHandle();
 
+	int _maxSize = 0;
 	int _pageSize = 0;
 	int _numPages = 0;
 	GLuint _pbo = 0;

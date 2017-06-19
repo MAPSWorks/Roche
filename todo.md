@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Set max tex size in DDS Streamer
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
@@ -9,6 +8,7 @@
 
 ## Done
 - [x] Better DDS Streamer partitioning
+- [x] Set max tex size in DDS Streamer
 
 ## Feature summary
 - [x] Texture streaming w/ PBOs, split files and BC7

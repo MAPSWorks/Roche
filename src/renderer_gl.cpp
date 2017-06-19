@@ -358,7 +358,7 @@ void RendererGL::init(
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
 
 	// Streamer init
-	streamer.init(512*512, 200);
+	streamer.init(512*512, 200, maxTexSize);
 }
 
 float getAnisotropy(const int requestedAnisotropy)

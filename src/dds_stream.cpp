@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <cmath>
 
 using namespace std;
 
@@ -34,8 +35,9 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 	return 0;
 }
 
-void DDSStreamer::init(int pageSize, int numPages)
+void DDSStreamer::init(int pageSize, int numPages, int maxSize)
 {
+	_maxSize = maxSize;
 	_pageSize = pageSize;
 	_numPages = numPages;
 	int pboSize = pageSize*numPages;
@@ -102,7 +104,7 @@ struct TexInfo
 	int levels = 0;
 };
 
-TexInfo parseInfoFile(const string &filename)
+TexInfo parseInfoFile(const string &filename, int maxSize)
 {
 	ifstream in(filename.c_str(), ios::in | ios::binary);
 	if (!in) return {};
@@ -124,6 +126,12 @@ TexInfo parseInfoFile(const string &filename)
 		info.size = swp("size").value<number>();
 		info.levels = swp("levels").value<number>();
 
+		if (maxSize)
+		{
+			int maxRows = maxSize/(info.size*2);
+			int maxLevel = (int)floor(log2(maxRows))+1;
+			info.levels = max(1,min(info.levels, maxLevel));
+		}
 		return info;
 	} 
 	catch (parse_error &e)
@@ -136,7 +144,7 @@ TexInfo parseInfoFile(const string &filename)
 DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 {
 	// Get info file
-	TexInfo info = parseInfoFile(filename + "/info.sn");
+	TexInfo info = parseInfoFile(filename + "/info.sn", _maxSize);
 
 	// Check if file exists or is valid
 	if (info.levels == 0) return 0;
