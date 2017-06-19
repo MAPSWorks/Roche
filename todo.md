@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Better DDS Streamer partitioning
 - [ ] Set max tex size in DDS Streamer
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
@@ -9,6 +8,9 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better DDS Streamer partitioning
+
+## Feature summary
 - [x] Texture streaming w/ PBOs, split files and BC7
 - [x] Better performance bloom, w/ reduction of fireflies, true bloom curve
 - [x] More parametrizable log depth, more precision
