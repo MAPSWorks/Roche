@@ -94,7 +94,7 @@ planets: [
 		density:1
 	}
 	clouds:{
-		filename:"tex/earth/clouds.dds"
+		filename:"tex/earth/clouds"
 		period:0
 	}
 	night:{
@@ -106,7 +106,7 @@ planets: [
 	name:"Moon"
 	parent:"Earth"
 	orbit:{
-		ecc:5.298940118493898E-02e
+		ecc:5.298940118493898E-02
 		sma:3.844212844766085E+05
 		inc:2.836200854713088E+01
 		lan:2.294272126732694E+00
