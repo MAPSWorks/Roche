@@ -160,7 +160,7 @@ private:
 	GLuint bloomRendertargets;
 
 	// Number of bloom steps
-	int bloomDepth = 4;
+	int bloomDepth = 8;
 	// Texture views to mipmaps
 	std::vector<GLuint> highpassViews;
 	std::vector<GLuint> bloomViews;
