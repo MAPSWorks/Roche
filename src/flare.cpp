@@ -63,7 +63,7 @@ std::vector<uint16_t> generateFlareIntensityTex(const int dimensions)
 	{
 		float r = (SIZE_DEGREES*i)/((float)dimensions-1);
 		float intensity = 0.282f*f0(r)+0.478f*f1(r)+0.207f*f2(r);
-		pixelData[i] = glm::packHalf1x16(std::min(1000.f,intensity));
+		pixelData[i] = glm::packHalf1x16(std::min(10.f,intensity));
 	}
 	return pixelData;
 }
@@ -96,7 +96,8 @@ std::vector<uint8_t> generateFlareLinesTex(int dimensions)
 			{
 				const float x = xs[k]/(float)(dimensions-1) - 0.5f;
 				const float y = ys[k]/(float)(dimensions-1) - 0.5f;
-				const float angle = (float)(atan2(y,x)+glm::pi<float>())/2*glm::pi<float>();
+				const float angle = (float)(atan2(y,x)+glm::pi<float>())/
+					(2*glm::pi<float>())*9.083145;
 				minAngle = std::min(angle, minAngle);
 				maxAngle = std::max(angle, maxAngle);
 			}
