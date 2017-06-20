@@ -102,6 +102,10 @@ struct TexInfo
 {
 	int size = 0;
 	int levels = 0;
+	string prefix = "";
+	string separator = "";
+	string suffix = "";
+	bool rowColumnOrder = false;
 };
 
 TexInfo parseInfoFile(const string &filename, int maxSize)
@@ -125,6 +129,10 @@ TexInfo parseInfoFile(const string &filename, int maxSize)
 		TexInfo info{};
 		info.size = swp("size").value<number>();
 		info.levels = swp("levels").value<number>();
+		info.prefix = (std::string)swp("prefix").value<shaun::string>();
+		info.separator = (std::string)swp("separator").value<shaun::string>();
+		info.suffix = (std::string)swp("suffix").value<shaun::string>();
+		info.rowColumnOrder = swp("row_column_order").value<shaun::boolean>();
 
 		if (maxSize)
 		{
@@ -194,7 +202,12 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		{
 			for (int y=0;y<rows;++y)
 			{
-				const string ddsFile = to_string(x)+"_"+to_string(y)+".DDS";
+				const string ddsFile = 
+					info.prefix+
+					to_string(info.rowColumnOrder?y:x)+
+					info.separator+
+					to_string(info.rowColumnOrder?x:y)+
+					info.suffix;
 				const string fullFilename = levelFolder+ddsFile;
 				const DDSLoader loader(fullFilename);
 				const int fileLevel = 0;
