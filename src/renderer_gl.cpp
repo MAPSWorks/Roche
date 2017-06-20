@@ -397,7 +397,7 @@ void RendererGL::createTextures()
 	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
 	glCreateSamplers(1, &atmoSampler);
 	glSamplerParameteri(atmoSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
