@@ -27,5 +27,5 @@ public:
 	virtual void takeScreenshot(const std::string &filename) {}
 	virtual void destroy() {}
 	
-	virtual std::vector<std::pair<std::string,uint64_t>> getProfilerTimes() {}
+	virtual std::vector<std::pair<std::string,uint64_t>> getProfilerTimes() { return {}; }
 };

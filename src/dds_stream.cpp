@@ -119,19 +119,18 @@ TexInfo parseInfoFile(const string &filename, int maxSize)
 	in.seekg(0, ios::beg);
 	in.read(&contents[0], contents.size());
 
-	using namespace shaun;
 	try
 	{
-		parser p{};
-		object obj = p.parse(contents.c_str());
-		sweeper swp(&obj);
+		shaun::parser p{};
+		shaun::object obj = p.parse(contents.c_str());
+		shaun::sweeper swp(&obj);
 
 		TexInfo info{};
-		info.size = swp("size").value<number>();
-		info.levels = swp("levels").value<number>();
-		info.prefix = (std::string)swp("prefix").value<shaun::string>();
-		info.separator = (std::string)swp("separator").value<shaun::string>();
-		info.suffix = (std::string)swp("suffix").value<shaun::string>();
+		info.size = swp("size").value<shaun::number>();
+		info.levels = swp("levels").value<shaun::number>();
+		info.prefix = (string)swp("prefix").value<shaun::string>();
+		info.separator = (string)swp("separator").value<shaun::string>();
+		info.suffix = (string)swp("suffix").value<shaun::string>();
 		info.rowColumnOrder = swp("row_column_order").value<shaun::boolean>();
 
 		if (maxSize)
@@ -142,7 +141,7 @@ TexInfo parseInfoFile(const string &filename, int maxSize)
 		}
 		return info;
 	} 
-	catch (parse_error &e)
+	catch (shaun::parse_error &e)
 	{
 		cout << e << endl;
 		return {};
@@ -410,6 +409,7 @@ StreamTexture &StreamTexture::operator=(StreamTexture &&tex)
 	if (tex._id != _id) glDeleteTextures(1, &_id);
 	_id = tex._id;
 	tex._id = 0;
+	return *this;
 }
 
 StreamTexture::~StreamTexture()

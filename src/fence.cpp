@@ -12,6 +12,7 @@ Fence &Fence::operator=(Fence && fence)
 	if (sync) glDeleteSync(sync);
 	sync = fence.sync;
 	fence.sync = 0;
+  return *this;
 }
 
 Fence::~Fence()
