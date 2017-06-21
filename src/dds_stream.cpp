@@ -235,7 +235,7 @@ const StreamTexture &DDSStreamer::getTex(Handle handle)
 	if (!handle) return _nullTex;
 	auto it = _texs.find(handle);
 	if (it == _texs.end()) return _nullTex;
-	return _texs[handle];
+	return it->second;
 }
 
 void DDSStreamer::deleteTex(Handle handle)
