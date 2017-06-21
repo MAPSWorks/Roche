@@ -220,27 +220,44 @@ int getMipSize(int origSize, int mipLevel)
 	return max(1, origSize>>mipLevel);
 }
 
-DDSLoader::Format getDDSFormat(const DDS_HEADER &header)
+DXGI_FORMAT getFormatFromFourCC(const DDS_HEADER &header)
 {
 	string fourCC = string((const char*)&header.ddspf.dwFourCC, 4);
 	if (fourCC == "DXT1")
 	{
-		return DDSLoader::Format::BC1_SRGB;
+		return DXGI_FORMAT_BC1_UNORM_SRGB;
 	}
-	if (fourCC == "DXT2" || fourCC == "DXT3")
+	if (fourCC == "DXT3")
 	{
-		return DDSLoader::Format::BC2_SRGB;
+		return DXGI_FORMAT_BC2_UNORM_SRGB;
 	}
-	if (fourCC == "DXT4" || fourCC == "DXT5")
+	if (fourCC == "DXT5")
 	{
-		return DDSLoader::Format::BC3_SRGB;
+		return DXGI_FORMAT_BC3_UNORM_SRGB;
 	}
-	return DDSLoader::Format::Undefined;
+  if (fourCC == "BC4U")
+  {
+  	return DXGI_FORMAT_BC4_UNORM;
+  }
+  if (fourCC == "BC4S")
+  {
+  	return DXGI_FORMAT_BC4_SNORM;
+  }
+  if (fourCC == "ATI2")
+  {
+  	return DXGI_FORMAT_BC5_UNORM;
+  }
+  if (fourCC == "BC5S")
+  {
+  	return DXGI_FORMAT_BC5_SNORM;
+  }
+	throw runtime_error("Invalid fourCC : " + fourCC);
+	return DXGI_FORMAT_UNKNOWN;
 }
 
-DDSLoader::Format getDX10Format(const DDS_HEADER_DXT10 &header)
+DDSLoader::Format getDDSFormat(const DXGI_FORMAT format)
 {
-	switch (header.dxgiFormat)
+	switch (format)
 	{
 		case   DXGI_FORMAT_BC1_TYPELESS                :
 		case   DXGI_FORMAT_BC1_UNORM                   :
@@ -300,17 +317,21 @@ DDSLoader::DDSLoader(const string &filename)
 	bool hasDX10Header = false;
 	DDS_HEADER header;
 	in.read((char*)&header, sizeof(DDS_HEADER));
+	DXGI_FORMAT format;
 	if (!strncmp((const char*)&header.ddspf.dwFourCC, "DX10", 4))
 	{
 		hasDX10Header = true;
 		DDS_HEADER_DXT10 dx10Header;
 		in.read((char*)&dx10Header, sizeof(DDS_HEADER_DXT10));
-		_format = getDX10Format(dx10Header);
+		format = dx10Header.dxgiFormat;
 	}
 	else
 	{
-		_format = getDDSFormat(header);
+		format = getFormatFromFourCC(header);
 	}
+
+	_format = getDDSFormat(format);
+
 	// Header info
 	_width = header.dwWidth;
 	_height = header.dwHeight;
