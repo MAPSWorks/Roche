@@ -1,5 +1,5 @@
 ambientColor:0.0002
-startingPlanet:"Earth"
+startingPlanet:"Jupiter"
 planets: [
 {
 	name:"Sun"
@@ -216,7 +216,7 @@ planets: [
 		meanColor:[1.0,0.99,0.98]
 		albedo:0.52
 		GM:126686534
-		diffuse:"tex/jupiter/diffuse.dds"
+		diffuse:"tex/jupiter/albedo"
 	}
 	atmo:{
 		maxHeight:400
@@ -332,7 +332,7 @@ planets: [
 		meanColor:[1.0,0.98,0.96]
 		albedo:0.47
 		GM:37931187
-		diffuse:"tex/saturn/diffuse.dds"
+		diffuse:"tex/saturn/albedo"
 	}
 	atmo:{
 		maxHeight:800

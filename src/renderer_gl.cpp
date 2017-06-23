@@ -386,8 +386,8 @@ void RendererGL::createTextures()
 
 	// Default textures 
 	diffuseTexDefault = create1PixTex({0,0,0,255});
-	cloudTexDefault = create1PixTex({255,255,255,0});
-	nightTexDefault = create1PixTex({0,0,0,255});
+	cloudTexDefault = create1PixTex({0,0,0,0});
+	nightTexDefault = create1PixTex({0,0,0,0});
 
 	createFlare();
 
