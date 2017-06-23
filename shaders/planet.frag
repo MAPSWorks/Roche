@@ -36,7 +36,7 @@ void main()
 #endif
 
 #if defined(HAS_ATMO)
-	vec3 night = texture(night, passUv.st).rgb * planetUBO.nightIntensity;
+	vec3 night = texture(night, passUv.st).rrr * planetUBO.nightIntensity;
 	vec4 cloud = texture(cloud, passUv.st+vec2(planetUBO.cloudDisp, 0)).rrrr;
 
 	night = night*clamp(-light*10+0.2,0,1)*(1-cloud.a);
