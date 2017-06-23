@@ -1,4 +1,5 @@
 ambientColor:0.0002
+startingPlanet:"Earth"
 planets: [
 {
 	name:"Sun"
@@ -98,7 +99,7 @@ planets: [
 		period:0
 	}
 	night:{
-		filename:"tex/earth/night.dds"
+		filename:"tex/earth/nightlights"
 		intensity:0.04
 	}
 }
@@ -287,7 +288,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.43
 		GM:0
-		diffuse:"tex/jupiter/ganymede/diffuse.dds"
+		diffuse:"tex/jupiter/ganymede"
 	}
 }
 {
@@ -670,7 +671,7 @@ planets: [
 		meanColor:[0.94,0.97,1.0]
 		albedo:0.41
 		GM:6836529
-		diffuse:"tex/neptune/diffuse.dds"
+		diffuse:"tex/neptune/albedo"
 	}
 	atmo:{
 		maxHeight:400

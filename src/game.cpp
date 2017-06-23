@@ -190,6 +190,7 @@ void Game::loadPlanetFiles()
 		sweeper swp(&obj);
 
 		ambientColor = (float)get<double>(swp("ambientColor"));
+		std::string startingPlanet = std::string(swp("startingPlanet").value<string>());
 
 		sweeper planetsSweeper(swp("planets"));
 		planetCount = planetsSweeper.value<list>().elements().size();
@@ -200,7 +201,11 @@ void Game::loadPlanetFiles()
 		for (uint32_t i=0;i<planetCount;++i)
 		{
 			sweeper pl(planetsSweeper[i]);
-			Planet planet(std::string(pl("name").value<string>()));
+			std::string name = std::string(pl("name").value<string>());
+			// Set focus on starting planet
+			if (name == startingPlanet) focusedPlanetId = i;
+			// Create planet
+			Planet planet(name);
 			planet.setParentName(get<std::string>(pl("parent")));
 
 			sweeper orbitsw(pl("orbit"));
@@ -301,7 +306,7 @@ void Game::loadPlanetFiles()
 					}
 				}
 			}
-		}	
+		}
 	} 
 	catch (parse_error &e)
 	{
