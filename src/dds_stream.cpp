@@ -156,7 +156,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	// Check if file exists or is valid
 	if (info.levels == 0) return 0;
 
-	const string tailFile = "/level0/0_0.DDS";
+	const string tailFile = "/level0/" + info.prefix + "0" + info.separator + "0" + info.suffix;
 
 	// Gen texture
 	const Handle h = genHandle();
