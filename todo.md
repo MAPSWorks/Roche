@@ -1,4 +1,5 @@
 ## To Do
+- [ ] Proper reset/release for RAII objects
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
