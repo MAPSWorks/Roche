@@ -356,8 +356,8 @@ void Game::update(const double dt)
 
 		// Planet Angle
 		const float rotationAngle = 
-			(2.0*glm::pi<float>()*epoch)
-			/planetParams[i].getBody().getRotationPeriod()
+			(2.0*glm::pi<float>())*
+			fmod(epoch/planetParams[i].getBody().getRotationPeriod(),1.f)
 			+ glm::pi<float>();
 
 		// Cloud Displacement
