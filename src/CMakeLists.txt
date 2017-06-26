@@ -18,7 +18,8 @@ set(SOURCE_GL
 	fence.cpp
 	gl_util.cpp
 	gl_profiler.cpp
-	dds_stream.cpp)
+	dds_stream.cpp
+	shader_pipeline.cpp)
 
 project (roche)
 

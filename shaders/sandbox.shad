@@ -1,5 +1,3 @@
-#version 450
-
 struct SceneUBO
 {
 	mat4 projMat;

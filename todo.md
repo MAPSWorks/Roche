@@ -1,5 +1,4 @@
 ## To Do
-- [ ] Proper reset/release for RAII objects
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
@@ -15,6 +14,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Shader API with caching
 - [x] BC4 and BC5 loading through old fourCC codes
 - [x] Better DDS Streamer partitioning
 - [x] Set max tex size in DDS Streamer

@@ -8,6 +8,7 @@
 #include "gl_profiler.hpp"
 #include "dds_stream.hpp"
 #include "screenshot.hpp"
+#include "shader_pipeline.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -173,56 +174,20 @@ private:
 	std::vector<GLuint> highpassFBOs;
 	std::vector<GLuint> bloomFBOs;
 
-	// Vertex Shaders
-	GLuint shaderVertPlanet;
-	GLuint shaderVertFlare;
-	GLuint shaderVertDeferred;
-
-	// Tessellation Control Shaders
-	GLuint shaderTescPlanetBare;
-	GLuint shaderTescPlanetAtmo;
-	GLuint shaderTescAtmo;
-	GLuint shaderTescSun;
-	GLuint shaderTescRingFar;
-	GLuint shaderTescRingNear;
-
-	// Tessellation Evaluation Shaders
-	GLuint shaderTesePlanetBare;
-	GLuint shaderTesePlanetAtmo;
-	GLuint shaderTeseAtmo;
-	GLuint shaderTeseSun;
-	GLuint shaderTeseRingFar;
-	GLuint shaderTeseRingNear;
-
-	// Fragment Shaders
-	GLuint shaderFragPlanetBare;
-	GLuint shaderFragPlanetAtmo;
-	GLuint shaderFragAtmo;
-	GLuint shaderFragSun;
-	GLuint shaderFragRingFar;
-	GLuint shaderFragRingNear;
-	GLuint shaderFragHighpass;
-	GLuint shaderFragDownsample;
-	GLuint shaderFragBlurW;
-	GLuint shaderFragBlurH;
-	GLuint shaderFragBloomAdd;
-	GLuint shaderFragFlare;
-	GLuint shaderFragTonemap;
-
 	// Pipelines
-	GLuint pipelinePlanetBare;
-	GLuint pipelinePlanetAtmo;
-	GLuint pipelineAtmo;
-	GLuint pipelineSun;
-	GLuint pipelineRingFar;
-	GLuint pipelineRingNear;
-	GLuint pipelineHighpass;
-	GLuint pipelineDownsample;
-	GLuint pipelineBlurW;
-	GLuint pipelineBlurH;
-	GLuint pipelineBloomAdd;
-	GLuint pipelineFlare;
-	GLuint pipelineTonemap;
+	ShaderPipeline pipelinePlanetBare;
+	ShaderPipeline pipelinePlanetAtmo;
+	ShaderPipeline pipelineAtmo;
+	ShaderPipeline pipelineSun;
+	ShaderPipeline pipelineRingFar;
+	ShaderPipeline pipelineRingNear;
+	ShaderPipeline pipelineHighpass;
+	ShaderPipeline pipelineDownsample;
+	ShaderPipeline pipelineBlurW;
+	ShaderPipeline pipelineBlurH;
+	ShaderPipeline pipelineBloomAdd;
+	ShaderPipeline pipelineFlare;
+	ShaderPipeline pipelineTonemap;
 
 	// Multiple buffering
 	uint32_t frameId;

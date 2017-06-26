@@ -1,5 +1,5 @@
 ambientColor:0.0002
-startingPlanet:"Jupiter"
+startingPlanet:"Earth"
 planets: [
 {
 	name:"Sun"
@@ -58,7 +58,7 @@ planets: [
 		meanColor:[1.0,0.95,0.8]
 		albedo:0.67
 		GM:324859.9
-		diffuse:"tex/venus/diffuse.dds"
+		diffuse:"tex/venus/"
 	}
 	atmo:{
 		maxHeight:250
@@ -481,12 +481,12 @@ planets: [
 		meanColor:[1.0,0.97,0.94]
 		albedo:0.2
 		GM:0
-		diffuse:"tex/saturn/titan/diffuse.dds"
+		diffuse:"tex/saturn/titan"
 	}
 	atmo:{
 		maxHeight:500
 		scaleHeight:40
-		K:[1.0,1.0,1.0,0.0]
+		K:[1.0,0.85,0.55,0.0]
 		density:1.45
 	}
 }
@@ -532,7 +532,7 @@ planets: [
 		meanColor:[0.93,0.97,1.0]
 		albedo:0.51
 		GM:5793939
-		diffuse:"tex/uranus/diffuse.dds"
+		diffuse:"tex/uranus/albedo"
 	}
 	atmo:{
 		maxHeight:500
@@ -721,7 +721,7 @@ planets: [
 		meanColor:[1.0,1.0,0.99]
 		albedo:0.7
 		GM:0.0
-		diffuse:"tex/neptune/triton/diffuse.dds"
+		diffuse:"tex/neptune/triton/"
 	}
 }
 {

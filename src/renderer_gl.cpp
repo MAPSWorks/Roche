@@ -542,239 +542,125 @@ void RendererGL::createRendertargets()
 	glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
-pair<bool, string> loadFile(const string &filename)
-{
-	ifstream in(filename.c_str(), ios::in | ios::binary);
-	if (!in) return make_pair(false, "");
-	string source;
-	in.seekg(0, ios::end);
-	source.resize(in.tellg());
-	in.seekg(0, ios::beg);
-	in.read(&source[0], source.size());
-	return make_pair(true, source);
-}
-
-string loadSource(const string &folder, const string &filename)
-{
-	const auto result{loadFile(folder + filename)};
-	if (!result.first) throw runtime_error(string("Can't load ") + filename);
-	return result.second;
-}
-
-pair<bool, string> checkShaderProgram(const GLuint program)
-{
-	GLint success{0};
-	glGetProgramiv(program, GL_LINK_STATUS, &success);
-	if (success) return make_pair(true, "");
-
-	string log;
-	log.resize(2048);
-	glGetProgramInfoLog(program, log.size(), nullptr, &log[0]);
-	return make_pair(false, log);
-}
-
-GLuint createShader(const GLenum type, const vector<string> &sources)
-{
-	const vector<const char*> csources = [&]{
-		vector<const char*> s(sources.size());
-		for (int i=0;i<sources.size();++i) s[i] = sources[i].c_str();
-		return s;
-	}();
-	const GLuint program{
-		glCreateShaderProgramv(type, csources.size(), csources.data())};
-	const auto res{checkShaderProgram(program)};
-	if (!res.first)
-		throw runtime_error(string("Can't create shader : ") + res.second);
-	return program;
-}
-
 void RendererGL::createShaders()
 {
-	// Base folder
-	const string folder{"shaders/"};
-
-	// Header
-	const string headerSource{loadSource(folder, "header.shad")};
+	ShaderFactory factory;
+	factory.setVersion(450);
+	factory.setFolder("shaders/");
+	factory.setSandbox("sandbox.shad");
 
 	// Vert shaders
-	const string planetVertSource{loadSource(folder, "planet.vert")};
-	const string flareVertSource{loadSource(folder, "flare.vert")};
-	const string deferredSource{loadSource(folder, "deferred.vert")};
+	const string planetVert = "planet.vert";
+	const string flareVert = "flare.vert";
+	const string deferred = "deferred.vert";
 
 	// Tesc shaders
-	const string planetTescSource{loadSource(folder, "planet.tesc")};
+	const string planetTesc = "planet.tesc";
 
 	// Tese shaders
-	const string planetTeseSource{loadSource(folder, "planet.tese")};
+	const string planetTese = "planet.tese";
 	
 	// Frag shaders
-	const string planetFragSource{loadSource(folder, "planet.frag")};
-	const string atmoSource{loadSource(folder, "atmo.frag")};
-	const string ringFragSource{loadSource(folder, "ring.frag")};
-	const string highpassSource{loadSource(folder, "highpass.frag")};
-	const string downsampleSource{loadSource(folder, "downsample.frag")};
-	const string blurSource{loadSource(folder, "blur.frag")};
-	const string bloomAddSource{loadSource(folder, "bloom_add.frag")};
-	const string flareFragSource{loadSource(folder, "flare.frag")};
-	const string tonemapSource{loadSource(folder, "tonemap.frag")};
+	const string planetFrag = "planet.frag";
+	const string atmo = "atmo.frag";
+	const string ringFrag = "ring.frag";
+	const string highpass = "highpass.frag";
+	const string downsample = "downsample.frag";
+	const string blur = "blur.frag";
+	const string bloomAdd = "bloom_add.frag";
+	const string flareFrag = "flare.frag";
+	const string tonemap = "tonemap.frag";
 
 	// Defines
-	const string isStar{"#define IS_STAR\n"};
-	const string hasAtmo{"#define HAS_ATMO\n"};
-	const string isAtmo{"#define IS_ATMO\n"};
-	const string isFarRing{"#define IS_FAR_RING\n"};
-	const string isNearRing{"#define IS_NEAR_RING\n"};
+	const string isStar = "IS_STAR";
+	const string hasAtmo = "HAS_ATMO";
+	const string isAtmo = "IS_ATMO";
+	const string isFarRing = "IS_FAR_RING";
+	const string isNearRing = "IS_NEAR_RING";
 
-	const string blurW{"#define BLUR_W\n"};
-	const string blurH{"#define BLUR_H\n"};
+	const string blurW = "BLUR_W";
+	const string blurH = "BLUR_H";
 
-	// Vertex shader programs
-	shaderVertPlanet = createShader(GL_VERTEX_SHADER, 
-		{headerSource, planetVertSource});
+	const vector<GLenum> tessellated = {
+		GL_VERTEX_SHADER, 
+		GL_TESS_CONTROL_SHADER, 
+		GL_TESS_EVALUATION_SHADER, 
+		GL_FRAGMENT_SHADER
+	};
 
-	shaderVertFlare = createShader(GL_VERTEX_SHADER,
-		{headerSource, flareVertSource});
+	const vector<GLenum> notTessellated = {
+		GL_VERTEX_SHADER,
+		GL_FRAGMENT_SHADER
+	};
 
-	shaderVertDeferred = createShader(GL_VERTEX_SHADER,
-		{headerSource, deferredSource});
+	const vector<string> planetFilenames = {
+		planetVert, planetTesc, planetTese, planetFrag
+	};
 
-	// Tessellation control shader programs
-	shaderTescPlanetBare = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, planetTescSource});
+	pipelinePlanetBare = factory.createPipeline(
+		tessellated,
+		planetFilenames);
 
-	shaderTescPlanetAtmo = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, hasAtmo, planetTescSource});
+	pipelinePlanetAtmo = factory.createPipeline(
+		tessellated,
+		planetFilenames,
+		{hasAtmo});
 
-	shaderTescAtmo = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, isAtmo, planetTescSource});
+	pipelineAtmo = factory.createPipeline(
+		tessellated,
+		{planetVert, planetTesc, planetTese, atmo},
+		{isAtmo});
 
-	shaderTescSun = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, isStar, planetTescSource});
+	pipelineSun = factory.createPipeline(
+		tessellated,
+		planetFilenames,
+		{isStar});
 
-	shaderTescRingFar = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, isFarRing, planetTescSource});
+	const vector<string> ringFilenames = {
+		planetVert, planetTesc, planetTese, ringFrag
+	};
 
-	shaderTescRingNear = createShader(GL_TESS_CONTROL_SHADER,
-		{headerSource, isNearRing, planetTescSource});
+	pipelineRingFar = factory.createPipeline(
+		tessellated,
+		ringFilenames,
+		{isFarRing});
 
-	// Tessellation evaluation shader programs
-	shaderTesePlanetBare = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, planetTeseSource});
+	pipelineRingNear = factory.createPipeline(
+		tessellated,
+		ringFilenames,
+		{isNearRing});
 
-	shaderTesePlanetAtmo = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, hasAtmo, planetTeseSource});
+	auto deferredFrag = [&](string p) { return vector<string>{deferred, p}; };
 
-	shaderTeseAtmo = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, isAtmo, planetTeseSource});
+	pipelineHighpass = factory.createPipeline(
+		notTessellated,
+		deferredFrag(highpass));
 
-	shaderTeseSun = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, isStar, planetTeseSource});
+	pipelineDownsample = factory.createPipeline(
+		notTessellated,
+		deferredFrag(downsample));
 
-	shaderTeseRingFar = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, isFarRing, planetTeseSource});
+	pipelineBlurW = factory.createPipeline(
+		notTessellated,
+		deferredFrag(blur),
+		{blurW});
 
-	shaderTeseRingNear = createShader(GL_TESS_EVALUATION_SHADER,
-		{headerSource, isNearRing, planetTeseSource});
+	pipelineBlurH = factory.createPipeline(
+		notTessellated,
+		deferredFrag(blur),
+		{blurH});
 
-	// Fragment shader programs
-	shaderFragPlanetBare = createShader(GL_FRAGMENT_SHADER, 
-		{headerSource, planetFragSource});
+	pipelineBloomAdd = factory.createPipeline(
+		notTessellated,
+		deferredFrag(bloomAdd));
 
-	shaderFragPlanetAtmo = createShader(GL_FRAGMENT_SHADER, 
-		{headerSource, hasAtmo, planetFragSource});
+	pipelineFlare = factory.createPipeline(
+		notTessellated,
+		{flareVert, flareFrag});
 
-	shaderFragAtmo = createShader(GL_FRAGMENT_SHADER, 
-		{headerSource, isAtmo, atmoSource});
-
-	shaderFragSun = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, isStar, planetFragSource});
-
-	shaderFragRingFar = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, isFarRing, ringFragSource});
-
-	shaderFragRingNear = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, isNearRing, ringFragSource});
-
-	shaderFragHighpass = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, highpassSource});
-
-	shaderFragDownsample = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, downsampleSource});
-
-	shaderFragBlurW = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, blurW, blurSource});
-
-	shaderFragBlurH = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, blurH, blurSource});
-
-	shaderFragBloomAdd = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, bloomAddSource});
-
-	shaderFragFlare = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, flareFragSource});
-
-	shaderFragTonemap = createShader(GL_FRAGMENT_SHADER,
-		{headerSource, tonemapSource});
-
-
-	// Pipelines
-	glCreateProgramPipelines(1, &pipelinePlanetBare);
-	glCreateProgramPipelines(1, &pipelinePlanetAtmo);
-	glCreateProgramPipelines(1, &pipelineAtmo);
-	glCreateProgramPipelines(1, &pipelineSun);
-	glCreateProgramPipelines(1, &pipelineRingFar);
-	glCreateProgramPipelines(1, &pipelineRingNear);
-	glCreateProgramPipelines(1, &pipelineHighpass);
-	glCreateProgramPipelines(1, &pipelineDownsample);
-	glCreateProgramPipelines(1, &pipelineBlurW);
-	glCreateProgramPipelines(1, &pipelineBlurH);
-	glCreateProgramPipelines(1, &pipelineBloomAdd);
-	glCreateProgramPipelines(1, &pipelineFlare);
-	glCreateProgramPipelines(1, &pipelineTonemap);
-
-
-	// Pipeline use
-	glUseProgramStages(pipelinePlanetBare, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelinePlanetAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelineAtmo, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelineSun, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelineRingFar, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelineRingNear, GL_VERTEX_SHADER_BIT, shaderVertPlanet);
-	glUseProgramStages(pipelineHighpass, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-	glUseProgramStages(pipelineDownsample, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-	glUseProgramStages(pipelineBlurW, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-	glUseProgramStages(pipelineBlurH, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-	glUseProgramStages(pipelineBloomAdd, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-	glUseProgramStages(pipelineFlare, GL_VERTEX_SHADER_BIT, shaderVertFlare);
-	glUseProgramStages(pipelineTonemap, GL_VERTEX_SHADER_BIT, shaderVertDeferred);
-
-	glUseProgramStages(pipelinePlanetBare, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetBare);
-	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescPlanetAtmo);
-	glUseProgramStages(pipelineAtmo, GL_TESS_CONTROL_SHADER_BIT, shaderTescAtmo);
-	glUseProgramStages(pipelineSun, GL_TESS_CONTROL_SHADER_BIT, shaderTescSun);
-	glUseProgramStages(pipelineRingFar, GL_TESS_CONTROL_SHADER_BIT, shaderTescRingFar);
-	glUseProgramStages(pipelineRingNear, GL_TESS_CONTROL_SHADER_BIT, shaderTescRingNear);
-
-	glUseProgramStages(pipelinePlanetBare, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetBare);
-	glUseProgramStages(pipelinePlanetAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTesePlanetAtmo);
-	glUseProgramStages(pipelineAtmo, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseAtmo);
-	glUseProgramStages(pipelineSun, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseSun);
-	glUseProgramStages(pipelineRingFar, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseRingFar);
-	glUseProgramStages(pipelineRingNear, GL_TESS_EVALUATION_SHADER_BIT, shaderTeseRingNear);
-
-	glUseProgramStages(pipelinePlanetBare, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetBare);
-	glUseProgramStages(pipelinePlanetAtmo, GL_FRAGMENT_SHADER_BIT, shaderFragPlanetAtmo);
-	glUseProgramStages(pipelineAtmo, GL_FRAGMENT_SHADER_BIT, shaderFragAtmo);
-	glUseProgramStages(pipelineSun, GL_FRAGMENT_SHADER_BIT, shaderFragSun);
-	glUseProgramStages(pipelineRingFar, GL_FRAGMENT_SHADER_BIT, shaderFragRingFar);
-	glUseProgramStages(pipelineRingNear, GL_FRAGMENT_SHADER_BIT, shaderFragRingNear);
-	glUseProgramStages(pipelineHighpass, GL_FRAGMENT_SHADER_BIT, shaderFragHighpass);
-	glUseProgramStages(pipelineDownsample, GL_FRAGMENT_SHADER_BIT, shaderFragDownsample);
-	glUseProgramStages(pipelineBlurW, GL_FRAGMENT_SHADER_BIT, shaderFragBlurW);
-	glUseProgramStages(pipelineBlurH, GL_FRAGMENT_SHADER_BIT, shaderFragBlurH);
-	glUseProgramStages(pipelineBloomAdd, GL_FRAGMENT_SHADER_BIT, shaderFragBloomAdd);
-	glUseProgramStages(pipelineFlare, GL_FRAGMENT_SHADER_BIT, shaderFragFlare);
-	glUseProgramStages(pipelineTonemap, GL_FRAGMENT_SHADER_BIT, shaderFragTonemap);
+	pipelineTonemap = factory.createPipeline(
+		notTessellated,
+		deferredFrag(tonemap));
 }
 
 void RendererGL::createScreenshot()
@@ -1026,10 +912,9 @@ void RendererGL::renderHdr(
 		auto &data = planetData[i];
 		const bool star = planetParams[i].isStar();
 		const bool hasAtmo = planetParams[i].hasAtmo();
-		glBindProgramPipeline(
-			star?
-			pipelineSun:
-			(hasAtmo?pipelinePlanetAtmo:pipelinePlanetBare));
+		if (star) pipelineSun.bind();
+		else if (hasAtmo) pipelinePlanetAtmo.bind();
+		else pipelinePlanetBare.bind();
 
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
@@ -1111,21 +996,21 @@ void RendererGL::renderTranslucent(
 		// Far rings
 		if (hasRing)
 		{
-			glBindProgramPipeline(pipelineRingFar);
+			pipelineRingFar.bind();
 			ringModel.draw();
 		}
 
 		// Atmosphere
 		if (hasAtmo)
 		{
-			glBindProgramPipeline(pipelineAtmo);
+			pipelineAtmo.bind();
 			data.planetModel.draw();
 		}
 
 		// Near rings
 		if (hasRing)
 		{
-			glBindProgramPipeline(pipelineRingNear);
+			pipelineRingNear.bind();
 			ringModel.draw();
 		}
 	}
@@ -1146,7 +1031,7 @@ void RendererGL::renderHighpass(const DynamicData &data)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[0]);
 
-	glBindProgramPipeline(pipelineHighpass);
+	pipelineHighpass.bind();
 
 	const vector<GLuint> samplers = {rendertargetSampler};
 	const vector<GLuint> texs = {hdrMSRendertarget};
@@ -1165,7 +1050,7 @@ void RendererGL::renderDownsample(const DynamicData &data)
 {
 	const vector<GLenum> invalidateAttach = {GL_COLOR_ATTACHMENT0};
 	glBindSampler(0, rendertargetSampler);
-	glBindProgramPipeline(pipelineDownsample);
+	pipelineDownsample.bind();
 	for (int i=0;i<bloomDepth;++i)
 	{
 		glInvalidateNamedFramebufferData(highpassFBOs[i+1], invalidateAttach.size(), invalidateAttach.data());
@@ -1192,14 +1077,14 @@ void RendererGL::renderBloom(const DynamicData &data)
 	for (int i=bloomDepth;i>=1;--i)
 	{
 		// Blur horizontally
-		glBindProgramPipeline(pipelineBlurW);
+		pipelineBlurW.bind();
 		glInvalidateNamedFramebufferData(highpassFBOs[i], invalidateAttach.size(), invalidateAttach.data());
 		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i]);
 		glBindTextureUnit(0, bloomViews[i-1]);
 		fullscreenTri.draw();
 
 		// Blur vertically
-		glBindProgramPipeline(pipelineBlurH);
+		pipelineBlurH.bind();
 		glInvalidateNamedFramebufferData(bloomFBOs[i-1], invalidateAttach.size(), invalidateAttach.data());
 		glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-1]);
 		glBindTextureUnit(0, highpassViews[i]);
@@ -1208,7 +1093,7 @@ void RendererGL::renderBloom(const DynamicData &data)
 		// Add blur with higher res
 		if (i>1)
 		{
-			glBindProgramPipeline(pipelineBloomAdd);
+			pipelineBloomAdd.bind();
 			glInvalidateNamedFramebufferData(bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
 			glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-2]);
 			const vector<GLuint> texs = {bloomViews[i-1], highpassViews[i-1]};
@@ -1232,7 +1117,7 @@ void RendererGL::renderFlares(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
-	glBindProgramPipeline(pipelineFlare);
+	pipelineFlare.bind();
 
 	for (uint32_t i : farPlanets)
 	{
@@ -1275,7 +1160,7 @@ void RendererGL::renderTonemap(const DynamicData &data)
 	// Bind default FBO
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	glBindProgramPipeline(pipelineTonemap);
+	pipelineTonemap.bind();
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
