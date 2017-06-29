@@ -1,16 +1,16 @@
 ## To Do
 
-### Minor stuff
-- [ ] Frustum culling
-- [ ] Compute log average luminance for auto exposure
-- [ ] Correct luminance values
-- [ ] Add runtime option to see wireframe
-
 ### Important stuff
 - [ ] Specular support
 - [ ] Ring shadow on planet
 - [ ] Don't use stream textures when incomplete
 - [ ] Convert all textures to BC7 or BC4
+
+### Minor stuff
+- [ ] Frustum culling
+- [ ] Compute log average luminance for auto exposure
+- [ ] Correct luminance values
+- [ ] Add runtime option to see wireframe
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
