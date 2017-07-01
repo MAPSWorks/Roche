@@ -24,10 +24,15 @@ public:
 	StreamTexture &operator=(StreamTexture &&tex);
 	~StreamTexture();
 
+	void setComplete();
+
 	GLuint getId(GLuint def=0) const;
+	bool isComplete() const;
+	GLuint getCompleteId(GLuint def=0) const;
 
 private:
 	GLuint _id = 0;
+	bool _complete = false;
 };
 
 class DDSStreamer
@@ -55,6 +60,7 @@ private:
 		int offsetY;
 		int level;
 		int imageSize;
+		int completenessId;
 		int ptrOffset = -1;
 	};
 
@@ -69,6 +75,7 @@ private:
 		GLenum format;
 		int imageSize;
 		int ptrOffset;
+		int completenessId;
 	};
 
 	int acquirePages(int size);
@@ -90,6 +97,7 @@ private:
 	std::vector<LoadData> _loadData; // Finished loading
 
 	std::map<Handle, StreamTexture> _texs;
+	std::map<Handle, std::vector<bool>> _completeness;
 	std::vector<Handle> _texDeleted;
 	StreamTexture _nullTex{};
 

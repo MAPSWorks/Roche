@@ -938,9 +938,9 @@ void RendererGL::renderHdr(
 		};
 		// Bind textures
 		const vector<GLuint> texs = {
-			streamer.getTex(data.diffuse).getId(diffuseTexDefault),
-			streamer.getTex(data.cloud).getId(cloudTexDefault),
-			streamer.getTex(data.night).getId(nightTexDefault),
+			streamer.getTex(data.diffuse).getCompleteId(diffuseTexDefault),
+			streamer.getTex(data.cloud).getCompleteId(cloudTexDefault),
+			streamer.getTex(data.night).getCompleteId(nightTexDefault),
 			data.atmoLookupTable
 		};
 

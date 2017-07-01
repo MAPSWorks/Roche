@@ -3,7 +3,6 @@
 ### Important stuff
 - [ ] Specular support
 - [ ] Ring shadow on planet
-- [ ] Don't use stream textures when incomplete
 - [ ] Convert all textures to BC7 or BC4
 
 ### Minor stuff
@@ -18,6 +17,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Don't use stream textures when incomplete
 - [x] Wireframe option
 - [x] Shader API with caching
 - [x] BC4 and BC5 loading through old fourCC codes

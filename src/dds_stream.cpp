@@ -70,6 +70,9 @@ void DDSStreamer::init(int pageSize, int numPages, int maxSize)
 				_loadInfoQueue.erase(_loadInfoQueue.begin());
 			}
 
+			// Use this to simulate slow load times (debug purposes)
+			//this_thread::sleep_for(chrono::milliseconds(50));
+
 			LoadData data = load(info);
 
 			{
@@ -174,6 +177,8 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	// Gen jobs
 	vector<LoadInfo> jobs;
 
+	int completenessId = 0;
+
 	// Tail mipmaps (level0)
 	const int tailMipsFile = mipmapCount(info.size);
 	const int tailMips = mipmapCount(min(_maxSize,info.size));
@@ -188,6 +193,8 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		tailInfo.offsetY = 0;
 		tailInfo.level = info.levels-1+i;
 		tailInfo.imageSize = tailLoader.getImageSize(tailInfo.fileLevel);
+		tailInfo.completenessId = completenessId;
+		completenessId += 1;
 		jobs.push_back(tailInfo);
 	}
 
@@ -220,10 +227,14 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 				loadInfo.offsetY = y*info.size;
 				loadInfo.level = info.levels-i-1;
 				loadInfo.imageSize = imageSize;
+				loadInfo.completenessId = completenessId;
+				completenessId += 1;
 				jobs.push_back(loadInfo);
 			}
 		}
 	}
+
+	_completeness.insert(make_pair(h, vector<bool>(completenessId, false)));
 
 	_loadInfoWaiting.insert(_loadInfoWaiting.end(), jobs.begin(), jobs.end());
 
@@ -241,6 +252,7 @@ const StreamTexture &DDSStreamer::getTex(Handle handle)
 void DDSStreamer::deleteTex(Handle handle)
 {
 	_texDeleted.push_back(handle);
+	_completeness.erase(handle);
 	_texs.erase(handle);
 }
 
@@ -320,6 +332,16 @@ void DDSStreamer::update()
 				d.format,
 				d.imageSize,
 				(void*)(intptr_t)d.ptrOffset);
+
+			// Set completeness of slice
+			auto &comp = _completeness[d.handle];
+			comp[d.completenessId] = true;
+
+			// If all slices have been uploaded, set the texture as complete
+			if (all_of(comp.begin(), comp.end(), [](bool c){return c;}))
+			{
+				it->second.setComplete();
+			}
 		}
 		releasePages(d.ptrOffset, d.imageSize);
 	}
@@ -380,6 +402,7 @@ DDSStreamer::LoadData DDSStreamer::load(const LoadInfo &info)
 	s.format  = DDSFormatToGL(info.loader.getFormat());
 	s.imageSize = info.imageSize;
 	s.ptrOffset = ptrOffset;
+	s.completenessId = info.completenessId;
 
 	info.loader.writeImageData(level, (char*)_pboPtr+ptrOffset);
 
@@ -417,8 +440,24 @@ StreamTexture::~StreamTexture()
 	if (_id) glDeleteTextures(1, &_id);
 }
 
+void StreamTexture::setComplete()
+{
+	_complete = true;
+}
+
 GLuint StreamTexture::getId(GLuint def) const
 {
 	if (_id) return _id;
+	return def;
+}
+
+bool StreamTexture::isComplete() const
+{
+	return _complete;
+}
+
+GLuint StreamTexture::getCompleteId(GLuint def) const
+{
+	if (isComplete()) return getId(def);
 	return def;
 }
