@@ -25,32 +25,20 @@ layout(location = 3) out vec4 passTangent[];
 patch out float gl_TessLevelOuter[4];
 patch out float gl_TessLevelInner[2];
 
-mat4 getMatrix(PlanetUBO ubo)
-{
-#if defined(IS_ATMO)
-	return ubo.atmoMat;
-#elif defined(IS_FAR_RING)
-	return ubo.ringFarMat;
-#elif defined(IS_NEAR_RING)
-	return ubo.ringNearMat;
-#else
-	return ubo.modelMat;
-#endif
-}
-
 float edgeTessLevel(vec3 pos0, vec3 pos1)
 {
-	float tess = distance(pos0.xy/pos0.z, pos1.xy/pos1.z)*100;
-	return clamp(tess, 1.0, 8.0);
+	float d = max(pos0.z, pos1.z);
+	float tess = distance(pos0.xy/d, pos1.xy/d)*80;
+	return clamp(tess, 1.0, 16.0);
 }
 
 void main()
 {
-	mat4 mMat = getMatrix(planetUBO);
-	vec3 p0 = vec3(sceneUBO.viewMat*mMat*inPosition[0]);
-	vec3 p1 = vec3(sceneUBO.viewMat*mMat*inPosition[1]);
-	vec3 p2 = vec3(sceneUBO.viewMat*mMat*inPosition[2]);
-	vec3 p3 = vec3(sceneUBO.viewMat*mMat*inPosition[3]);
+	mat4 mMat = sceneUBO.viewMat*getMatrix(planetUBO);
+	vec3 p0 = vec3(mMat*inPosition[0]);
+	vec3 p1 = vec3(mMat*inPosition[1]);
+	vec3 p2 = vec3(mMat*inPosition[2]);
+	vec3 p3 = vec3(mMat*inPosition[3]);
 
 	float tess0 = edgeTessLevel(p0, p2);
 	float tess1 = edgeTessLevel(p0, p1);

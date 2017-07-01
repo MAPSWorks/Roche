@@ -32,6 +32,19 @@ struct FlareUBO
 	float brightness;
 };
 
+mat4 getMatrix(PlanetUBO ubo)
+{
+#if defined(IS_ATMO)
+	return ubo.atmoMat;
+#elif defined(IS_FAR_RING)
+	return ubo.ringFarMat;
+#elif defined(IS_NEAR_RING)
+	return ubo.ringNearMat;
+#else
+	return ubo.modelMat;
+#endif
+}
+
 float logDepth(float w, float farPlane, float C)
 {
 	return log2(max(1e-6, C*w)) * farPlane * w;

@@ -29,6 +29,7 @@ private:
 	float exposure = 0.0;
 	float ambientColor = 0.0;
 	int maxTexSize = -1;
+	bool wireframe = false;
 	
 	// Main planet collection
 	uint32_t planetCount = 0;

@@ -246,8 +246,8 @@ void RendererGL::createModels()
 	modelInfos[flareModelId] = generateFlareModel();
 
 	// Sphere
-	const int planetMeridians = 64;
-	const int planetRings = 64;
+	const int planetMeridians = 32;
+	const int planetRings = 32;
 	modelInfos[sphereModelId] = generateSphere(planetMeridians, planetRings);
 
 	// Load custom models
@@ -262,7 +262,7 @@ void RendererGL::createModels()
 			ringModelId[i] = modelInfos.size();
 			const float near = param.getRing().getInnerDistance();
 			const float far = param.getRing().getOuterDistance();
-			const int ringMeridians = 64;
+			const int ringMeridians = 32;
 			modelInfos.push_back(generateRingModel(ringMeridians, near, far));
 		}
 	}
@@ -694,6 +694,7 @@ void RendererGL::render(
 		const vec3 &viewUp,
 		const float exposure,
 		const float ambientColor,
+		const bool wireframe,
 		const vector<PlanetState> &planetStates)
 {
 
@@ -828,13 +829,14 @@ void RendererGL::render(
 		return distI > distJ;
 	});
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
 	profiler.end();
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
+	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Highpass");
 	renderHighpass(currentData);
 	profiler.end();
@@ -844,10 +846,11 @@ void RendererGL::render(
 	profiler.begin("Bloom");
 	renderBloom(currentData);
 	profiler.end();
+	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Flares");
 	renderFlares(farPlanets, currentData);
 	profiler.end();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Tonemapping");
 	renderTonemap(currentData);
 	profiler.end();

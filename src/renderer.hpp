@@ -23,6 +23,7 @@ public:
 		const glm::vec3 &viewUp,
 		float exposure,
 		float ambientColor,
+		bool wireframe,
 		const std::vector<PlanetState> &planetStates) {}
 	virtual void takeScreenshot(const std::string &filename) {}
 	virtual void destroy() {}

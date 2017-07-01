@@ -44,19 +44,6 @@ vec4 lerp(vec4 v[gl_MaxPatchVertices])
 		gl_TessCoord.y);
 }
 
-mat4 getMatrix(PlanetUBO ubo)
-{
-#if defined(IS_ATMO)
-	return ubo.atmoMat;
-#elif defined(IS_FAR_RING)
-	return ubo.ringFarMat;
-#elif defined(IS_NEAR_RING)
-	return ubo.ringNearMat;
-#else
-	return ubo.modelMat;
-#endif
-}
-
 void main()
 {
 	passUv = lerp(inUv);

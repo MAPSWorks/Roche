@@ -400,6 +400,12 @@ void Game::update(const double dt)
 		cameraFovy = std::min(glm::radians(60.f), cameraFovy*1.1f);
 	}
 
+	// Wireframe on/off
+	if (isPressedOnce(GLFW_KEY_W))
+	{
+		wireframe = !wireframe;
+	}
+
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
@@ -517,7 +523,7 @@ void Game::update(const double dt)
 	// Scene rendering
 	renderer->render(
 		cameraPos, cameraFovy, cameraCenter, glm::vec3(0,0,1),
-		exposure, ambientColor,
+		exposure, ambientColor, wireframe,
 		planetStates);
 
 	auto a = renderer->getProfilerTimes();
