@@ -9,6 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 using namespace std;
 
@@ -37,7 +38,7 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 
 void DDSStreamer::init(int pageSize, int numPages, int maxSize)
 {
-	_maxSize = maxSize;
+	_maxSize = (maxSize>0)?maxSize:numeric_limits<int>::max();
 	_pageSize = pageSize;
 	_numPages = numPages;
 	int pboSize = pageSize*numPages;
@@ -133,12 +134,9 @@ TexInfo parseInfoFile(const string &filename, int maxSize)
 		info.suffix = (string)swp("suffix").value<shaun::string>();
 		info.rowColumnOrder = swp("row_column_order").value<shaun::boolean>();
 
-		if (maxSize)
-		{
-			int maxRows = maxSize/(info.size*2);
-			int maxLevel = (int)floor(log2(maxRows))+1;
-			info.levels = max(1,min(info.levels, maxLevel));
-		}
+		int maxRows = maxSize/(info.size*2);
+		int maxLevel = (int)floor(log2(maxRows))+1;
+		info.levels = max(1,min(info.levels, maxLevel));
 		return info;
 	} 
 	catch (shaun::parse_error &e)
@@ -168,7 +166,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	DDSLoader tailLoader = DDSLoader(filename+tailFile);
 
 	// Storage
-	const int width = info.size<<(info.levels-1);
+	const int width = min(_maxSize,info.size<<(info.levels-1));
 	const int height = width/2;
 	const GLenum format = DDSFormatToGL(tailLoader.getFormat());
 	glTextureStorage2D(id, mipmapCount(width), format, width, height);
@@ -177,17 +175,19 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	vector<LoadInfo> jobs;
 
 	// Tail mipmaps (level0)
-	const int tailMips = mipmapCount(info.size);
+	const int tailMipsFile = mipmapCount(info.size);
+	const int tailMips = mipmapCount(min(_maxSize,info.size));
+	const int skipMips = tailMipsFile - tailMips;
 	for (int i=tailMips-1;i>=0;--i)
 	{
 		LoadInfo tailInfo{};
 		tailInfo.handle = h;
 		tailInfo.loader = tailLoader;
-		tailInfo.fileLevel = i;
+		tailInfo.fileLevel = i+skipMips;
 		tailInfo.offsetX = 0;
 		tailInfo.offsetY = 0;
 		tailInfo.level = info.levels-1+i;
-		tailInfo.imageSize = tailLoader.getImageSize(i);
+		tailInfo.imageSize = tailLoader.getImageSize(tailInfo.fileLevel);
 		jobs.push_back(tailInfo);
 	}
 
