@@ -10,7 +10,6 @@
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
-- [ ] Add runtime option to see wireframe
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
@@ -19,6 +18,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Wireframe option
 - [x] Shader API with caching
 - [x] BC4 and BC5 loading through old fourCC codes
 - [x] Better DDS Streamer partitioning
