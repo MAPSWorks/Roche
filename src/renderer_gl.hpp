@@ -72,6 +72,8 @@ private:
 		glm::vec4 planetPos;
 		glm::vec4 lightDir;
 		glm::vec4 K;
+		glm::vec4 mask0ColorHardness;
+		glm::vec4 mask1ColorHardness;
 		float starBrightness;
 		float cloudDisp;
 		float nightTexIntensity;
@@ -205,6 +207,7 @@ private:
 		DDSStreamer::Handle diffuse{};
 		DDSStreamer::Handle cloud{};
 		DDSStreamer::Handle night{};
+		DDSStreamer::Handle specular{};
 
 		GLuint atmoLookupTable = 0;
 		GLuint ringTex1 = 0;
@@ -234,6 +237,7 @@ private:
 	GLuint diffuseTexDefault;
 	GLuint cloudTexDefault;
 	GLuint nightTexDefault;
+	GLuint specularTexDefault;
 
 	GLuint flareIntensityTex;
 	GLuint flareLinesTex;

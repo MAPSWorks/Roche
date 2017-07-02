@@ -288,6 +288,20 @@ void Game::loadPlanetFiles()
 				planet.setNight(night);
 			}
 
+			sweeper specsw(pl("specular"));
+			if (!specsw.is_null())
+			{
+				sweeper mask0(specsw("mask0"));
+				sweeper mask1(specsw("mask1"));
+				Planet::Specular spec(
+					get<std::string>(specsw("filename")),
+					{get<glm::vec3>(mask0("color")), 
+					 (float)get<double>(mask0("hardness"))},
+					{get<glm::vec3>(mask1("color")),
+					 (float)get<double>(mask1("hardness"))});
+				planet.setSpecular(spec);
+			}
+
 			planetParams[i] = planet;
 		}
 		// Assign planet parents

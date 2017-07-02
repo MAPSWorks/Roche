@@ -24,23 +24,20 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 	PlanetUBO planetUBO;
 };
 
-layout (binding = 5) uniform sampler2D atmo;
+#if defined(HAS_ATMO)
+layout (binding = 6) uniform sampler2D atmo;
+#endif
 
 layout (location = 0) out vec4 passUv;
 layout (location = 1) out vec4 passNormal;
 layout (location = 2) out vec4 passPosition;
 layout (location = 3) out vec4 passScattering;
 
-vec4 lerp(vec4 a, vec4 b, float x)
-{
-	return a*(1-x)+b*x;
-}
-
 vec4 lerp(vec4 v[gl_MaxPatchVertices])
 {
-	return lerp(
-		lerp(v[0],v[1],gl_TessCoord.x),
-		lerp(v[2],v[3],gl_TessCoord.x),
+	return mix(
+		mix(v[0],v[1],gl_TessCoord.x),
+		mix(v[2],v[3],gl_TessCoord.x),
 		gl_TessCoord.y);
 }
 

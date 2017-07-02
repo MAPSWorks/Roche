@@ -18,6 +18,8 @@ struct PlanetUBO
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;
+	vec4 mask0ColorHardness;
+	vec4 mask1ColorHardness;
 	float starBrightness;
 	float cloudDisp;
 	float nightIntensity;

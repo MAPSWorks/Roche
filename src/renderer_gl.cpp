@@ -388,6 +388,7 @@ void RendererGL::createTextures()
 	diffuseTexDefault = create1PixTex({0,0,0,255});
 	cloudTexDefault = create1PixTex({0,0,0,0});
 	nightTexDefault = create1PixTex({0,0,0,0});
+	specularTexDefault = create1PixTex({0,0,0,0});
 
 	createFlare();
 
@@ -934,6 +935,7 @@ void RendererGL::renderHdr(
 			planetTexSampler,
 			planetTexSampler,
 			planetTexSampler,
+			planetTexSampler,
 			atmoSampler
 		};
 		// Bind textures
@@ -941,6 +943,7 @@ void RendererGL::renderHdr(
 			streamer.getTex(data.diffuse).getCompleteId(diffuseTexDefault),
 			streamer.getTex(data.cloud).getCompleteId(cloudTexDefault),
 			streamer.getTex(data.night).getCompleteId(nightTexDefault),
+			streamer.getTex(data.specular).getCompleteId(specularTexDefault),
 			data.atmoLookupTable
 		};
 
@@ -1192,6 +1195,8 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 			data.cloud = streamer.createTex(param.getClouds().getFilename());
 		if (param.hasNight())
 			data.night = streamer.createTex(param.getNight().getFilename());
+		if (param.hasSpecular())
+			data.specular = streamer.createTex(param.getSpecular().getFilename());
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
@@ -1268,24 +1273,26 @@ void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 	for (uint32_t i : texUnloadPlanets)
 	{
 		auto &data = planetData[i];
-		const auto param = planetParams[i];
 
-		if (param.hasAtmo())
-		{
+		if (data.atmoLookupTable)
 			glDeleteTextures(1, &data.atmoLookupTable);
-		}
 
-		if (param.hasRing())
-		{
+		if (data.ringTex1)
 			glDeleteTextures(1, &data.ringTex1);
+
+		if (data.ringTex2)
 			glDeleteTextures(2, &data.ringTex2);
-		}
 
 		// Reset variables
 		data.texLoaded = false;
 		streamer.deleteTex(data.diffuse);
 		streamer.deleteTex(data.cloud);
 		streamer.deleteTex(data.night);
+		streamer.deleteTex(data.specular);
+		data.diffuse = 0;
+		data.cloud = 0;
+		data.night = 0;
+		data.specular = 0;
 		data.atmoLookupTable = 0;
 		data.ringTex1 = 0;
 		data.ringTex2 = 0;
@@ -1364,6 +1371,14 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	ubo.K = params.hasAtmo()
 		?params.getAtmo().getScatteringConstant()
 		:glm::vec4(0.0);
+
+	if (params.hasSpecular())
+	{
+		auto &spec = params.getSpecular();
+		ubo.mask0ColorHardness = vec4(spec.getMask0().color, spec.getMask0().hardness);
+		ubo.mask1ColorHardness = vec4(spec.getMask1().color, spec.getMask1().hardness);
+	}
+
 	ubo.cloudDisp = state.getCloudDisp();
 	ubo.nightTexIntensity = params.hasNight()
 		?params.getNight().getIntensity():0.0;

@@ -373,6 +373,30 @@ float Planet::Night::getIntensity() const
 	return _intensity;
 }
 
+Planet::Specular::Specular(const std::string &filename,
+	const Mask mask0, const Mask mask1) :
+	_filename{filename},
+	_mask0{mask0},
+	_mask1{mask1}
+{
+
+}
+
+Planet::Specular::Mask Planet::Specular::getMask0() const
+{
+	return _mask0;
+}
+
+Planet::Specular::Mask Planet::Specular::getMask1() const
+{
+	return _mask1;
+}
+
+std::string Planet::Specular::getFilename() const
+{
+	return _filename;
+}
+
 Planet::Planet(const std::string &name) : Planet()
 {
 	_name = name;
@@ -418,6 +442,11 @@ void Planet::setNight(const Night &night)
 	_night = std::make_pair(true, night);
 }
 
+void Planet::setSpecular(const Specular &specular)
+{
+	_specular = std::make_pair(true, specular);
+}
+
 bool Planet::hasOrbit() const
 {
 	return _orbit.first;
@@ -446,6 +475,11 @@ bool Planet::hasClouds() const
 bool Planet::hasNight() const
 {
 	return _night.first;
+}
+
+bool Planet::hasSpecular() const
+{
+	return _specular.first;
 }
 
 std::string Planet::getName() const
@@ -491,6 +525,11 @@ const Planet::Clouds &Planet::getClouds() const
 const Planet::Night &Planet::getNight() const
 {
 	return _night.second;
+}
+
+const Planet::Specular &Planet::getSpecular() const
+{
+	return _specular.second;
 }
 
 PlanetState::PlanetState(

@@ -16,51 +16,68 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 layout (binding = 2) uniform sampler2D diffuse;
 layout (binding = 3) uniform sampler2D cloud;
 layout (binding = 4) uniform sampler2D night;
+layout (binding = 5) uniform sampler2D specular;
 
 layout (location = 0) out vec4 outColor;
 
 #if defined(HAS_ATMO)
-layout (binding = 5) uniform sampler2D atmo;
+layout (binding = 6) uniform sampler2D atmo;
 #endif
 
 void main()
 {
 	vec3 day = texture(diffuse, passUv.st).rgb;
 
-#if !defined(IS_STAR)
-	float light = clamp(max(dot(planetUBO.lightDir.xyz, passNormal.xyz), sceneUBO.ambientColor),0,1);
+	// Light calculations
+	vec3 normal = normalize(passNormal.xyz);
+	vec3 lightDir = planetUBO.lightDir.xyz;
+	vec3 planetPos = planetUBO.planetPos.xyz;
+	vec3 pp = normalize(passPosition.xyz-planetPos)*planetUBO.radius;
+	vec3 viewer = sceneUBO.viewPos.xyz-planetPos;
+	vec3 viewDir = normalize(pp-viewer);
 
-	vec3 color = day*light;
+	float lambert = clamp(max(dot(lightDir, normal), sceneUBO.ambientColor),0,1);
+
+	// Specular calculation
+	float spec = texture(specular, passUv.st).r;
+	vec3 H = normalize(lightDir - viewDir);
+	float NdotH = clamp(dot(normal, H), 0, 1);
+
+	vec3 specColor = mix(planetUBO.mask0ColorHardness.rgb, planetUBO.mask1ColorHardness.rgb, spec);
+	float hardness0 = planetUBO.mask0ColorHardness.w;
+	float hardness1 = planetUBO.mask1ColorHardness.w;
+	float specIntensity0 = hardness0 < 1 ? 0 : pow(NdotH, hardness0);
+	float specIntensity1 = hardness1 < 1 ? 0 : pow(NdotH, hardness1);
+	float specIntensity = mix(specIntensity0, specIntensity1, spec);
+
+	// Clouds & night
+	float nightTex = texture(night, passUv.st).r * planetUBO.nightIntensity;
+	float cloudTex = texture(cloud, passUv.st+vec2(planetUBO.cloudDisp, 0)).r;
+
+	vec3 nightFinal = vec3(nightTex*clamp(-lambert*10+0.2,0,1)*(1-cloudTex));
+	float k = mix(specIntensity, 0, cloudTex);
+	vec3 dayWithClouds = mix(day, vec3(cloudTex), cloudTex);
+
+#if !defined(IS_STAR)
+	vec3 color = dayWithClouds*lambert*(1-k) + k*specColor;
 #else
 	vec3 color = day*planetUBO.starBrightness;
 #endif
 
 #if defined(HAS_ATMO)
-	vec3 night = texture(night, passUv.st).rrr * planetUBO.nightIntensity;
-	vec4 cloud = texture(cloud, passUv.st+vec2(planetUBO.cloudDisp, 0)).rrrr;
-
-	night = night*clamp(-light*10+0.2,0,1)*(1-cloud.a);
-	day = mix(day, cloud.rgb, cloud.a);
-
-	color = day*light;
-
-	vec3 norm_v = normalize(passPosition.xyz-planetUBO.planetPos.xyz);
-	vec3 pp = norm_v*planetUBO.radius;
-	vec3 viewer = sceneUBO.viewPos.xyz-planetUBO.planetPos.xyz;
-	vec3 view_dir = pp-viewer;
-	float c = dot(normalize(view_dir),-planetUBO.lightDir.xyz);
+	float c = dot(viewDir,-lightDir);
 	float cc = c*c;
 
 	vec3 scat = passScattering.rgb * (planetUBO.K.xyz*rayleigh(cc) + planetUBO.K.www*mie(c,cc));
 
 	scat = clamp(scat, vec3(0),vec3(2));
 
-	float angle_light = dot(norm_v, planetUBO.lightDir.xyz)*0.5+0.5;
-	float angle_view = dot(norm_v, -normalize(view_dir))*0.5+0.5;
+	float angleLight = dot(normal, lightDir)*0.5+0.5;
+	float angleView = dot(normal, -viewDir)*0.5+0.5;
 	color = color*
-		exp(-texture(atmo, vec2(angle_view ,0)).g*(planetUBO.K.xyz+planetUBO.K.www))*
-		exp(-texture(atmo, vec2(angle_light,0)).g*(planetUBO.K.xyz+planetUBO.K.www))+scat+night;
+		exp(-texture(atmo, vec2(angleView ,0)).g*(planetUBO.K.xyz+planetUBO.K.www))*
+		exp(-texture(atmo, vec2(angleLight,0)).g*(planetUBO.K.xyz+planetUBO.K.www))+scat;
 #endif
 
-	outColor = vec4(color, 1.0);
+	outColor = vec4(color+nightFinal, 1.0);
 } 

@@ -1,7 +1,6 @@
 ## To Do
 
 ### Important stuff
-- [ ] Specular support
 - [ ] Ring shadow on planet
 - [ ] Convert all textures to BC7 or BC4
 
@@ -17,6 +16,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Specular support
 - [x] Don't use stream textures when incomplete
 - [x] Wireframe option
 - [x] Shader API with caching

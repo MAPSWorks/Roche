@@ -251,9 +251,12 @@ const StreamTexture &DDSStreamer::getTex(Handle handle)
 
 void DDSStreamer::deleteTex(Handle handle)
 {
-	_texDeleted.push_back(handle);
-	_completeness.erase(handle);
-	_texs.erase(handle);
+	if (handle)
+	{
+		_texDeleted.push_back(handle);
+		_completeness.erase(handle);
+		_texs.erase(handle);
+	}
 }
 
 void DDSStreamer::update()
