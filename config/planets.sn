@@ -1,5 +1,5 @@
 ambientColor:0.0002
-startingPlanet:"Saturn"
+startingPlanet:"Earth"
 planets: [
 {
 	name:"Sun"
@@ -9,12 +9,12 @@ planets: [
 		rotPeriod:2192831.6
 		radius:696000
 		GM:132712440018
-		diffuse:"tex/sun/diffuse.dds"
+		diffuse:"tex/sun"
 		meanColor:[1.0,1.0,0.9]
 		albedo:1.0
 	}
 	star:{
-		brightness:4.0
+		brightness:2.0
 	}
 }
 {
@@ -36,7 +36,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.142
 		GM:22032.9
-		diffuse:"tex/mercury/diffuse.dds"
+		diffuse:"tex/mercury/"
 	}
 }
 {
@@ -133,7 +133,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.12
 		GM:4902.768
-		diffuse:"tex/earth/moon/diffuse.dds"
+		diffuse:"tex/moon"
 	}
 }
 {
@@ -155,7 +155,7 @@ planets: [
 		meanColor:[1.0,0.9,0.9]
 		albedo:0.170
 		GM:42828.9
-		diffuse:"tex/mars/diffuse.dds"
+		diffuse:"tex/mars"
 	}
 	atmo:{
 		maxHeight:170
@@ -183,7 +183,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.423
 		GM:17.8
-		diffuse:"tex/vesta/diffuse.dds"
+		diffuse:"tex/vesta"
 	}
 }
 {
@@ -205,7 +205,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		Ceres:0.090
 		GM:63.2
-		diffuse:"tex/ceres/diffuse.dds"
+		diffuse:"tex/ceres"
 	}
 }
 {
@@ -255,7 +255,7 @@ planets: [
 		meanColor:[1.0,0.96,0.90]
 		albedo:0.63
 		GM:0
-		diffuse:"tex/jupiter/io/diffuse.dds"
+		diffuse:"tex/io"
 	}
 }
 {
@@ -277,7 +277,7 @@ planets: [
 		meanColor:[1.0,0.99,0.96]
 		albedo:0.67
 		GM:0
-		diffuse:"tex/jupiter/europa/diffuse.dds"
+		diffuse:"tex/europa"
 	}
 }
 {
@@ -299,7 +299,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.43
 		GM:0
-		diffuse:"tex/jupiter/ganymede"
+		diffuse:"tex/ganymede"
 	}
 }
 {
@@ -321,7 +321,7 @@ planets: [
 		meanColor:[1.0,0.97,0.96]
 		albedo:0.22
 		GM:0
-		diffuse:"tex/jupiter/callisto/diffuse.dds"
+		diffuse:"tex/callisto"
 	}
 }
 {
@@ -382,7 +382,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.962
 		GM:0
-		diffuse:"tex/saturn/mimas/diffuse.dds"
+		diffuse:"tex/mimas"
 	}
 }
 {
@@ -404,7 +404,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:1.04
 		GM:0
-		diffuse:"tex/saturn/enceladus/diffuse.dds"
+		diffuse:"tex/enceladus"
 	}
 }
 {
@@ -426,7 +426,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.80
 		GM:0
-		diffuse:"tex/saturn/tethys/diffuse.dds"
+		diffuse:"tex/tethys"
 	}
 }
 {
@@ -448,7 +448,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.6
 		GM:0
-		diffuse:"tex/saturn/dione/diffuse.dds"
+		diffuse:"tex/dione"
 	}
 }
 {
@@ -470,7 +470,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.6
 		GM:0
-		diffuse:"tex/saturn/rhea/diffuse.dds"
+		diffuse:"tex/rhea/"
 	}
 }
 {
@@ -492,7 +492,7 @@ planets: [
 		meanColor:[1.0,0.97,0.94]
 		albedo:0.2
 		GM:0
-		diffuse:"tex/saturn/titan"
+		diffuse:"tex/titan"
 	}
 	atmo:{
 		maxHeight:500
@@ -520,7 +520,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.6
 		GM:120.51
-		diffuse:"tex/saturn/iapetus/diffuse.dds"
+		diffuse:"tex/iapetus"
 	}
 }
 
@@ -571,7 +571,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.27
 		GM:0.0
-		diffuse:"tex/uranus/miranda/diffuse.dds"
+		diffuse:"tex/miranda/"
 	}
 }
 {
@@ -593,7 +593,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.34
 		GM:0.0
-		diffuse:"tex/uranus/ariel/diffuse.dds"
+		diffuse:"tex/ariel/"
 	}
 }
 {
@@ -615,7 +615,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.18
 		GM:0.0
-		diffuse:"tex/uranus/umbriel/diffuse.dds"
+		diffuse:"tex/umbriel"
 	}
 }
 {
@@ -637,7 +637,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.27
 		GM:0.0
-		diffuse:"tex/uranus/titania/diffuse.dds"
+		diffuse:"tex/titania"
 	}
 }
 {
@@ -659,7 +659,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.24
 		GM:0.0
-		diffuse:"tex/uranus/oberon/diffuse.dds"
+		diffuse:"tex/oberon"
 	}
 }
 
@@ -710,7 +710,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.06
 		GM:0.0
-		diffuse:"tex/neptune/proteus/diffuse.dds"
+		diffuse:"tex/proteus"
 	}
 }
 {
@@ -732,7 +732,7 @@ planets: [
 		meanColor:[1.0,1.0,0.99]
 		albedo:0.7
 		GM:0.0
-		diffuse:"tex/neptune/triton/"
+		diffuse:"tex/triton/"
 	}
 }
 {
@@ -754,7 +754,7 @@ planets: [
 		meanColor:[1.0,1.0,1.0]
 		albedo:0.2
 		GM:0.0
-		diffuse:"tex/neptune/nereid/diffuse.dds"
+		diffuse:"tex/nereid"
 	}
 }
 {
@@ -776,7 +776,7 @@ planets: [
 		meanColor:[1.0,0.99,0.95]
 		albedo:0.57
 		GM:871
-		diffuse:"tex/pluto/diffuse.dds"
+		diffuse:"tex/pluto"
 	}
 	atmo:{
 		maxHeight:10
@@ -804,7 +804,7 @@ planets: [
 		meanColor:[1.0,0.99,0.97]
 		albedo:0.2
 		GM:106
-		diffuse:"tex/pluto/charon/diffuse.dds"
+		diffuse:"tex/charon"
 	}
 }
 ]

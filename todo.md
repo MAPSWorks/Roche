@@ -1,7 +1,6 @@
 ## To Do
 
 ### Important stuff
-- [ ] Convert all textures to BC7 or BC4
 
 ### Minor stuff
 - [ ] Frustum culling
@@ -10,11 +9,11 @@
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
-- [ ] Investigate slowdown when zooming in
-- [ ] Some kind of HUD
+- [ ] Some kind of HUD (imgui)
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Convert all textures to BC7 or BC4
 - [x] Ring shadow on planet
 - [x] Specular support
 - [x] Don't use stream textures when incomplete
