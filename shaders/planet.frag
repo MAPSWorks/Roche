@@ -24,6 +24,10 @@ layout (location = 0) out vec4 outColor;
 layout (binding = 6) uniform sampler2D atmo;
 #endif
 
+#if defined(HAS_RING)
+layout (binding = 7) uniform sampler1D ringOcclusion;
+#endif
+
 void main()
 {
 	vec3 day = texture(diffuse, passUv.st).rgb;
@@ -77,6 +81,21 @@ void main()
 	color = color*
 		exp(-texture(atmo, vec2(angleView ,0)).g*(planetUBO.K.xyz+planetUBO.K.www))*
 		exp(-texture(atmo, vec2(angleLight,0)).g*(planetUBO.K.xyz+planetUBO.K.www))+scat;
+#endif
+
+#if defined(HAS_RING)
+	// Ray-plane test
+	vec3 rayOrigin = pp;
+	vec3 rayDir = lightDir;
+	vec3 ringNormal = planetUBO.ringNormal.xyz;
+
+	float t = -dot(rayOrigin, ringNormal)/dot(rayDir, ringNormal);
+	float dist = length(rayOrigin+t*rayDir);
+	float texOffset = (dist-planetUBO.ringInner)/(planetUBO.ringOuter-planetUBO.ringInner);
+
+	vec4 ring = texture(ringOcclusion, texOffset);
+	float mul = t>=0 && texOffset > 0 && texOffset < 1 ? ring.a : 1.0;
+	color *= mul;
 #endif
 
 	outColor = vec4(color+nightFinal, 1.0);

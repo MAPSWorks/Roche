@@ -1,5 +1,5 @@
 ambientColor:0.0002
-startingPlanet:"Earth"
+startingPlanet:"Saturn"
 planets: [
 {
 	name:"Sun"

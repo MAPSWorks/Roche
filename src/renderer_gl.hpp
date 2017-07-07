@@ -74,6 +74,9 @@ private:
 		glm::vec4 K;
 		glm::vec4 mask0ColorHardness;
 		glm::vec4 mask1ColorHardness;
+		glm::vec4 ringNormal;
+		float ringInner;
+		float ringOuter;
 		float starBrightness;
 		float cloudDisp;
 		float nightTexIntensity;
@@ -180,6 +183,7 @@ private:
 	// Pipelines
 	ShaderPipeline pipelinePlanetBare;
 	ShaderPipeline pipelinePlanetAtmo;
+	ShaderPipeline pipelinePlanetAtmoRing;
 	ShaderPipeline pipelineAtmo;
 	ShaderPipeline pipelineSun;
 	ShaderPipeline pipelineRingFar;

@@ -1,7 +1,6 @@
 ## To Do
 
 ### Important stuff
-- [ ] Ring shadow on planet
 - [ ] Convert all textures to BC7 or BC4
 
 ### Minor stuff
@@ -16,6 +15,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Ring shadow on planet
 - [x] Specular support
 - [x] Don't use stream textures when incomplete
 - [x] Wireframe option

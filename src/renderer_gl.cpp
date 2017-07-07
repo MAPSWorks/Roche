@@ -578,6 +578,7 @@ void RendererGL::createShaders()
 	const string isAtmo = "IS_ATMO";
 	const string isFarRing = "IS_FAR_RING";
 	const string isNearRing = "IS_NEAR_RING";
+	const string hasRing = "HAS_RING";
 
 	const string blurW = "BLUR_W";
 	const string blurH = "BLUR_H";
@@ -606,6 +607,11 @@ void RendererGL::createShaders()
 		tessellated,
 		planetFilenames,
 		{hasAtmo});
+
+	pipelinePlanetAtmoRing = factory.createPipeline(
+		tessellated,
+		planetFilenames,
+		{hasAtmo, hasRing});
 
 	pipelineAtmo = factory.createPipeline(
 		tessellated,
@@ -916,8 +922,13 @@ void RendererGL::renderHdr(
 		auto &data = planetData[i];
 		const bool star = planetParams[i].isStar();
 		const bool hasAtmo = planetParams[i].hasAtmo();
+		const bool hasRing = planetParams[i].hasRing();
 		if (star) pipelineSun.bind();
-		else if (hasAtmo) pipelinePlanetAtmo.bind();
+		else if (hasAtmo)
+		{
+			if (hasRing) pipelinePlanetAtmoRing.bind();
+			else pipelinePlanetAtmo.bind();
+		}
 		else pipelinePlanetBare.bind();
 
 		// Bind Scene UBO
@@ -936,7 +947,8 @@ void RendererGL::renderHdr(
 			planetTexSampler,
 			planetTexSampler,
 			planetTexSampler,
-			atmoSampler
+			atmoSampler,
+			ringSampler
 		};
 		// Bind textures
 		const vector<GLuint> texs = {
@@ -944,7 +956,8 @@ void RendererGL::renderHdr(
 			streamer.getTex(data.cloud).getCompleteId(cloudTexDefault),
 			streamer.getTex(data.night).getCompleteId(nightTexDefault),
 			streamer.getTex(data.specular).getCompleteId(specularTexDefault),
-			data.atmoLookupTable
+			data.atmoLookupTable,
+			data.ringTex2,
 		};
 
 		glBindSamplers(2, samplers.size(), samplers.data());
@@ -1356,6 +1369,8 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 
 		return make_pair(ringFarMat, ringNearMat);
 	}();
+
+	const mat3 viewNormalMat = transpose(inverse(mat3(viewMat)));
 	
 
 	// Light direction
@@ -1377,6 +1392,14 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		auto &spec = params.getSpecular();
 		ubo.mask0ColorHardness = vec4(spec.getMask0().color, spec.getMask0().hardness);
 		ubo.mask1ColorHardness = vec4(spec.getMask1().color, spec.getMask1().hardness);
+	}
+
+	if (params.hasRing())
+	{
+		auto &ring = params.getRing();
+		ubo.ringNormal = vec4(viewNormalMat*ring.getNormal(), 0.0);
+		ubo.ringInner = ring.getInnerDistance();
+		ubo.ringOuter = ring.getOuterDistance();
 	}
 
 	ubo.cloudDisp = state.getCloudDisp();
