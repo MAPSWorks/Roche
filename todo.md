@@ -3,6 +3,8 @@
 ### Important stuff
 
 ### Minor stuff
+- [ ] Investigate zoom in slowdown
+- [ ] Investigate z fighting
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
@@ -13,19 +15,13 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
-- [x] Convert all textures to BC7 or BC4
-- [x] Ring shadow on planet
-- [x] Specular support
-- [x] Don't use stream textures when incomplete
-- [x] Wireframe option
-- [x] Shader API with caching
-- [x] BC4 and BC5 loading through old fourCC codes
-- [x] Better DDS Streamer partitioning
-- [x] Set max tex size in DDS Streamer
 
 ## Feature summary
 - [x] Texture streaming w/ PBOs, split files and latest BC formats
 - [x] Better performance bloom, w/ reduction of fireflies, true bloom curve
 - [x] More parametrizable log depth, more precision
-- [x] Tessellation
+- [x] Tessellation when looking at close bodies
+- [x] Bodies can have specular reflection and masks, e.g. ocean reflections
+- [x] Higher resolution and better compression on most textures
+- [x] Rings cast shadows on the parent body
 - [x] Misc design improvements
