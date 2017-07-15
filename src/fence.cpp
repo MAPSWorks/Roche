@@ -2,6 +2,9 @@
 
 #include <stdexcept>
 
+// Max timeout before killing program
+const int criticalWaitTime = 5000000000;
+
 Fence::Fence(Fence&& fence) : sync{fence.sync}
 {
 	fence.sync = 0;
@@ -27,16 +30,20 @@ void Fence::wait()
 	glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
 }
 
-bool Fence::waitClient(uint64_t timeout)
+bool Fence::waitClient(int64_t timeout)
 {
 	if (!sync) return true;
 
-	const GLenum ret = glClientWaitSync(sync, 0, timeout);
+	const GLenum ret = glClientWaitSync(sync, 0, (timeout == -1)?criticalWaitTime:timeout);
 
 	if (ret == GL_CONDITION_SATISFIED ||
 		ret == GL_ALREADY_SIGNALED) return true;
 
-	if (ret == GL_TIMEOUT_EXPIRED) return false;
+	if (ret == GL_TIMEOUT_EXPIRED)
+	{
+		if (timeout == -1) throw std::runtime_error("Waited too long on fence");
+		return false;
+	}
 
 	if (ret == GL_WAIT_FAILED)
 	{

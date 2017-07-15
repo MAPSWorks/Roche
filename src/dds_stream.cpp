@@ -362,7 +362,7 @@ int DDSStreamer::acquirePages(int size)
 	int start = 0;
 	for (int i=0;i<_usedPages.size();++i)
 	{
-		if (_usedPages[i] || !_pageFences[i].waitClient(1000))
+		if (_usedPages[i] || !_pageFences[i].waitClient(0))
 		{
 			start = i+1;
 		}
