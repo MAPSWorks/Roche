@@ -5,6 +5,8 @@
 ### Minor stuff
 - [ ] Investigate zoom in slowdown
 - [ ] Investigate z fighting
+- [ ] Better loading predictions
+- [ ] Completeness for mipmap levels
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
