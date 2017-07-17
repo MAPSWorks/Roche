@@ -3,6 +3,7 @@
 ### Important stuff
 
 ### Minor stuff
+- [ ] Put glViewport() where necessary
 - [ ] Investigate zoom in slowdown
 - [ ] Investigate z fighting
 - [ ] Better loading predictions
