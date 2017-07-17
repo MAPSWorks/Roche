@@ -895,6 +895,9 @@ void RendererGL::renderHdr(
 	const vector<uint32_t> &closePlanets,
 	const DynamicData &ddata)
 {
+	// Wiewport
+	glViewport(0,0, windowWidth, windowHeight);
+
 	// Depth test/write
 	glDepthMask(GL_TRUE);
 	glDepthFunc(GL_LESS);
@@ -971,6 +974,8 @@ void RendererGL::renderTranslucent(
 	const vector<uint32_t> &translucentPlanets,
 	const DynamicData &data)
 {
+	// Wiewport
+	glViewport(0,0, windowWidth, windowHeight);
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
@@ -1037,6 +1042,9 @@ void RendererGL::renderTranslucent(
 
 void RendererGL::renderHighpass(const DynamicData &data)
 {
+	// Wiewport
+	glViewport(0,0, windowWidth, windowHeight);
+
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
 	glDepthMask(GL_FALSE);
@@ -1072,6 +1080,8 @@ void RendererGL::renderDownsample(const DynamicData &data)
 	pipelineDownsample.bind();
 	for (int i=0;i<bloomDepth;++i)
 	{
+		// Wiewport
+		glViewport(0,0, windowWidth>>(i+1), windowHeight>>(i+1));
 		glInvalidateNamedFramebufferData(highpassFBOs[i+1], invalidateAttach.size(), invalidateAttach.data());
 		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i+1]);
 		glBindTextureUnit(0, highpassViews[i]);
@@ -1095,6 +1105,8 @@ void RendererGL::renderBloom(const DynamicData &data)
 	glBindSamplers(0, samplers.size(), samplers.data());
 	for (int i=bloomDepth;i>=1;--i)
 	{
+		// Wiewport
+		glViewport(0,0, windowWidth>>i, windowHeight>>i);
 		// Blur horizontally
 		pipelineBlurW.bind();
 		glInvalidateNamedFramebufferData(highpassFBOs[i], invalidateAttach.size(), invalidateAttach.data());
@@ -1112,6 +1124,8 @@ void RendererGL::renderBloom(const DynamicData &data)
 		// Add blur with higher res
 		if (i>1)
 		{
+			// Wiewport
+			glViewport(0,0, windowWidth>>(i-1), windowHeight>>(i-1));
 			pipelineBloomAdd.bind();
 			glInvalidateNamedFramebufferData(bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
 			glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-2]);
@@ -1126,6 +1140,8 @@ void RendererGL::renderFlares(
 	const vector<uint32_t> &farPlanets, 
 	const DynamicData &data)
 {
+	// Wiewport
+	glViewport(0,0, windowWidth, windowHeight);
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
@@ -1164,6 +1180,8 @@ void RendererGL::renderFlares(
 
 void RendererGL::renderTonemap(const DynamicData &data)
 {
+	// Wiewport
+	glViewport(0,0, windowWidth, windowHeight);
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
 	glDepthMask(GL_FALSE);

@@ -3,7 +3,6 @@
 ### Important stuff
 
 ### Minor stuff
-- [ ] Put glViewport() where necessary
 - [ ] Investigate zoom in slowdown
 - [ ] Investigate z fighting
 - [ ] Better loading predictions
@@ -18,6 +17,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Put glViewport() where necessary
 
 ## Feature summary
 - [x] Texture streaming w/ PBOs, split files and latest BC formats
