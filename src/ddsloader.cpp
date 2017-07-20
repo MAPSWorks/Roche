@@ -302,7 +302,7 @@ DDSLoader::DDSLoader(const string &filename)
 {
 	_filename = filename;
 	ifstream in(_filename.c_str(), ios::in | ios::binary);
-	if (!in) return;
+	if (!in) throw runtime_error("File not found : " + filename);
 
 	// Magic number
 	in.seekg(0, ios::beg);
@@ -310,7 +310,7 @@ DDSLoader::DDSLoader(const string &filename)
 	in.read(buf, 4);
 	if (strncmp(buf, "DDS ", 4))
 	{
-		return;
+		throw runtime_error("Not a DDS file : " + filename);
 	}
 
 	// DDS header

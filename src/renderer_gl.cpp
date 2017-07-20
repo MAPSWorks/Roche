@@ -356,9 +356,6 @@ void RendererGL::init(
 
 	// Patch primitives
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
-
-	// Streamer init
-	streamer.init(512*512, 200, maxTexSize);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -383,6 +380,9 @@ void RendererGL::createTextures()
 	// Anisotropy
 	const float requestedAnisotropy = 16.f;
 	textureAnisotropy = getAnisotropy(requestedAnisotropy);
+
+	// Streamer init
+	streamer.init(textureAnisotropy, 512*512, 200, maxTexSize);
 
 	// Default textures 
 	diffuseTexDefault = create1PixTex({0,0,0,255});
@@ -946,19 +946,19 @@ void RendererGL::renderHdr(
 
 		// Bind samplers
 		const vector<GLuint> samplers = {
-			planetTexSampler,
-			planetTexSampler,
-			planetTexSampler,
-			planetTexSampler,
+			streamer.getTex(data.diffuse).getSamplerId(planetTexSampler),
+			streamer.getTex(data.cloud).getSamplerId(planetTexSampler),
+			streamer.getTex(data.night).getSamplerId(planetTexSampler),
+			streamer.getTex(data.specular).getSamplerId(planetTexSampler),
 			atmoSampler,
 			ringSampler
 		};
 		// Bind textures
 		const vector<GLuint> texs = {
-			streamer.getTex(data.diffuse).getCompleteId(diffuseTexDefault),
-			streamer.getTex(data.cloud).getCompleteId(cloudTexDefault),
-			streamer.getTex(data.night).getCompleteId(nightTexDefault),
-			streamer.getTex(data.specular).getCompleteId(specularTexDefault),
+			streamer.getTex(data.diffuse).getCompleteTextureId(diffuseTexDefault),
+			streamer.getTex(data.cloud).getCompleteTextureId(cloudTexDefault),
+			streamer.getTex(data.night).getCompleteTextureId(nightTexDefault),
+			streamer.getTex(data.specular).getCompleteTextureId(specularTexDefault),
 			data.atmoLookupTable,
 			data.ringTex2,
 		};

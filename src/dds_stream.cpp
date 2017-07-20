@@ -36,8 +36,9 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 	return 0;
 }
 
-void DDSStreamer::init(int pageSize, int numPages, int maxSize)
+void DDSStreamer::init(int anisotropy, int pageSize, int numPages, int maxSize)
 {
+	_anisotropy = anisotropy;
 	_maxSize = (maxSize>0)?maxSize:numeric_limits<int>::max();
 	_pageSize = pageSize;
 	_numPages = numPages;
@@ -71,7 +72,7 @@ void DDSStreamer::init(int pageSize, int numPages, int maxSize)
 			}
 
 			// Use this to simulate slow load times (debug purposes)
-			//this_thread::sleep_for(chrono::milliseconds(50));
+			//this_thread::sleep_for(chrono::milliseconds(200));
 
 			LoadData data = load(info);
 
@@ -159,30 +160,40 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 
 	const string tailFile = "/level0/" + info.prefix + "0" + info.separator + "0" + info.suffix;
 
-	// Gen texture
-	const Handle h = genHandle();
-	GLuint id;
-	glCreateTextures(GL_TEXTURE_2D, 1, &id);
-	_texs.insert(make_pair(h, StreamTexture(id)));
-
 	// Tail loader
 	DDSLoader tailLoader = DDSLoader(filename+tailFile);
 
-	// Storage
+	// Storage params
 	const int width = min(_maxSize,info.size<<(info.levels-1));
 	const int height = width/2;
 	const GLenum format = DDSFormatToGL(tailLoader.getFormat());
-	glTextureStorage2D(id, mipmapCount(width), format, width, height);
+	const int mipNumber = mipmapCount(width);
 
 	// Gen jobs
 	vector<LoadInfo> jobs;
+	vector<vector<bool>> completenessVector(mipNumber);
 
-	int completenessId = 0;
+	// Gen texture & sampler
+	const Handle h = genHandle();
+	GLuint texId;
+	glCreateTextures(GL_TEXTURE_2D, 1, &texId);
+	glTextureStorage2D(texId, mipNumber, format, width, height);
+
+	GLuint samplerId;
+	int minLod = mipNumber;
+	glCreateSamplers(1, &samplerId);
+	glSamplerParameterf(samplerId, GL_TEXTURE_MAX_ANISOTROPY_EXT, _anisotropy);
+	glSamplerParameteri(samplerId, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(samplerId, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(samplerId, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glSamplerParameterf(samplerId, GL_TEXTURE_MIN_LOD, (float)minLod);
+	_texs.insert(make_pair(h, StreamTexture(texId, samplerId, minLod)));
 
 	// Tail mipmaps (level0)
 	const int tailMipsFile = mipmapCount(info.size);
-	const int tailMips = mipmapCount(min(_maxSize,info.size));
-	const int skipMips = tailMipsFile - tailMips;
+	const int tailMips = mipmapCount(min(_maxSize, info.size));
+	const int skipMips = tailMipsFile-tailMips;
 	for (int i=tailMips-1;i>=0;--i)
 	{
 		LoadInfo tailInfo{};
@@ -193,8 +204,8 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		tailInfo.offsetY = 0;
 		tailInfo.level = info.levels-1+i;
 		tailInfo.imageSize = tailLoader.getImageSize(tailInfo.fileLevel);
-		tailInfo.completenessId = completenessId;
-		completenessId += 1;
+		tailInfo.completenessId = 0;
+		completenessVector[tailInfo.level] = {false};
 		jobs.push_back(tailInfo);
 	}
 
@@ -203,6 +214,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		const string levelFolder = filename + "/level" + to_string(i) + "/";
 		const int rows = 1<<(i-1);
 		const int columns = 2*rows;
+		const int level = info.levels-i-1;
 
 		for (int x=0;x<columns;++x)
 		{
@@ -225,16 +237,16 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 				loadInfo.fileLevel = fileLevel;
 				loadInfo.offsetX = x*info.size;
 				loadInfo.offsetY = y*info.size;
-				loadInfo.level = info.levels-i-1;
+				loadInfo.level = level;
 				loadInfo.imageSize = imageSize;
-				loadInfo.completenessId = completenessId;
-				completenessId += 1;
+				loadInfo.completenessId = x*rows+y;
 				jobs.push_back(loadInfo);
 			}
 		}
+		completenessVector[level] = vector<bool>(rows*columns, false);
 	}
 
-	_completeness.insert(make_pair(h, vector<bool>(completenessId, false)));
+	_completeness.insert(make_pair(h, completenessVector));
 
 	_loadInfoWaiting.insert(_loadInfoWaiting.end(), jobs.begin(), jobs.end());
 
@@ -326,7 +338,8 @@ void DDSStreamer::update()
 		auto it = _texs.find(d.handle);
 		if (it != _texs.end())
 		{
-			glCompressedTextureSubImage2D(it->second.getId(),
+			auto &tex = it->second;
+			glCompressedTextureSubImage2D(tex.getTextureId(),
 				d.level,
 				d.offsetX,
 				d.offsetY,
@@ -337,13 +350,18 @@ void DDSStreamer::update()
 				(void*)(intptr_t)d.ptrOffset);
 
 			// Set completeness of slice
-			auto &comp = _completeness[d.handle];
+			auto &texComp = _completeness[d.handle];
+			auto &comp = texComp[d.level];
 			comp[d.completenessId] = true;
+
+			if (d.level == texComp.size()-1) tex.setComplete();
 
 			// If all slices have been uploaded, set the texture as complete
 			if (all_of(comp.begin(), comp.end(), [](bool c){return c;}))
 			{
-				it->second.setComplete();
+				tex.setMinLod(d.level);
+				glSamplerParameterf(
+					tex.getSamplerId(), GL_TEXTURE_MIN_LOD, tex.getMinLod());
 			}
 		}
 		releasePages(d.ptrOffset, d.imageSize);
@@ -420,27 +438,34 @@ DDSStreamer::Handle DDSStreamer::genHandle()
 	return h;
 }
 
-StreamTexture::StreamTexture(GLuint id) :_id{id}
+StreamTexture::StreamTexture(GLuint id, GLuint samplerId, int minLod) :
+	_texId{id}, _samplerId{samplerId}, _minLod{minLod}
 {
 
 }
 
-StreamTexture::StreamTexture(StreamTexture &&tex) : _id{tex._id}
+StreamTexture::StreamTexture(StreamTexture &&tex) : 
+	_texId{tex._texId}, _samplerId{tex._samplerId}
 {
-	tex._id = 0;
+	tex._texId = 0;
+	tex._samplerId = 0;
 }
 
 StreamTexture &StreamTexture::operator=(StreamTexture &&tex)
 {
-	if (tex._id != _id) glDeleteTextures(1, &_id);
-	_id = tex._id;
-	tex._id = 0;
+	if (_texId && tex._texId != _texId) glDeleteTextures(1, &_texId);
+	if (_samplerId && tex._samplerId != _samplerId) glDeleteSamplers(1, &_samplerId);
+	_texId = tex._texId;
+	_samplerId = tex._samplerId;
+	tex._texId = 0;
+	tex._samplerId = 0;
 	return *this;
 }
 
 StreamTexture::~StreamTexture()
 {
-	if (_id) glDeleteTextures(1, &_id);
+	if (_texId) glDeleteTextures(1, &_texId);
+	if (_samplerId) glDeleteSamplers(1, &_samplerId);
 }
 
 void StreamTexture::setComplete()
@@ -448,9 +473,9 @@ void StreamTexture::setComplete()
 	_complete = true;
 }
 
-GLuint StreamTexture::getId(GLuint def) const
+GLuint StreamTexture::getTextureId(GLuint def) const
 {
-	if (_id) return _id;
+	if (_texId) return _texId;
 	return def;
 }
 
@@ -459,8 +484,24 @@ bool StreamTexture::isComplete() const
 	return _complete;
 }
 
-GLuint StreamTexture::getCompleteId(GLuint def) const
+GLuint StreamTexture::getCompleteTextureId(GLuint def) const
 {
-	if (isComplete()) return getId(def);
+	if (isComplete()) return getTextureId(def);
 	return def;
+}
+
+GLuint StreamTexture::getSamplerId(GLuint def) const
+{
+	if (_samplerId) return _samplerId;
+	return def;
+}
+
+int StreamTexture::getMinLod() const
+{
+	return _minLod;
+}
+
+void StreamTexture::setMinLod(int minLod)
+{
+	_minLod = min(_minLod, minLod);
 }

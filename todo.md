@@ -6,7 +6,6 @@
 - [ ] Investigate zoom in slowdown
 - [ ] Investigate z fighting
 - [ ] Better loading predictions (pass currently focused body to renderer)
-- [ ] Completeness for mipmap levels (add sampler in StreamTexture)
 - [ ] Frustum culling
 - [ ] Compute log average luminance for auto exposure
 - [ ] Correct luminance values
@@ -18,5 +17,6 @@
 
 ## Done
 - [x] Put glViewport() where necessary
+- [x] Completeness for mipmap levels
 
 ## Feature summary

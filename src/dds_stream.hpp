@@ -17,7 +17,7 @@ class StreamTexture
 {
 public:
 	StreamTexture() = default;
-	explicit StreamTexture(GLuint id);
+	explicit StreamTexture(GLuint id, GLuint samplerId, int minLod);
 	StreamTexture(const StreamTexture &) = delete;
 	StreamTexture &operator=(const StreamTexture &) = delete;
 	StreamTexture(StreamTexture &&tex);
@@ -25,13 +25,18 @@ public:
 	~StreamTexture();
 
 	void setComplete();
+	void setMinLod(int minLod);
 
-	GLuint getId(GLuint def=0) const;
+	GLuint getTextureId(GLuint def=0) const;
 	bool isComplete() const;
-	GLuint getCompleteId(GLuint def=0) const;
+	int getMinLod() const;
+	GLuint getCompleteTextureId(GLuint def=0) const;
+	GLuint getSamplerId(GLuint def=0) const;
 
 private:
-	GLuint _id = 0;
+	GLuint _texId = 0;
+	GLuint _samplerId = 0;
+	int _minLod = 1000;
 	bool _complete = false;
 };
 
@@ -41,7 +46,7 @@ public:
 	typedef uint32_t Handle;
 
 	DDSStreamer() = default;
-	void init(int pageSize, int numPages, int maxSize=0);
+	void init(int anisotropy, int pageSize, int numPages, int maxSize=0);
 	~DDSStreamer();
 
 	Handle createTex(const std::string &filename);
@@ -84,6 +89,8 @@ private:
 
 	Handle genHandle();
 
+	int _anisotropy = 1;
+
 	int _maxSize = 0;
 	int _pageSize = 0;
 	int _numPages = 0;
@@ -97,7 +104,7 @@ private:
 	std::vector<LoadData> _loadData; // Finished loading
 
 	std::map<Handle, StreamTexture> _texs;
-	std::map<Handle, std::vector<bool>> _completeness;
+	std::map<Handle, std::vector<std::vector<bool>>> _completeness;
 	std::vector<Handle> _texDeleted;
 	StreamTexture _nullTex{};
 
