@@ -3,7 +3,6 @@
 ### Important stuff
 
 ### Minor stuff
-- [ ] Investigate zoom in slowdown
 - [ ] Investigate ~~z fighting~~ atmo planet rendering code messing up at high distances
 - [ ] Frustum culling
 - [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
