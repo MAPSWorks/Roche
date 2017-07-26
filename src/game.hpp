@@ -44,6 +44,7 @@ private:
 	float ambientColor = 0.0;
 	int maxTexSize = -1;
 	bool wireframe = false;
+	bool bloom = true;
 	
 	// Main planet collection
 	uint32_t planetCount = 0;

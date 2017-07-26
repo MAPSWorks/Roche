@@ -28,6 +28,9 @@ void main()
 		sum += reinhard(color);
 	}
 	vec3 bloom = texture(bloom, texCoord).rgb;
-	vec3 finalColor = sum*SAMPLES_MUL+bloom;
+	vec3 finalColor = sum*SAMPLES_MUL;
+#if defined(USE_BLOOM)
+	finalColor += bloom;
+#endif
 	outColor = vec4(finalColor, 1.0);
 }

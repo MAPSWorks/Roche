@@ -29,6 +29,7 @@ public:
 		float exposure;
 		float ambientColor;
 		bool wireframe;
+		bool bloom;
 		std::vector<PlanetState> planetStates;
 		std::vector<size_t> focusedPlanetsId;
 	};

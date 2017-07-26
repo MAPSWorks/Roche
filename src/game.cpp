@@ -420,6 +420,12 @@ void Game::update(const double dt)
 		wireframe = !wireframe;
 	}
 
+	// Bloom on/off
+	if (isPressedOnce(GLFW_KEY_B))
+	{
+		bloom = !bloom;
+	}
+
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
@@ -540,7 +546,7 @@ void Game::update(const double dt)
 	// Scene rendering
 	renderer->render({
 		cameraPos, cameraFovy, cameraCenter, glm::vec3(0,0,1),
-		exposure, ambientColor, wireframe,
+		exposure, ambientColor, wireframe, bloom, 
 		planetStates, visiblePlanetsId});
 
 	auto a = renderer->getProfilerTimes();

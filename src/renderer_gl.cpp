@@ -578,6 +578,8 @@ void RendererGL::createShaders()
 	const string blurW = "BLUR_W";
 	const string blurH = "BLUR_H";
 
+	const string bloom = "USE_BLOOM";
+
 	const vector<GLenum> tessellated = {
 		GL_VERTEX_SHADER, 
 		GL_TESS_CONTROL_SHADER, 
@@ -660,7 +662,12 @@ void RendererGL::createShaders()
 		notTessellated,
 		{flareVert, flareFrag});
 
-	pipelineTonemap = factory.createPipeline(
+	pipelineTonemapBloom = factory.createPipeline(
+		notTessellated,
+		deferredFrag(tonemap),
+		{bloom});
+
+	pipelineTonemapNoBloom = factory.createPipeline(
 		notTessellated,
 		deferredFrag(tonemap));
 }
@@ -832,23 +839,26 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
-	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	profiler.begin("Highpass");
-	renderHighpass(currentData);
-	profiler.end();
-	profiler.begin("Downsample");
-	renderDownsample(currentData);
-	profiler.end();
-	profiler.begin("Bloom");
-	renderBloom(currentData);
-	profiler.end();
+	if (info.bloom)
+	{
+		if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		profiler.begin("Highpass");
+		renderHighpass(currentData);
+		profiler.end();
+		profiler.begin("Downsample");
+		renderDownsample(currentData);
+		profiler.end();
+		profiler.begin("Bloom");
+		renderBloom(currentData);
+		profiler.end();
+	}
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Flares");
 	renderFlares(farPlanets, currentData);
 	profiler.end();
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Tonemapping");
-	renderTonemap(currentData);
+	renderTonemap(currentData, info.bloom);
 	profiler.end();
 
 	if (takeScreen)
@@ -1167,7 +1177,7 @@ void RendererGL::renderFlares(
 	}
 }
 
-void RendererGL::renderTonemap(const DynamicData &data)
+void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 {
 	// Wiewport
 	glViewport(0,0, windowWidth, windowHeight);
@@ -1186,7 +1196,8 @@ void RendererGL::renderTonemap(const DynamicData &data)
 	// Bind default FBO
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	pipelineTonemap.bind();
+	if (bloom) pipelineTonemapBloom.bind();
+	else pipelineTonemapNoBloom.bind();
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),

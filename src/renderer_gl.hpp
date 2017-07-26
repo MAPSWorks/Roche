@@ -98,7 +98,7 @@ private:
 	void renderFlares(
 		const std::vector<uint32_t> &farPlanets, 
 		const DynamicData &data);
-	void renderTonemap(const DynamicData &data);
+	void renderTonemap(const DynamicData &data, bool bloom);
 
 	void loadTextures(const std::vector<uint32_t> &planets);
 	void unloadTextures(const std::vector<uint32_t> &planets);
@@ -180,7 +180,8 @@ private:
 	ShaderPipeline pipelineBlurH;
 	ShaderPipeline pipelineBloomAdd;
 	ShaderPipeline pipelineFlare;
-	ShaderPipeline pipelineTonemap;
+	ShaderPipeline pipelineTonemapBloom;
+	ShaderPipeline pipelineTonemapNoBloom;
 
 	// Multiple buffering
 	uint32_t frameId;

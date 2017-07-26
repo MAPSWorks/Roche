@@ -14,6 +14,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Toggleable bloom
 - [x] Fix atmosphere artifacts at high distances
 - [x] Better loading predictions
 - [x] Put glViewport() where necessary
