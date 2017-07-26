@@ -72,24 +72,20 @@ float mie(float c, float cc)
 	return 1.5*a/b;
 }
 
-float ray_sphere_far(vec3 ori, vec3 ray, float radius)
+vec2 ray_sphere(vec3 ori, vec3 ray, float radius)
 {
 	float b = dot(ori, ray);
 	float c = dot(ori,ori) - radius*radius;
-	return -b+sqrt(b*b-c);
-}
-
-float ray_sphere_near(vec3 ori, vec3 ray, float radius)
-{
-	float b = dot(ori, ray);
-	float c = dot(ori,ori) - radius*radius;
-	return -b-sqrt(b*b-c);
+	float d = b*b-c;
+	if (d < 0) return vec2(+1.0/0.0, -1.0/0.0);
+	float e = sqrt(d);
+	return vec2(-b-e, -b+e);
 }
 
 const int IN_SAMPLES_ATMO = 10;
 
 vec3 in_scattering_atmo(
-	vec3 viewer,
+	vec3 pos,
 	vec3 view_dir,
 	vec3 light_dir,
 	float radius,
@@ -97,20 +93,11 @@ vec3 in_scattering_atmo(
 	sampler2D atmo,
 	vec4 K)
 {
-	float far = length(view_dir);
-	view_dir = normalize(view_dir);
-
-	float b = dot(viewer, view_dir);
-	float c = dot(viewer,viewer) - pow(radius+atmos_height,2);
-	if (b*b-c <= 0) return vec3(0,0,0);
-	float near = -b-sqrt(b*b-c);
-	if (near < 0) return vec3(0,0,0);
-
-	float len = (far-near)/float(IN_SAMPLES_ATMO);
+	float far = ray_sphere(pos, view_dir, radius+atmos_height).y;
+	if (far < 0) return vec3(0);
+	float len = far/float(IN_SAMPLES_ATMO);
 	vec3 step = view_dir*len;
-
-	vec3 p = viewer+view_dir*near;
-	vec3 v = p+step*0.5;
+	vec3 v = pos+step*0.5;
 
 	vec3 sum = vec3(0.0);
 	for (int i=0;i<IN_SAMPLES_ATMO;++i)
@@ -118,7 +105,7 @@ vec3 in_scattering_atmo(
 		float alt = (length(v)-radius)/atmos_height;
 		vec3 norm_v = normalize(v);
 
-		float angle_view = dot(norm_v, -view_dir)*0.5+0.5;
+		float angle_view = dot(norm_v, view_dir)*0.5+0.5;
 		float angle_light = dot(norm_v, light_dir)*0.5+0.5;
 
 		vec2 s = texture(atmo, vec2(angle_view,alt)).rg;
@@ -137,7 +124,7 @@ vec3 in_scattering_atmo(
 const int IN_SAMPLES_PLANET = 50;
 
 vec3 in_scattering_planet(
-	vec3 viewer,
+	vec3 pos,
 	vec3 view_dir,
 	vec3 light_dir,
 	float radius,
@@ -145,16 +132,10 @@ vec3 in_scattering_planet(
 	sampler2D atmo,
 	vec4 K)
 {
-	float far = length(view_dir);
-	view_dir = normalize(view_dir);
-
-	float near = ray_sphere_near(viewer, view_dir, radius+atmos_height);
-
-	float len = (far-near)/float(IN_SAMPLES_PLANET);
+	float far = ray_sphere(pos, view_dir, radius+atmos_height).y;
+	float len = far/float(IN_SAMPLES_PLANET);
 	vec3 step = view_dir*len;
-
-	vec3 p = viewer+view_dir*near;
-	vec3 v = p+step*0.5;
+	vec3 v = pos+step*0.5;
 
 	vec3 sum = vec3(0.0);
 	for (int i=0;i<IN_SAMPLES_PLANET;++i)
@@ -162,7 +143,7 @@ vec3 in_scattering_planet(
 		float alt = (length(v)-radius)/atmos_height;
 		vec3 norm_v = normalize(v);
 
-		float angle_view = dot(norm_v, -view_dir)*0.5+0.5;
+		float angle_view = dot(norm_v, view_dir)*0.5+0.5;
 		float angle_light = dot(norm_v, light_dir)*0.5+0.5;
 
 		vec2 s = texture(atmo, vec2(angle_view,alt)).rg;

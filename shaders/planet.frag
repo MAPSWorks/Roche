@@ -1,8 +1,7 @@
 layout (location = 0) in vec4 passUv;
-layout (location = 1) in vec4 passNormal;
-layout (location = 2) in vec4 passPosition;
-layout (location = 3) in vec4 passLocalPosition;
-layout (location = 4) in vec4 passScattering;
+layout (location = 1) in vec3 passNormal;
+layout (location = 2) in vec3 passPosition;
+layout (location = 3) in vec4 passScattering;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -37,14 +36,14 @@ void main()
 	vec3 normal = normalize(passNormal.xyz);
 	vec3 lightDir = planetUBO.lightDir.xyz;
 	vec3 planetPos = planetUBO.planetPos.xyz;
-	vec3 pp = normalize(passLocalPosition.xyz)*planetUBO.radius;
-	vec3 viewDir = normalize(pp+planetPos);
+	vec3 pp = normalize(passPosition-planetPos)*planetUBO.radius;
+	vec3 viewDir = -normalize(pp+planetPos);
 
 	float lambert = clamp(max(dot(lightDir, normal), sceneUBO.ambientColor),0,1);
 
 	// Specular calculation
 	float spec = texture(specular, passUv.st).r;
-	vec3 H = normalize(lightDir - viewDir);
+	vec3 H = normalize(lightDir + viewDir);
 	float NdotH = clamp(dot(normal, H), 0, 1);
 
 	vec3 specColor = mix(planetUBO.mask0ColorHardness.rgb, planetUBO.mask1ColorHardness.rgb, spec);
@@ -69,7 +68,7 @@ void main()
 #endif
 
 #if defined(HAS_ATMO)
-	float c = dot(viewDir,-lightDir);
+	float c = dot(viewDir,lightDir);
 	float cc = c*c;
 
 	vec3 scat = passScattering.rgb * (planetUBO.K.xyz*rayleigh(cc) + planetUBO.K.www*mie(c,cc));
@@ -77,7 +76,7 @@ void main()
 	scat = clamp(scat, vec3(0),vec3(2));
 
 	float angleLight = dot(normal, lightDir)*0.5+0.5;
-	float angleView = dot(normal, -viewDir)*0.5+0.5;
+	float angleView = dot(normal, viewDir)*0.5+0.5;
 	color = color*
 		exp(-texture(atmo, vec2(angleView ,0)).g*(planetUBO.K.xyz+planetUBO.K.www))*
 		exp(-texture(atmo, vec2(angleLight,0)).g*(planetUBO.K.xyz+planetUBO.K.www))+scat;
