@@ -52,7 +52,7 @@ mat4 getMatrix(PlanetUBO ubo)
 
 float logDepth(float w, float farPlane, float C)
 {
-	return log2(max(1e-6, C*w)) * farPlane * w;
+	return log2(max(1e-6, C*w+1.0)) * farPlane * w;
 }
 
 float rayleigh(float cc)
