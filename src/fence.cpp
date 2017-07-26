@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 // Max timeout before killing program
-const int criticalWaitTime = 5000000000;
+const int64_t criticalWaitTime = 5000000000;
 
 Fence::Fence(Fence&& fence) : sync{fence.sync}
 {
