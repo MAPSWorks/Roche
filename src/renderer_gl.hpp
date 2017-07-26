@@ -24,21 +24,8 @@ class RendererGL : public Renderer
 public:
 	RendererGL() = default;
 	void windowHints() override;
-	void init(
-		const std::vector<Planet> &planetParams, 
-		int msaa,
-		int maxTexSize,
-		int windowWidth,
-		int windowHeight) override;
-	void render(
-		const glm::dvec3 &viewPos, 
-		float fovy,
-		const glm::dvec3 &viewCenter,
-		const glm::vec3 &viewUp,
-		float exposure,
-		float ambientColor,
-		bool wireframe,
-		const std::vector<PlanetState> &planetStates) override;
+	void init(const InitInfo &info) override;
+	void render(const RenderInfo &info) override;
 	void takeScreenshot(const std::string &filename) override;
 	void destroy() override;
 

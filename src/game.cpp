@@ -127,7 +127,7 @@ void Game::init()
 	}
 
 	// Renderer init
-	renderer->init(planetParams, msaaSamples, maxTexSize, width, height);
+	renderer->init({planetParams, msaaSamples, maxTexSize, width, height});
 }
 
 template<class T>
@@ -351,21 +351,21 @@ void Game::update(const double dt)
 	{
 		// Relative position update
 		relativePositions[i] = 
-			(planetParents[i] == -1 || !planetParams[i].hasOrbit())?
+			(getParent(i) == -1 || !planetParams[i].hasOrbit())?
 			glm::dvec3(0.0):
 			planetParams[i].getOrbit().computePosition(
-				epoch, planetParams[planetParents[i]].getBody().getGM());
+				epoch, planetParams[getParent(i)].getBody().getGM());
 	}
 
 	// Planet absolute position update
 	for (uint32_t i=0;i<planetCount;++i)
 	{
 		glm::dvec3 absPosition = relativePositions[i];
-		int parent = planetParents[i];
+		int parent = getParent(i);
 		while (parent != -1)
 		{
 			absPosition += relativePositions[parent];
-			parent = planetParents[parent];
+			parent = getParent(parent);
 		}
 
 		// Planet Angle
@@ -407,7 +407,7 @@ void Game::update(const double dt)
 	// Fovy adjustement
 	if (glfwGetKey(win, GLFW_KEY_Y))
 	{
-		cameraFovy = std::max(glm::radians(5.f), cameraFovy/1.1f);
+		cameraFovy = std::max(glm::radians(0.1f), cameraFovy/1.1f);
 	}
 	if (glfwGetKey(win, GLFW_KEY_U))
 	{
@@ -533,12 +533,15 @@ void Game::update(const double dt)
 		sin(cameraPolar.x)*cos(cameraPolar.y), 
 		sin(cameraPolar.y))*(double)cameraPolar.z +
 		cameraCenter;
+
+	// Focused planets
+	std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
 		
 	// Scene rendering
-	renderer->render(
+	renderer->render({
 		cameraPos, cameraFovy, cameraCenter, glm::vec3(0,0,1),
 		exposure, ambientColor, wireframe,
-		planetStates);
+		planetStates, visiblePlanetsId});
 
 	auto a = renderer->getProfilerTimes();
 
@@ -571,6 +574,84 @@ bool Game::isRunning()
 {
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
 }
+
+int Game::getParent(size_t planetId)
+{
+	return planetParents[planetId];
+}
+
+std::vector<size_t> Game::getAllParents(size_t planetId)
+{
+	std::vector<size_t> parents = {};
+	int temp = planetId;
+	int tempParent = -1;
+	while ((tempParent = getParent(temp)) != -1)
+	{
+		parents.push_back(tempParent);
+		temp = tempParent;
+	}
+	return parents;
+}
+
+int Game::getLevel(size_t planetId)
+{
+	int level = 0;
+	int temp = planetId;
+	int tempParent = -1;
+	while ((tempParent = getParent(temp)) != -1)
+	{
+		level += 1;
+		temp = tempParent;
+	}
+	return level;
+}
+
+std::vector<size_t> Game::getChildren(size_t planetId)
+{
+	std::vector<size_t> children;
+	for (int i=0;i<planetParents.size();++i)
+	{
+		if (getParent(i) == planetId) children.push_back(i);
+	}
+	return children;
+}
+
+std::vector<size_t> Game::getAllChildren(size_t planetId)
+{
+	auto c = getChildren(planetId);
+	std::vector<size_t> accum = {};
+	for (auto i : c)
+	{
+		auto cc = getAllChildren(i);
+		accum.insert(accum.end(), cc.begin(), cc.end());
+	}
+	c.insert(c.end(), accum.begin(), accum.end());
+	return c;
+}
+
+std::vector<size_t> Game::getFocusedPlanets(size_t focusedPlanetId)
+{
+	int level = getLevel(focusedPlanetId);
+
+	// Itself visible
+	std::vector<size_t> v = {focusedPlanetId};
+	// All children visible
+	auto children = getAllChildren(focusedPlanetId);
+	v.insert(v.end(), children.begin(), children.end());
+
+	// All parents visible
+	auto parents = getAllParents(focusedPlanetId);
+	v.insert(v.end(), parents.begin(), parents.end());
+
+	// If it is a moon, siblings are visible
+	if (level >= 2)
+	{
+		auto siblings = getAllChildren(getParent(focusedPlanetId));
+		v.insert(v.end(), siblings.begin(), siblings.end());
+	}
+	return v;
+}
+
 
 std::string generateScreenshotName()
 {

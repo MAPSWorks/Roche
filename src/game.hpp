@@ -25,6 +25,20 @@ private:
 	void loadPlanetFiles();
 	void loadSettingsFile();
 
+	// Returns the id of planet's parent (-1 if no parent)
+	int getParent(size_t planetId);
+	// Returns all parents (recursive) until there is no parent
+	std::vector<size_t> getAllParents(size_t planetId);
+	// Returns the level inside the hierarchy
+	int getLevel(size_t planetId);
+	// Returns direct children
+	std::vector<size_t> getChildren(size_t planetId);
+	// Returns all children recursively
+	std::vector<size_t> getAllChildren(size_t planetId);
+
+	// Returns planets in the vicinity of the given planet
+	std::vector<size_t> getFocusedPlanets(size_t focusedPlanetId);
+
 	std::unique_ptr<Renderer> renderer;
 	float exposure = 0.0;
 	float ambientColor = 0.0;

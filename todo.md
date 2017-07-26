@@ -4,11 +4,10 @@
 
 ### Minor stuff
 - [ ] Investigate zoom in slowdown
-- [ ] Investigate z fighting
-- [ ] Better loading predictions (pass currently focused body to renderer)
+- [ ] Investigate ~~z fighting~~ atmo planet rendering code messing up at high distances
 - [ ] Frustum culling
-- [ ] Compute log average luminance for auto exposure
-- [ ] Correct luminance values
+- [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
+- [ ] Better focus transitions
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
@@ -16,6 +15,7 @@
 - [ ] Vulkan implementation, one day
 
 ## Done
+- [x] Better loading predictions
 - [x] Put glViewport() where necessary
 - [x] Completeness for mipmap levels
 

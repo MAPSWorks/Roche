@@ -314,19 +314,14 @@ void RendererGL::createUBO()
 	uboBuffer.validate();
 }
 
-void RendererGL::init(
-	const vector<Planet> &planetParams,
-	const int msaa,
-	const int maxTexSize,
-	const int windowWidth,
-	const int windowHeight)
+void RendererGL::init(const InitInfo &info)
 {
-	this->planetParams = planetParams;
-	this->planetCount = planetParams.size();
-	this->msaaSamples = msaa;
-	this->maxTexSize = maxTexSize;
-	this->windowWidth = windowWidth;
-	this->windowHeight = windowHeight;
+	this->planetParams = info.planetParams;
+	this->planetCount = info.planetParams.size();
+	this->msaaSamples = info.msaa;
+	this->maxTexSize = info.maxTexSize;
+	this->windowWidth = info.windowWidth;
+	this->windowHeight = info.windowHeight;
 
 	this->bufferFrames = 3; // triple-buffering
 
@@ -694,19 +689,10 @@ void RendererGL::takeScreenshot(const string &filename)
 	screenFilename = filename;
 }
 
-void RendererGL::render(
-		const dvec3 &viewPos, 
-		const float fovy,
-		const dvec3 &viewCenter,
-		const vec3 &viewUp,
-		const float exposure,
-		const float ambientColor,
-		const bool wireframe,
-		const vector<PlanetState> &planetStates)
+void RendererGL::render(const RenderInfo &info)
 {
-
 	const float closePlanetMinSizePixels = 1;
-	this->closePlanetMaxDistance = windowHeight/(closePlanetMinSizePixels*tan(fovy/2));
+	this->closePlanetMaxDistance =windowHeight/(closePlanetMinSizePixels*tan(info.fovy/2));
 	this->farPlanetMinDistance = closePlanetMaxDistance*0.35;
 	this->farPlanetOptimalDistance = closePlanetMaxDistance*2.0;
 	this->texLoadDistance = closePlanetMaxDistance*1.4;
@@ -717,8 +703,8 @@ void RendererGL::render(
 	auto &currentData = dynamicData[frameId];
 
 	// Projection and view matrices
-	const mat4 projMat = perspective(fovy, windowWidth/(float)windowHeight, 0.f,1.f);
-	const mat4 viewMat = lookAt(vec3(0), (vec3)(viewCenter-viewPos), viewUp);
+	const mat4 projMat = perspective(info.fovy, windowWidth/(float)windowHeight, 0.f,1.f);
+	const mat4 viewMat = lookAt(vec3(0), (vec3)(info.viewCenter-info.viewPos), info.viewUp);
 
 	// Planet classification
 	vector<uint32_t> closePlanets;
@@ -728,20 +714,24 @@ void RendererGL::render(
 	vector<uint32_t> texLoadPlanets;
 	vector<uint32_t> texUnloadPlanets;
 
-	for (uint32_t i=0;i<planetStates.size();++i)
+	for (uint32_t i=0;i<info.planetStates.size();++i)
 	{
 		auto &data = planetData[i];
 		const auto &param = planetParams[i];
-		const auto &state = planetStates[i];
+		const auto &state = info.planetStates[i];
 		const float radius = param.getBody().getRadius();
 		const float maxRadius = radius+(param.hasRing()?
 			param.getRing().getOuterDistance():0);
 		const dvec3 pos = state.getPosition();
-		const double dist = distance(viewPos, pos)/radius;
+		const double dist = distance(info.viewPos, pos)/radius;
+		bool focused = count(
+			info.focusedPlanetsId.begin(), 
+			info.focusedPlanetsId.end(), i)>0;
+
 		if (dist < texLoadDistance && !data.texLoaded)
 		{
 			// Textures need to be loaded
-			texLoadPlanets.push_back(i);
+			if (focused) texLoadPlanets.push_back(i);
 		}
 		else if (dist > texUnloadDistance && data.texLoaded)
 		{
@@ -750,7 +740,7 @@ void RendererGL::render(
 		}
 
 		// Don't render planets behind the view
-		if ((viewMat*vec4(pos - viewPos,1.0)).z < maxRadius)
+		if ((viewMat*vec4(pos - info.viewPos,1.0)).z < maxRadius)
 		{
 			if (dist < closePlanetMaxDistance)
 			{
@@ -777,14 +767,14 @@ void RendererGL::render(
 	uploadLoadedTextures();
 	profiler.end();
 
-	const float exp = pow(2, exposure);
+	const float exp = pow(2, info.exposure);
 
 	// Scene uniform update
 	SceneDynamicUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
-	sceneUBO.ambientColor = ambientColor;
+	sceneUBO.ambientColor = info.ambientColor;
 	sceneUBO.exposure = exp;
 	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));
 	sceneUBO.logDepthC = logDepthC;
@@ -794,15 +784,15 @@ void RendererGL::render(
 	vector<PlanetDynamicUBO> planetUBOs(planetCount);
 	for (uint32_t i : closePlanets)
 	{
-		planetUBOs[i] = getPlanetUBO(viewPos, viewMat, 
-			planetStates[i], planetParams[i], planetData[i]);
+		planetUBOs[i] = getPlanetUBO(info.viewPos, viewMat, 
+			info.planetStates[i], planetParams[i], planetData[i]);
 	}
 	// Far away planets (flare)
 	vector<FlareDynamicUBO> flareUBOs(planetCount);
 	for (uint32_t i : farPlanets)
 	{
-		flareUBOs[i] = getFlareUBO(viewPos, projMat, viewMat, fovy, exp,
-			planetStates[i], planetParams[i]);
+		flareUBOs[i] = getFlareUBO(info.viewPos, projMat, viewMat, info.fovy, exp,
+			info.planetStates[i], planetParams[i]);
 	}
 
 	// Dynamic data upload
@@ -823,27 +813,27 @@ void RendererGL::render(
 	// Planet sorting from front to back
 	sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
 	{
-		const float distI = distance(planetStates[i].getPosition(), viewPos);
-		const float distJ = distance(planetStates[j].getPosition(), viewPos);
+		const float distI = distance(info.planetStates[i].getPosition(), info.viewPos);
+		const float distJ = distance(info.planetStates[j].getPosition(), info.viewPos);
 		return distI < distJ;
 	});
 
 	// Atmosphere sorting from back to front
 	sort(translucentPlanets.begin(), translucentPlanets.end(), [&](int i, int j)
 	{
-		const float distI = distance(planetStates[i].getPosition(), viewPos);
-		const float distJ = distance(planetStates[j].getPosition(), viewPos);
+		const float distI = distance(info.planetStates[i].getPosition(), info.viewPos);
+		const float distJ = distance(info.planetStates[j].getPosition(), info.viewPos);
 		return distI > distJ;
 	});
 
-	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
 	profiler.end();
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
-	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Highpass");
 	renderHighpass(currentData);
 	profiler.end();
@@ -853,11 +843,11 @@ void RendererGL::render(
 	profiler.begin("Bloom");
 	renderBloom(currentData);
 	profiler.end();
-	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Flares");
 	renderFlares(farPlanets, currentData);
 	profiler.end();
-	if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Tonemapping");
 	renderTonemap(currentData);
 	profiler.end();

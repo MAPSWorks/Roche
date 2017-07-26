@@ -10,21 +10,31 @@ class Renderer
 public:
 	virtual ~Renderer() {}
 	virtual void windowHints() {}
-	virtual void init(
-		const std::vector<Planet> &planetParams, 
-		int msaa,
-		int maxTexSize,
-		int windowWidth,
-		int windowHeight) {}
-	virtual void render(
-		const glm::dvec3 &viewPos, 
-		float fovy,
-		const glm::dvec3 &viewCenter,
-		const glm::vec3 &viewUp,
-		float exposure,
-		float ambientColor,
-		bool wireframe,
-		const std::vector<PlanetState> &planetStates) {}
+
+	struct InitInfo
+	{
+		std::vector<Planet> planetParams;
+		int msaa;
+		int maxTexSize;
+		unsigned windowWidth;
+		unsigned windowHeight;
+	};
+
+	struct RenderInfo
+	{
+		glm::dvec3 viewPos;
+		float fovy;
+		glm::dvec3 viewCenter;
+		glm::vec3 viewUp;
+		float exposure;
+		float ambientColor;
+		bool wireframe;
+		std::vector<PlanetState> planetStates;
+		std::vector<size_t> focusedPlanetsId;
+	};
+
+	virtual void init(const InitInfo &info) {}
+	virtual void render(const RenderInfo &info) {}
 	virtual void takeScreenshot(const std::string &filename) {}
 	virtual void destroy() {}
 	
