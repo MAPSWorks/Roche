@@ -773,7 +773,6 @@ void RendererGL::render(const RenderInfo &info)
 	SceneDynamicUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
-	sceneUBO.viewPos = vec4(0.0,0.0,0.0,1.0);
 	sceneUBO.ambientColor = info.ambientColor;
 	sceneUBO.exposure = exp;
 	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));

@@ -1,6 +1,7 @@
 layout (location = 0) in vec4 passUv;
 layout (location = 1) in vec4 passNormal;
 layout (location = 2) in vec4 passPosition;
+layout (location = 3) in vec4 passLocalPosition;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -18,10 +19,9 @@ layout (location = 0) out vec4 outColor;
 
 void main()
 {
-	vec3 norm_v = normalize(passPosition.xyz-planetUBO.planetPos.xyz);
-	vec3 pp = norm_v*(planetUBO.radius+planetUBO.atmoHeight);
-	vec3 viewer = sceneUBO.viewPos.xyz-planetUBO.planetPos.xyz;
-	vec3 view_dir = pp-viewer;
+	vec3 norm_v = normalize(passLocalPosition.xyz);
+	vec3 view_dir = norm_v*(planetUBO.radius+planetUBO.atmoHeight);
+	vec3 viewer = -planetUBO.planetPos.xyz;
 	float c = dot(normalize(view_dir),-planetUBO.lightDir.xyz);
 	float cc = c*c;
 

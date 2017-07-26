@@ -5,7 +5,7 @@ in int gl_InvocationID;
 layout(location = 0) in vec4 inPosition[];
 layout(location = 1) in vec4 inUv[];
 layout(location = 2) in vec4 inNormal[];
-layout(location = 3) in vec4 inTangent[];
+layout(location = 4) in vec4 inTangent[];
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {

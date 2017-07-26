@@ -2,7 +2,6 @@ struct SceneUBO
 {
 	mat4 projMat;
 	mat4 viewMat;
-	vec4 viewPos;
 	float ambientColor;
 	float exposure;
 	float logDepthFarPlane;

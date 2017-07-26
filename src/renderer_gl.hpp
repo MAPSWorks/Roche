@@ -43,7 +43,6 @@ private:
 	{
 		glm::mat4 projMat;
 		glm::mat4 viewMat;
-		glm::vec4 viewPos;
 		float ambientColor;
 		float exposure;
 		float logDepthFarPlane;

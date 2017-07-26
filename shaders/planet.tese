@@ -31,7 +31,8 @@ layout (binding = 6) uniform sampler2D atmo;
 layout (location = 0) out vec4 passUv;
 layout (location = 1) out vec4 passNormal;
 layout (location = 2) out vec4 passPosition;
-layout (location = 3) out vec4 passScattering;
+layout (location = 3) out vec4 passLocalPosition;
+layout (location = 4) out vec4 passScattering;
 
 vec4 lerp(vec4 v[gl_MaxPatchVertices])
 {
@@ -50,16 +51,16 @@ void main()
 #if !defined(IS_FAR_RING) && !defined(IS_NEAR_RING)
 	pos = vec4(normalize(pos.xyz),1);
 #endif
-	passPosition = sceneUBO.viewMat*mMat*pos;
+	passLocalPosition = mMat*pos;
+	passPosition = sceneUBO.viewMat*passLocalPosition;
 	gl_Position = sceneUBO.projMat*passPosition;
 	// Logarithmic depth buffer
 	gl_Position.z = logDepth(
 		gl_Position.w, sceneUBO.logDepthFarPlane, sceneUBO.logDepthC);
 
 #if defined(HAS_ATMO)
-	vec3 pp = passPosition.xyz-planetUBO.planetPos.xyz;
-	vec3 viewer = sceneUBO.viewPos.xyz-planetUBO.planetPos.xyz;
-	vec3 view_dir = pp-viewer;
+	vec3 viewer = -planetUBO.planetPos.xyz;
+	vec3 view_dir = passPosition.xyz;
 	vec3 scat = in_scattering_planet(viewer, view_dir,
 		planetUBO.lightDir.xyz, planetUBO.radius, planetUBO.atmoHeight,
 		atmo, planetUBO.K);

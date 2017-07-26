@@ -1,7 +1,8 @@
 layout (location = 0) in vec4 passUv;
 layout (location = 1) in vec4 passNormal;
 layout (location = 2) in vec4 passPosition;
-layout (location = 3) in vec4 passScattering;
+layout (location = 3) in vec4 passLocalPosition;
+layout (location = 4) in vec4 passScattering;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -36,9 +37,8 @@ void main()
 	vec3 normal = normalize(passNormal.xyz);
 	vec3 lightDir = planetUBO.lightDir.xyz;
 	vec3 planetPos = planetUBO.planetPos.xyz;
-	vec3 pp = normalize(passPosition.xyz-planetPos)*planetUBO.radius;
-	vec3 viewer = sceneUBO.viewPos.xyz-planetPos;
-	vec3 viewDir = normalize(pp-viewer);
+	vec3 pp = normalize(passLocalPosition.xyz)*planetUBO.radius;
+	vec3 viewDir = normalize(pp+planetPos);
 
 	float lambert = clamp(max(dot(lightDir, normal), sceneUBO.ambientColor),0,1);
 
