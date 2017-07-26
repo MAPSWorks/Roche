@@ -27,14 +27,14 @@ patch out float gl_TessLevelInner[2];
 
 float edgeTessLevel(vec3 pos0, vec3 pos1)
 {
-	float d = max(pos0.z, pos1.z);
-	float tess = distance(pos0.xy/d, pos1.xy/d)*80;
+	float d = 1.0/max(pos0.z, pos1.z);
+	float tess = distance(pos0.xy*d, pos1.xy*d)*120;
 	return clamp(tess, 1.0, 16.0);
 }
 
 void main()
 {
-	mat4 mMat = sceneUBO.viewMat*getMatrix(planetUBO);
+	mat4 mMat = sceneUBO.projMat*sceneUBO.viewMat*getMatrix(planetUBO);
 	vec3 p0 = vec3(mMat*inPosition[0]);
 	vec3 p1 = vec3(mMat*inPosition[1]);
 	vec3 p2 = vec3(mMat*inPosition[2]);
