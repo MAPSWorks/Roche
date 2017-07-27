@@ -3,6 +3,7 @@
 ### Important stuff
 
 ### Minor stuff
+- [ ] Full warning check and comments to add
 - [ ] Frustum culling
 - [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
 - [ ] Better focus transitions
