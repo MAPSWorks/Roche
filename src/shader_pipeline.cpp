@@ -35,6 +35,11 @@ void ShaderPipeline::bind()
 	glBindProgramPipeline(_id);
 }
 
+ShaderFactory::ShaderFactory()
+{
+	setVersion(450);
+}
+
 void ShaderFactory::setVersion(int version)
 {
 	_versionHeader = "#version " + std::to_string(version) + " core\n";
@@ -119,8 +124,7 @@ GLbitfield shaderTypeToStage(GLenum type)
 }
 
 ShaderPipeline ShaderFactory::createPipeline(
-	const vector<GLenum> &stages,
-	const vector<string> &filenames,
+	const vector<pair<GLenum, string>> &stageFilenames,
 	const vector<string> &defines)
 {
 	// Create Pipeline
@@ -136,11 +140,11 @@ ShaderPipeline ShaderFactory::createPipeline(
 	const std::string preSource = _versionHeader + definesStr + _sandbox;
 
 	// Load sources from filenames
-	for (size_t i=0;i<stages.size();++i)
+	for (auto stageFilename : stageFilenames)
 	{
-		const string filename = filenames[i];
+		const string filename = stageFilename.second;
 		const auto it = _sourceCache.find(filename);
-		string source;
+		string source = "";
 		if (it == _sourceCache.end())
 		{
 			// Loading
@@ -154,11 +158,11 @@ ShaderPipeline ShaderFactory::createPipeline(
 			source = it->second;
 		}
 
-		const GLenum type = stages[i];
+		const GLenum type = stageFilename.first;
 		const string finalSource = preSource + source;
-		GLuint shadId = createShader(type, finalSource);
+		const GLuint shadId = createShader(type, finalSource);
 
-		glUseProgramStages(pipelineId, shaderTypeToStage(stages[i]), shadId);
+		glUseProgramStages(pipelineId, shaderTypeToStage(type), shadId);
 	}
 	return ShaderPipeline(pipelineId);
 }

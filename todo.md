@@ -3,7 +3,6 @@
 ### Important stuff
 
 ### Minor stuff
-- [ ] Full warning check and comments to add
 - [ ] Frustum culling
 - [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
 - [ ] Better focus transitions
@@ -15,6 +14,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Full warning check and comments
 - [x] Toggleable bloom
 - [x] Fix atmosphere artifacts at high distances
 - [x] Better loading predictions

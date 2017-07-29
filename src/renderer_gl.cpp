@@ -545,27 +545,29 @@ void RendererGL::createShaders()
 	factory.setFolder("shaders/");
 	factory.setSandbox("sandbox.shad");
 
+	typedef pair<GLenum,string> shader;
+
 	// Vert shaders
-	const string planetVert = "planet.vert";
-	const string flareVert = "flare.vert";
-	const string deferred = "deferred.vert";
+	const shader planetVert = {GL_VERTEX_SHADER, "planet.vert"};
+	const shader flareVert = {GL_VERTEX_SHADER, "flare.vert"};
+	const shader deferred = {GL_VERTEX_SHADER, "deferred.vert"};
 
 	// Tesc shaders
-	const string planetTesc = "planet.tesc";
+	const shader planetTesc = {GL_TESS_CONTROL_SHADER, "planet.tesc"};
 
 	// Tese shaders
-	const string planetTese = "planet.tese";
+	const shader planetTese = {GL_TESS_EVALUATION_SHADER, "planet.tese"};
 	
 	// Frag shaders
-	const string planetFrag = "planet.frag";
-	const string atmo = "atmo.frag";
-	const string ringFrag = "ring.frag";
-	const string highpass = "highpass.frag";
-	const string downsample = "downsample.frag";
-	const string blur = "blur.frag";
-	const string bloomAdd = "bloom_add.frag";
-	const string flareFrag = "flare.frag";
-	const string tonemap = "tonemap.frag";
+	const shader planetFrag = {GL_FRAGMENT_SHADER, "planet.frag"};
+	const shader atmo = {GL_FRAGMENT_SHADER, "atmo.frag"};
+	const shader ringFrag = {GL_FRAGMENT_SHADER, "ring.frag"};
+	const shader highpass = {GL_FRAGMENT_SHADER, "highpass.frag"};
+	const shader downsample = {GL_FRAGMENT_SHADER, "downsample.frag"};
+	const shader blur = {GL_FRAGMENT_SHADER, "blur.frag"};
+	const shader bloomAdd = {GL_FRAGMENT_SHADER, "bloom_add.frag"};
+	const shader flareFrag = {GL_FRAGMENT_SHADER, "flare.frag"};
+	const shader tonemap = {GL_FRAGMENT_SHADER, "tonemap.frag"};
 
 	// Defines
 	const string isStar = "IS_STAR";
@@ -580,96 +582,67 @@ void RendererGL::createShaders()
 
 	const string bloom = "USE_BLOOM";
 
-	const vector<GLenum> tessellated = {
-		GL_VERTEX_SHADER, 
-		GL_TESS_CONTROL_SHADER, 
-		GL_TESS_EVALUATION_SHADER, 
-		GL_FRAGMENT_SHADER
-	};
-
-	const vector<GLenum> notTessellated = {
-		GL_VERTEX_SHADER,
-		GL_FRAGMENT_SHADER
-	};
-
-	const vector<string> planetFilenames = {
+	const vector<shader> planetFilenames = {
 		planetVert, planetTesc, planetTese, planetFrag
 	};
 
 	pipelinePlanetBare = factory.createPipeline(
-		tessellated,
 		planetFilenames);
 
 	pipelinePlanetAtmo = factory.createPipeline(
-		tessellated,
 		planetFilenames,
 		{hasAtmo});
 
 	pipelinePlanetAtmoRing = factory.createPipeline(
-		tessellated,
 		planetFilenames,
 		{hasAtmo, hasRing});
 
 	pipelineAtmo = factory.createPipeline(
-		tessellated,
 		{planetVert, planetTesc, planetTese, atmo},
 		{isAtmo});
 
 	pipelineSun = factory.createPipeline(
-		tessellated,
 		planetFilenames,
 		{isStar});
 
-	const vector<string> ringFilenames = {
+	const vector<shader> ringFilenames = {
 		planetVert, planetTesc, planetTese, ringFrag
 	};
 
 	pipelineRingFar = factory.createPipeline(
-		tessellated,
 		ringFilenames,
 		{isFarRing});
 
 	pipelineRingNear = factory.createPipeline(
-		tessellated,
 		ringFilenames,
 		{isNearRing});
 
-	auto deferredFrag = [&](string p) { return vector<string>{deferred, p}; };
-
 	pipelineHighpass = factory.createPipeline(
-		notTessellated,
-		deferredFrag(highpass));
+		{deferred, highpass});
 
 	pipelineDownsample = factory.createPipeline(
-		notTessellated,
-		deferredFrag(downsample));
+		{deferred, downsample});
 
 	pipelineBlurW = factory.createPipeline(
-		notTessellated,
-		deferredFrag(blur),
+		{deferred, blur},
 		{blurW});
 
 	pipelineBlurH = factory.createPipeline(
-		notTessellated,
-		deferredFrag(blur),
+		{deferred, blur},
 		{blurH});
 
 	pipelineBloomAdd = factory.createPipeline(
-		notTessellated,
-		deferredFrag(bloomAdd));
+		{deferred, bloomAdd});
 
 	pipelineFlare = factory.createPipeline(
-		notTessellated,
 		{flareVert, flareFrag});
 
 	pipelineTonemapBloom = factory.createPipeline(
-		notTessellated,
-		deferredFrag(tonemap),
+		{deferred, tonemap},
 		{bloom});
 
 	pipelineTonemapNoBloom = factory.createPipeline(
-		notTessellated,
-		deferredFrag(tonemap));
+		{deferred, tonemap});
 }
 
 void RendererGL::createScreenshot()
