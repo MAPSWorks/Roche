@@ -391,7 +391,7 @@ void Game::update(const double dt)
 	}
 	if (isPressedOnce(GLFW_KEY_L))
 	{
-		if (timeWarpIndex < (int)timeWarpValues.size()-1) timeWarpIndex++;
+		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
 	}
 
 	// Exposure adjustement
@@ -555,7 +555,7 @@ void Game::update(const double dt)
 	if (isPressedOnce(GLFW_KEY_F5) && !a.empty())
 	{
 		uint64_t full = a[0].second;
-		int largestName = 0;
+		size_t largestName = 0;
 		for (auto p : a)
 		{
 			if (p.first.size() > largestName) largestName = p.first.size();
@@ -615,9 +615,9 @@ int Game::getLevel(size_t planetId)
 std::vector<size_t> Game::getChildren(size_t planetId)
 {
 	std::vector<size_t> children;
-	for (int i=0;i<planetParents.size();++i)
+	for (size_t i=0;i<planetParents.size();++i)
 	{
-		if (getParent(i) == planetId) children.push_back(i);
+		if (getParent(i) == (int)planetId) children.push_back(i);
 	}
 	return children;
 }

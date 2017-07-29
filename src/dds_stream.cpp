@@ -31,9 +31,8 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 		case DDSLoader::Format::BC6_SIGNED:return GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT;
 		case DDSLoader::Format::BC7:       return GL_COMPRESSED_RGBA_BPTC_UNORM;
 		case DDSLoader::Format::BC7_SRGB:  return GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
-
+		default: return 0;
 	}
-	return 0;
 }
 
 void DDSStreamer::init(int anisotropy, int pageSize, int numPages, int maxSize)
@@ -354,7 +353,7 @@ void DDSStreamer::update()
 			auto &comp = texComp[d.level];
 			comp[d.completenessId] = true;
 
-			if (d.level == texComp.size()-1) tex.setComplete();
+			if (d.level == (int)(texComp.size()-1)) tex.setComplete();
 
 			// If all slices have been uploaded, set the texture as complete
 			if (all_of(comp.begin(), comp.end(), [](bool c){return c;}))
@@ -371,14 +370,14 @@ void DDSStreamer::update()
 
 int DDSStreamer::acquirePages(int size)
 {
-	const int pages = ((size-1)/_pageSize)+1;
+	const size_t pages = ((size-1)/_pageSize)+1;
 	if (pages > _numPages)
 	{
 		throw runtime_error("Not enough pages");
 	}
 
-	int start = 0;
-	for (int i=0;i<_usedPages.size();++i)
+	size_t start = 0;
+	for (size_t i=0;i<_usedPages.size();++i)
 	{
 		if (_usedPages[i] || !_pageFences[i].waitClient(0))
 		{
@@ -388,7 +387,7 @@ int DDSStreamer::acquirePages(int size)
 		{
 			if (i-start+1 == pages)
 			{
-				for (int j=start;j<start+pages;++j)
+				for (size_t j=start;j<start+pages;++j)
 				{
 					_usedPages[j] = true;
 				}

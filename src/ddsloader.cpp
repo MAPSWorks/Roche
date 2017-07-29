@@ -204,8 +204,9 @@ int getFormatBytesPerBlock(const DDSLoader::Format format)
 		case DDSLoader::Format::BC7 : 
 		case DDSLoader::Format::BC7_SRGB : 
 		return 16;
+		default:
+		return 0;
 	}
-	return 0;
 }
 
 int getSize(const int width, const int height,
@@ -294,8 +295,9 @@ DDSLoader::Format getDDSFormat(const DXGI_FORMAT format)
 			return DDSLoader::Format::BC7;
 		case   DXGI_FORMAT_BC7_UNORM_SRGB              :
 			return DDSLoader::Format::BC7_SRGB;
+		default:
+			return DDSLoader::Format::Undefined;
 	}
-	return DDSLoader::Format::Undefined;
 }
 
 DDSLoader::DDSLoader(const string &filename)

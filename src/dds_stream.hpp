@@ -93,7 +93,7 @@ private:
 
 	int _maxSize = 0;
 	int _pageSize = 0;
-	int _numPages = 0;
+	size_t _numPages = 0;
 	GLuint _pbo = 0;
 	void *_pboPtr = nullptr;
 	std::vector<bool> _usedPages;

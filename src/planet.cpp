@@ -138,19 +138,17 @@ std::vector<float> Planet::Atmo::generateLookupTable(
 	std::vector<float> table(size*size*2);
 
 	size_t index = 0;
-	for (int i=0;i<size;++i)
+	for (size_t i=0;i<size;++i)
 	{
 		const float altitude = (float)i/(float)size * _maxHeight;
 		const float density = glm::exp(-altitude/_scaleHeight);
-		for (int j=0;j<size;++j)
+		for (size_t j=0;j<size;++j)
 		{
 			const float angle = acos(2*(float)j/(float)(size-1)-1);
 			const glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
 			const glm::vec2 rayOri = glm::vec2(0, radius + altitude);
 			// Test against planet surface
 			const float b = glm::dot(rayOri, rayDir);
-			const float r1 = radius;
-			const float c1 = glm::dot(rayOri, rayOri)-r1*r1;
 			const float r2 = radius+_maxHeight;
 			const float c2 = glm::dot(rayOri,rayOri)-r2*r2;
 			const float t = -b+sqrt(b*b-c2);
@@ -288,11 +286,11 @@ Planet::Body::Body(
 	const float rotPeriod,
 	const glm::vec3 meanColor,
 	const std::string &diffuseFilename) :
-	_radius{radius},
-	_GM{GM},
 	_rotAxis{glm::normalize(rotAxis)},
 	_rotPeriod{rotPeriod},
 	_meanColor{meanColor},
+	_radius{radius},
+	_GM{GM},
 	_diffuseFilename{diffuseFilename}
 {
 

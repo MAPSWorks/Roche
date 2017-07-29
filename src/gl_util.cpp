@@ -263,8 +263,8 @@ DrawCommand::DrawCommand(GLuint vao, GLenum mode, GLenum type,
 	
 	_vao(vao),
 	_mode(mode),
-	_type(type),
 	_count(indices.getSize()/indexSize),
+	_type(type),
 	_indices((void*)(intptr_t)indices.getOffset()),
 	_baseVertex(vertices.getOffset()/vertexSize)
 {

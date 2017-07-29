@@ -49,6 +49,7 @@ bool Fence::waitClient(int64_t timeout)
 	{
 		throw std::runtime_error("Fence wait failed");
 	}
+	return false;
 }
 
 void Fence::lock()

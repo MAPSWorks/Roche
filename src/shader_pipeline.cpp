@@ -136,7 +136,7 @@ ShaderPipeline ShaderFactory::createPipeline(
 	const std::string preSource = _versionHeader + definesStr + _sandbox;
 
 	// Load sources from filenames
-	for (int i=0;i<stages.size();++i)
+	for (size_t i=0;i<stages.size();++i)
 	{
 		const string filename = filenames[i];
 		const auto it = _sourceCache.find(filename);

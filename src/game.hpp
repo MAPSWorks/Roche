@@ -56,7 +56,7 @@ private:
 	double epoch = 0.0; // Seconds since January 1st 1950 00:00
 	size_t timeWarpIndex = 0;
 	std::vector<double> timeWarpValues 
-		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};;
+		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};
 
 	// INTERACTION RELATED STUFF
 	double preMousePosX = 0.0;

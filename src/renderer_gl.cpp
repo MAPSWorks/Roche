@@ -195,7 +195,7 @@ vector<DrawCommand> getCommands(
 	vector<DrawCommand> commands(infos.size());
 	vector<pair<BufferRange, BufferRange>> ranges(infos.size());
 
-	for (int i=0;i<infos.size();++i)
+	for (size_t i=0;i<infos.size();++i)
 	{
 		ranges[i] = make_pair(
 			vertexBuffer.assignVertices(infos[i].vertices.size(), sizeof(Vertex)),
@@ -210,7 +210,7 @@ vector<DrawCommand> getCommands(
 	vertexBuffer.validate();
 	indexBuffer.validate();
 
-	for (int i=0;i<infos.size();++i)
+	for (size_t i=0;i<infos.size();++i)
 	{
 		vertexBuffer.write(ranges[i].first, infos[i].vertices.data());
 		indexBuffer.write(ranges[i].second, infos[i].indices.data());
@@ -492,7 +492,7 @@ void RendererGL::createRendertargets()
 	// Highpass views
 	highpassViews.resize(bloomDepth+1);
 	glGenTextures(highpassViews.size(), highpassViews.data());
-	for (int i=0;i<highpassViews.size();++i)
+	for (size_t i=0;i<highpassViews.size();++i)
 	{
 		glTextureView(highpassViews[i], GL_TEXTURE_2D, highpassRendertargets, 
 			hdrFormat, i, 1, 0, 1);
@@ -506,7 +506,7 @@ void RendererGL::createRendertargets()
 	// Bloom views
 	bloomViews.resize(bloomDepth);
 	glGenTextures(bloomViews.size(), bloomViews.data());
-	for (int i=0;i<bloomViews.size();++i)
+	for (size_t i=0;i<bloomViews.size();++i)
 	{
 		glTextureView(bloomViews[i], GL_TEXTURE_2D, bloomRendertargets,
 			hdrFormat, i, 1, 0, 1);
@@ -526,12 +526,12 @@ void RendererGL::createRendertargets()
 
 	highpassFBOs.resize(bloomDepth+1);
 	glCreateFramebuffers(highpassFBOs.size(), highpassFBOs.data());
-	for (int i=0;i<highpassFBOs.size();++i)
+	for (size_t i=0;i<highpassFBOs.size();++i)
 		glNamedFramebufferTexture(highpassFBOs[i], GL_COLOR_ATTACHMENT0, highpassViews[i], 0);
 
 	bloomFBOs.resize(bloomDepth);
 	glCreateFramebuffers(bloomFBOs.size(), bloomFBOs.data());
-	for (int i=0;i<bloomFBOs.size();++i)
+	for (size_t i=0;i<bloomFBOs.size();++i)
 		glNamedFramebufferTexture(bloomFBOs[i], GL_COLOR_ATTACHMENT0, bloomViews[i], 0);
 
 	// Enable SRGB output
@@ -1269,7 +1269,7 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
 			vector<float> t1(size*3);
 			vector<float> t2(size*4);
-			for (int i=0;i<size;++i)
+			for (size_t i=0;i<size;++i)
 			{
 				t1[i*3+0] = backscat[i];
 				t1[i*3+1] = forwardscat[i];

@@ -26,8 +26,14 @@ project (roche)
 add_executable(roche ${SOURCE} ${SOURCE_GL})
 
 if (CMAKE_BUILD_TYPE MATCHES Release)
+	# Coherent mapping
 	message("Coherent mapping enabled - Not supported by apitrace!")
 	set(COMPILE_DEFS ${COMPILE_DEFS} -DUSE_COHERENT_MAPPING)
+else()
+	# Activate warnings
+	if(CMAKE_COMPILER_IS_GNUCXX)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
+	endif()
 endif()
 
 target_compile_definitions(roche PRIVATE ${COMPILE_DEFS})
