@@ -2,7 +2,7 @@
 
 using namespace std;
 
-void GPUProfilerGL::begin(const string name)
+void GPUProfilerGL::begin(const string &name)
 {
 	int id = (bufferId+1)%2;
 	auto &val = queries[id][name].first;

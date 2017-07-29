@@ -50,7 +50,8 @@ void ShaderFactory::setFolder(const string &folder)
 	_folder = folder;
 }
 
-pair<bool, string> loadFile(const string &filename)
+/// Returns whether the loading was successful, and the file's contents
+static pair<bool, string> loadFile(const string &filename)
 {
 	ifstream in(filename.c_str(), ios::in | ios::binary);
 	if (!in) return make_pair(false, "");
@@ -62,7 +63,7 @@ pair<bool, string> loadFile(const string &filename)
 	return make_pair(true, source);
 }
 
-string loadSource(const string &folder, const string &filename)
+static string loadSource(const string &folder, const string &filename)
 {
 	const auto result{loadFile(folder + filename)};
 	if (!result.first) throw runtime_error(string("Can't load ") + filename);
@@ -74,7 +75,8 @@ void ShaderFactory::setSandbox(const string &filename)
 	_sandbox = loadSource(_folder, filename);
 }
 
-pair<bool, string> checkShaderProgram(const GLuint program)
+/// Returns whether the shader program compiled successfully and error log
+static pair<bool, string> checkShaderProgram(const GLuint program)
 {
 	GLint success = 0;
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
@@ -87,7 +89,8 @@ pair<bool, string> checkShaderProgram(const GLuint program)
 	return make_pair(success!=0, log);
 }
 
-GLuint createShader(const GLenum type, const string &source)
+/// Creates a shader and check errors
+static GLuint createShader(const GLenum type, const string &source)
 {
 	const char *cstr = source.c_str();
 
@@ -104,7 +107,7 @@ GLuint createShader(const GLenum type, const string &source)
 	return program;
 }
 
-string formatDefine(const string &define)
+static string formatDefine(const string &define)
 {
 	return "#define " + define + "\n";
 }

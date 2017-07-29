@@ -2,6 +2,7 @@ assets/
 build/
 screenshots/
 tex/
+doc/
 *.trace
 *.dll
 *.exe

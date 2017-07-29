@@ -48,16 +48,19 @@ public:
 	 * Creates Shader Pipeline from source files
 	 * @param stageFilenames pairs of stages and source filenames
 	 * @param defines constants to be defined in the source files
-	 * @return
+	 * @return new Shader Pipeline
 	 */
 	ShaderPipeline createPipeline(
 		const std::vector<std::pair<GLenum,std::string>> &stageFilenames,
 		const std::vector<std::string> &defines = {});
 
 private:
-	std::string _versionHeader = ""; /// GLSL version header
-	std::string _folder = ""; /// Base folder
-	std::string _sandbox = ""; /// Sandbox source
+	/// GLSL version header
+	std::string _versionHeader = "";
+	/// Base folder
+	std::string _folder = ""; 
+	/// Sandbox source
+	std::string _sandbox = "";
 	/// filename->source map for caching
 	std::map<std::string, std::string> _sourceCache; 
 };
