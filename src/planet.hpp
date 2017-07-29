@@ -161,7 +161,7 @@ public:
 	};
 
 	Planet() = default;
-	Planet(const std::string &name);
+	void setName(const std::string &name);
 	void setParentName(const std::string &name);
 	void setBody(const Body &body);
 	void setOrbit(const Orbit &orbit);

@@ -285,7 +285,9 @@ void DDSStreamer::update()
 		}
 		return false;
 	};
-	remove_if(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), isDeleted);
+	_loadInfoWaiting.erase(
+		remove_if(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), isDeleted),
+		_loadInfoWaiting.end());
 
 	// Assign offsets
 	std::vector<LoadInfo> assigned;
@@ -309,7 +311,9 @@ void DDSStreamer::update()
 	{
 		lock_guard<mutex> lk(_mtx);
 		// Invalidate deleted textures from queue
-		remove_if(_loadInfoQueue.begin(), _loadInfoQueue.end(), isDeleted);
+		_loadInfoQueue.erase(
+			remove_if(_loadInfoQueue.begin(), _loadInfoQueue.end(), isDeleted),
+			_loadInfoQueue.end());
 		// Submit created textures
 		_loadInfoQueue.insert(
 			_loadInfoQueue.end(),

@@ -8,21 +8,21 @@ using namespace glm;
 
 // Flare radial components
 // r is the radius in degrees
-float f0(const float r)
+static float f0(const float r)
 {
 	const float a = r/0.02f;
 	const float a2 = a*a;
 	return 2.61e6*glm::exp(-a2);
 }
 
-float f1(const float r)
+static float f1(const float r)
 {
 	const float a = r+0.02f;
 	const float a3 = a*a*a;
 	return 20.91f/a3;
 }
 
-float f2(const float r)
+static float f2(const float r)
 {
 	const float a = r+0.02f;
 	const float a2 = a*a;
@@ -30,20 +30,14 @@ float f2(const float r)
 }
 
 // L is the wavelength in nanometers
-float f3(const float r, const float L)
+static float f3(const float r, const float L)
 {
 	const float a = r-3.f*(L/568.f);
 	const float a2 = a*a;
 	return 436.9f*(568.f/L)*exp(-19.75f*a2);
 }
 
-// pupil diameter in mm, luminance in cd/m2
-float lumToPupilDiameter(const float L)
-{
-	return 4.9f-3.f*glm::tanh(0.4f*glm::log(L+1.f));
-}
-
-glm::vec3 wavelengthToRGB(const float L)
+static glm::vec3 wavelengthToRGB(const float L)
 {
 	if (L>=380 && L<440) return vec3(-(L-440)/(440-380),0.0,1.0);
 	if (L>=440 && L<490) return vec3(0.0,(L-440)/(490-440),1.0);
@@ -53,7 +47,6 @@ glm::vec3 wavelengthToRGB(const float L)
 	if (L>=645 && L<781) return vec3(1.0,0.0,0.0);
 	return vec3(0.0,0.0,0.0);
 }
-
 
 std::vector<uint16_t> generateFlareIntensityTex(const int dimensions)
 {

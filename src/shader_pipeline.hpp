@@ -10,7 +10,7 @@ class ShaderPipeline
 {
 public:
 	ShaderPipeline() = default;
-	ShaderPipeline(GLuint id);
+	explicit ShaderPipeline(GLuint id);
 	ShaderPipeline(const ShaderPipeline &) = delete;
 	ShaderPipeline(ShaderPipeline &&pipeline);
 	ShaderPipeline &operator=(const ShaderPipeline &) = delete;

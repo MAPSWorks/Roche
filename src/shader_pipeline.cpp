@@ -99,7 +99,7 @@ GLuint createShader(const GLenum type, const string &source)
 	return program;
 }
 
-string formatDefine(string define)
+string formatDefine(const string &define)
 {
 	return "#define " + define + "\n";
 }

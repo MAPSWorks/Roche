@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
+#include <limits>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -30,7 +31,7 @@ Planet::Orbit::Orbit(
 
 }
 
-double meanToEccentric(const double mean, const double ecc)
+static double meanToEccentric(const double mean, const double ecc)
 {
 	// Newton to find eccentric anomaly (En)
 	double En = (ecc<0.8)?mean:glm::pi<float>(); // Starting value of En
@@ -80,17 +81,17 @@ Planet::Atmo::Atmo(
 
 }
 
-float scatDensity(const float p, const float scaleHeight)
+static float scatDensity(const float p, const float scaleHeight)
 {
 	return glm::exp(-std::max(0.f, p)/scaleHeight);
 }
 
-float scatDensity(const glm::vec2 p, const float radius, const float scaleHeight)
+static float scatDensity(const glm::vec2 p, const float radius, const float scaleHeight)
 {
 	return scatDensity(glm::length(p) - radius, scaleHeight);
 }
 
-float scatOptic(const glm::vec2 a, const glm::vec2 b, 
+static float scatOptic(const glm::vec2 a, const glm::vec2 b, 
 	const float radius, const float scaleHeight, const float maxHeight, const int samples)
 {
 	const glm::vec2 step = (b-a)/(float)samples;
@@ -105,24 +106,19 @@ float scatOptic(const glm::vec2 a, const glm::vec2 b,
 	return sum * glm::length(step) / maxHeight;
 }
 
-float intersectsSphereNear(
-	const glm::vec3 ori, 
-	const glm::vec3 dir, 
+static glm::vec2 intersectsSphere(
+	const glm::vec2 ori, 
+	const glm::vec2 dir, 
 	const float radius)
 {
 	const float b = glm::dot(ori,dir);
 	const float c = glm::dot(ori,ori)-radius*radius;
-	return -b-sqrt(b*b-c);
-}
-
-float intersectsSphereFar(
-	const glm::vec3 ori, 
-	const glm::vec3 dir, 
-	const float radius)
-{
-	const float b = glm::dot(ori,dir);
-	const float c = glm::dot(ori,ori)-radius*radius;
-	return -b+sqrt(b*b-c);
+	const float d = b*b-c;
+	if (d < 0) return glm::vec2(
+		+std::numeric_limits<float>::infinity(), 
+		-std::numeric_limits<float>::infinity());
+	const float e = sqrt(d);
+	return glm::vec2(-b-e,-b+e);
 }
 
 std::vector<float> Planet::Atmo::generateLookupTable(
@@ -147,11 +143,7 @@ std::vector<float> Planet::Atmo::generateLookupTable(
 			const float angle = acos(2*(float)j/(float)(size-1)-1);
 			const glm::vec2 rayDir = glm::vec2(sin(angle), cos(angle));
 			const glm::vec2 rayOri = glm::vec2(0, radius + altitude);
-			// Test against planet surface
-			const float b = glm::dot(rayOri, rayDir);
-			const float r2 = radius+_maxHeight;
-			const float c2 = glm::dot(rayOri,rayOri)-r2*r2;
-			const float t = -b+sqrt(b*b-c2);
+			const float t = intersectsSphere(rayOri, rayDir, radius+_maxHeight).y;
 			const glm::vec2 u = rayOri + rayDir*t;
 			const float depth = scatOptic(rayOri, u, radius, _scaleHeight, _maxHeight, 50);
 			table[index+0] = density;
@@ -395,7 +387,7 @@ std::string Planet::Specular::getFilename() const
 	return _filename;
 }
 
-Planet::Planet(const std::string &name) : Planet()
+void Planet::setName(const std::string &name)
 {
 	_name = name;
 }

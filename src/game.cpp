@@ -205,7 +205,8 @@ void Game::loadPlanetFiles()
 			// Set focus on starting planet
 			if (name == startingPlanet) focusedPlanetId = i;
 			// Create planet
-			Planet planet(name);
+			Planet planet;
+			planet.setName(name);
 			planet.setParentName(get<std::string>(pl("parent")));
 
 			sweeper orbitsw(pl("orbit"));
