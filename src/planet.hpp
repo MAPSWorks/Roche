@@ -15,15 +15,35 @@ public:
 	{
 	public:
 		Orbit() = default;
+		/**
+		 * @param ecc Eccentricity
+		 * @param sma Semi-Major Axis (meters)
+		 * @param inc Inclination (radians)
+		 * @param lan Longitude of ascending node (radians)
+		 * @param arg Argument of periapsis (radians)
+		 * @param m0 Mean anomaly at epoch (radians)
+		 */
 		Orbit(double ecc, double sma, double inc, double lan, double arg, double m0);
+		/**
+		 * Computes cartesian coordinates of body around parent body
+		 * @param epoch epoch in seconds
+		 * @param parentGM gravitational parameter of parent body
+		 * @return cartesian coordinates around parent body
+		 */
 		glm::dvec3 computePosition(double epoch, double parentGM) const;
 	private:
 		// Kepler orbital parameters (Meters & radians)
+		/// Eccentricity
 		double _ecc = 0.0;
+		/// Semi-Major Axis (meters)
 		double _sma = 0.0;
+		/// Inclination (radians)
 		double _inc = 0.0;
+		/// Longitude of ascending node (radians)
 		double _lan = 0.0;
+		/// Argument of periapsis (radians)
 		double _arg = 0.0;
+		/// Mean anomaly at epoch (radians)
 		double _m0 = 0.0; 
 	};
 
@@ -31,7 +51,18 @@ public:
 	{
 	public:
 		Atmo() = default;
+		/**
+		 * @param K scattering constants
+		 * @param density density at sea level
+		 * @param maxHeight Atmospheric ceiling (0 pressure above)
+		 * @param scaleHeight Scale height of atmosphere
+		 */
 		Atmo(glm::vec4 K, float density, float maxHeight, float scaleHeight);
+		/**
+		 * Generate lookup texture for atmosphere rendering
+		 * @param size width and height of texture
+		 * @param radius radius of planet
+		 */
 		std::vector<float> generateLookupTable(size_t size, float radius) const;
 
 		glm::vec4 getScatteringConstant() const;
@@ -39,22 +70,38 @@ public:
 		float getMaxHeight() const;
 		float getScaleHeight() const;
 	private:
+		/// Scattering constants
 		glm::vec4 _K = glm::vec4(0.0);
+		/// Density at sea level
 		float _density = 0.0;
-		float _maxHeight = 0.0; /// Max atmospheric height
-		float _scaleHeight = 0.0; /// Scale height
+		/// Atmospheric ceiling
+		float _maxHeight = 0.0;
+		/// Atmospheric scale height
+		float _scaleHeight = 0.0;
 	};
 
 	class Ring
 	{
 	public:
 		Ring() = default;
+		/**
+		 * @param innerDistance distance of inner edge of rings from planet center
+		 * @param outerDistance distance of outer edge of rings from planet center
+		 * @param normal ring plane normal
+		 * @param backscatFilename backscattering brightness amount
+		 * @param forwardscatFilename forward scattering brightness amount
+		 * @param unlitFilename unlit side brightness amount
+		 * @param transparencyFilename transparency amount
+		 * @param colorFilename ring color texture
+		 */
 		Ring(float innerDistance, float outerDistance, glm::vec3 normal,
 			const std::string &backscatFilename,
 			const std::string &forwardscatFilename,
 			const std::string &unlitFilename,
 			const std::string &transparencyFilename,
 			const std::string &colorFilename);
+
+		/** Load txt files for rings */
 		std::vector<float> loadFile(const std::string &filename) const;
 
 		float getInnerDistance() const;
@@ -66,9 +113,12 @@ public:
 		std::string getTransparencyFilename() const;
 		std::string getColorFilename() const;
 	private:
-		float _innerDistance = 0.0; /// distance to planet of inner ring
-		float _outerDistance = 0.0; /// distance to planet of outer ring
-		glm::vec3 _normal = glm::vec3(0.0); /// Plane normal (normalized)
+		/// distance from planet center to inner edge
+		float _innerDistance = 0.0;
+		/// distance from planet center to outer edge
+		float _outerDistance = 0.0;
+		/// Plane normal
+		glm::vec3 _normal = glm::vec3(0.0); 
 
 		// Assets
 		std::string _backscatFilename;
@@ -97,13 +147,17 @@ public:
 		std::string getDiffuseFilename() const;
 
 	private:
+		/// Planet rotation axis
 		glm::vec3 _rotAxis = glm::vec3(0.0,0.0,1.0);
-		// Seconds per revolution
+		/// Seconds per revolution
 		float _rotPeriod = std::numeric_limits<float>::infinity();
-		glm::vec3 _meanColor = glm::vec3(0.0); // Color seen from far away
-		float _radius = 0.0; // km
-		double _GM = 0.0; // gravitational parameter
-		// Asset paths
+		/// Color seen from far away
+		glm::vec3 _meanColor = glm::vec3(0.0);
+		/// Radius in km
+		float _radius = 0.0;
+		/// Gravitational parameter
+		double _GM = 0.0;
+		/// Diffuse texture filename
 		std::string _diffuseFilename;
 	};
 
