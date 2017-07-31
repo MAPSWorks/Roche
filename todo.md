@@ -3,6 +3,7 @@
 ### Important stuff
 
 ### Minor stuff
+- [ ] Change VAO / DrawCommand behavior for easier creation
 - [ ] Frustum culling
 - [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
 - [ ] Better focus transitions
