@@ -7,7 +7,9 @@
 
 #include <glm/glm.hpp>
 
-// Immutable state
+/**
+ * Fixed state of a celestial body, unlikely to change
+ */
 class Planet
 {
 public:
@@ -132,6 +134,14 @@ public:
 	{
 	public:
 		Body() = default;
+		/**
+		 * @param radius radius of body (km)
+		 * @param GM gravitational parameter
+		 * @param rotAxis Axis of rotation
+		 * @param rotPeriod length of sidereal day (seconds)
+		 * @param meanColor flare color
+		 * @param diffuseFilename diffuse texture filename
+		 */
 		Body(
 			float radius,
 			double GM,
@@ -200,10 +210,17 @@ public:
 	public:
 		struct Mask
 		{
+			/// Specular highlight color
 			glm::vec3 color;
+			/// Specular highlight hardness (0-large; 255-small)
 			float hardness;
 		};
 		Specular() = default;
+		/**
+		 * @param filename Specular mask image filename
+		 * @param mask0 Specular properties on black areas of mask
+		 * @param mask1 Specular properties on white areas of mask
+		 */
 		explicit Specular(const std::string &filename, Mask mask0, Mask mask1);
 		Mask getMask0() const;
 		Mask getMask1() const;
@@ -215,34 +232,91 @@ public:
 	};
 
 	Planet() = default;
+	/**
+	 * Sets the name of the planet
+	 * @param Name unique name for the planet
+	 */
 	void setName(const std::string &name);
+	/**
+	 * Sets the name of the parent body
+	 * @param Name of parent body
+	 */
 	void setParentName(const std::string &name);
+	/**
+	 * Sets the body properties of the planet
+	 * @param body Body properties
+	 */
 	void setBody(const Body &body);
+	/**
+	 * Sets the orbit parameters of the planet
+	 * @param orbit Orbit parameters
+	 */
 	void setOrbit(const Orbit &orbit);
+	/**
+	 * Sets the atmosphere properties of the planet
+	 * @param atmo Atmosphere properties
+	 */
 	void setAtmo(const Atmo &atmo);
+	/**
+	 * Sets the ring properties of the planet
+	 * @param ring Ring properties
+	 */
 	void setRing(const Ring &ring);
+	/**
+	 * Sets the planet to render as a star
+	 * @param star Star properties
+	 */
 	void setStar(const Star &star);
+	/**
+	 * Sets the cloud properties of the planet
+	 * @param cloud Cloud properties
+	 */
 	void setClouds(const Clouds &clouds);
+	/**
+	 * Sets the night texture properties of the planet
+	 * @param night Night texture properties
+	 */
 	void setNight(const Night &night);
+	/**
+	 * Sets the specular highlight properties of the planet
+	 * @param specular Specular highlight properties
+	 */
 	void setSpecular(const Specular &specular);
 
+	/// Indicates whether the planet is fixed in place or orbits some other body
 	bool hasOrbit() const;
+	/// Indicates whether the planet has an atmosphere
 	bool hasAtmo() const;
+	/// Indicates whether the planet has a set of rings
 	bool hasRing() const;
+	/// Indicates whether the planet is rendered as a star or not
 	bool isStar() const;
+	/// Indicates whether the planet has a layer of clouds
 	bool hasClouds() const;
+	/// Indicates whether the planet has an emissive night texture
 	bool hasNight() const;
+	/// Indicates whether the planet has a reflective surface
 	bool hasSpecular() const;
 
+	/// Returns the name of the planet
 	std::string getName() const;
+	/// Returns the name of the parent planet
 	std::string getParentName() const;
+	/// Returns the body properties
 	const Body &getBody() const;
+	/// Returns the orbital parameters
 	const Orbit &getOrbit() const;
+	/// Returns the atmosphere properties
 	const Atmo &getAtmo() const;
+	/// Returns the ring properties
 	const Ring &getRing() const;
+	/// Returns the star properties
 	const Star &getStar() const;
+	/// Returns the cloud properties
 	const Clouds &getClouds() const;
+	/// Returns the night texture properties
 	const Night &getNight() const;
+	/// Returns the specular highlight properties
 	const Specular &getSpecular() const;
 
 private:
@@ -258,14 +332,24 @@ private:
 	std::pair<bool, Specular> _specular = std::make_pair(false, Specular());
 };
 
-// Mutable state
+/**
+ * Changing state of a celestial body, changing at every update
+ */
 class PlanetState
 {
 public:
 	PlanetState() = default;
+	/**
+	 * @param pos world space position of center of body
+	 * @param rotationAngle rotation angle around Body::getRotationAxis()
+	 * @param cloudDisp amount of displacement of the cloud layer
+	 */
 	PlanetState(const glm::dvec3 &pos, float rotationAngle, float cloudDisp);
+	/// Returns the world space position of center of body
 	glm::dvec3 getPosition() const;
+	/// Returns the rotation angle around Body::getRotationAxis()
 	float getRotationAngle() const;
+	/// Returns the amount of displacement of the cloud layer
 	float getCloudDisp() const;
 private:
 	glm::dvec3 _position = glm::dvec3(0.0);
