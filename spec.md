@@ -27,16 +27,16 @@ suffix:".DDS"
 row_column_order:false
 ```
 It describes how the tiles for this texture are stored in the file structure. Here are the rules:
-* The `levels` field tells how many `/levelX/` folders there are (`N` being a number from `0` to `levels-1`)
+* The `levels` field tells how many `/levelN/` folders there are (`N` being a number from `0` to `levels-1`)
 * Each `levelN/` folder contains a number of DDS files named in the following fashion: `prefix + X + separator + Y + suffix` if `row_column_order` is `false`, `X` and `Y` are swapped otherwise. `X` and `Y` are the offset of the tiles from the top-left corner. Every DDS file must have the same format.
 * The `level0/` folder contains one DDS file named in the above fashion with `X=0` and `Y=0`. The width of the DDS file must be exactly `size`, the height must be `size/2`, and all mipmaps down to 1x1 must be in the file.
 * In `levelN/` folders where `N>0`, the files are `size*size` tiles, and `X` ranges from `0` to `2^N-1` and `Y` ranges from `0` to `2^(N-1)-1`. Each file should contain only one mipmap.
 * Any missing file will result in an exception.
 
 Example: With the above `info.sn` :
-* The `level0/` folder contains a `2048x1024` DDS file with all mipmaps (12 layers)
+* The `level0/` folder contains a single `2048x1024` DDS file with all mipmaps (12 levels) named `0_0.DDS`
 * The `level1/` folder contains two `2048x2048` DDS files with one mipmap each, each named `0_0.DDS` and `1_0.DDS`.
-* The overall size of the texture is then `4096x2048`, if we assemble all tiles of the topmost level.
+* The overall size of the texture is then `4096x2048`, if we assemble all tiles of the most detailed level.
 
 ## Streaming
 The DDSStreamer class manages multi-threaded texture streaming:
