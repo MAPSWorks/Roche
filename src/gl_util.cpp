@@ -242,39 +242,25 @@ void *Buffer::getPtr() const
 DrawCommand::DrawCommand(
 	GLuint vao,
 	GLenum mode,
-	uint32_t count,
 	GLenum type,
-	uint32_t indexOffset, 
-	uint32_t baseVertex) :
-	
-	_vao(vao),
-	_mode(mode),
-	_count(count),
-	_type(type),
-	_indices((void*)(intptr_t)indexOffset),
-	_baseVertex(baseVertex)
+	const vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo)
 {
-
-}
-
-DrawCommand::DrawCommand(GLuint vao, GLenum mode, GLenum type,
-	size_t vertexSize, size_t indexSize,
-	BufferRange vertices, BufferRange indices) :
-	
-	_vao(vao),
-	_mode(mode),
-	_count(indices.getSize()/indexSize),
-	_type(type),
-	_indices((void*)(intptr_t)indices.getOffset()),
-	_baseVertex(vertices.getOffset()/vertexSize)
-{
-
+	_vao = vao;
+	_mode = mode;
+	_count = indexInfo.count;
+	_type = type;
+	_indices = (void*)(intptr_t)indexInfo.range.getOffset();
+	_elementBuffer = indexInfo.buffer;
+	_vertexInfo = vertexInfo;
 }
 
 void DrawCommand::draw() const
 {
 	glBindVertexArray(_vao);
-	glDrawElementsBaseVertex(_mode, _count, _type, _indices, _baseVertex);
+	for (const auto &info : _vertexInfo)
+		glBindVertexBuffer(info.binding, info.buffer, info.range.getOffset(), info.stride);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _elementBuffer);
+	glDrawElements(_mode, _count, _type, _indices);
 }
 
 BufferRange::BufferRange(uint32_t offset, uint32_t size) :

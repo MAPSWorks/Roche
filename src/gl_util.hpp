@@ -56,34 +56,33 @@ public:
 	 * @param indexOffset offset in bytes of first index in index buffer bound to vao
 	 * @param baseVertex offset in vertices of first vertex in vertex buffer bound to vao
 	 */
-	DrawCommand(
-		GLuint vao,
-		GLenum mode,
-		uint32_t count,
-		GLenum type,
-		uint32_t indexOffset, 
-		uint32_t baseVertex);
-	/** Constructor from Buffer objects
-	 * @param vao GL VAO
-	 * @param mode GL rendering mode (GL_POINTS, GL_LINES, GL_TRIANGLES, GL_PATCHES)
-	 * @param type type of indices (GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT)
-	 * @param vertexSize size of a vertex in bytes
-	 * @param indexSize size of an index in bytes
-	 * @param range of vertex data in the vertex buffer
-	 * @param range of index data in the index buffer
-	 */
+
+	struct VertexInfo
+	{
+		GLuint binding;
+		GLuint buffer;
+		BufferRange range;
+		int stride;
+	};
+
+	struct IndexInfo
+	{
+		GLuint buffer;
+		BufferRange range;
+		size_t count;
+	};
 	DrawCommand(GLuint vao, GLenum mode, GLenum type,
-		size_t vertexSize, size_t indexSize,
-		BufferRange vertices, BufferRange indices);
+		const std::vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo);
 	/** Draw model */
 	void draw() const;
 private:
-	GLuint _vao;
+	GLenum _vao;
 	GLenum _mode;
 	GLsizei _count;
 	GLenum _type;
 	GLvoid *_indices;
-	GLint _baseVertex;
+	GLuint _elementBuffer;
+	std::vector<VertexInfo> _vertexInfo;
 };
 
 /**
@@ -189,9 +188,9 @@ public:
 	 */
 	void read(BufferRange range, void *data);
 	// Getters
-	/// Returns the OpenGL buffer handle
+	/// Returns the OpenGL buffer name
 	const GLuint &getId() const;
-	/// Returns the mapped pointer (for off-thread copy)
+	/// Returns the mapped pointer (for manual writes/reads)
 	void* getPtr() const;
 private:
 	/// Gets alignment requirements from the GL
@@ -201,15 +200,15 @@ private:
 	/// Creates dynamic storage for the buffer
 	void storageDynamic();
 
-	// GL buffer ID
+	/// GL buffer ID
 	GLuint _id = 0; 
-	// Buffer size in bytes
+	/// Buffer size in bytes
 	uint32_t _size = 0;
-	// Whether the buffer is ready for writing/reading
+	/// Whether the buffer is ready for writing/reading
 	bool _validated = false;
-	// Offset+size of last assigned element
+	/// Offset+size of last assigned element
 	uint32_t _lastOffset = 0;
-	// Persistent map for dynamic buffers
+	/// Persistent map for dynamic buffers
 	void *_mapPtr = nullptr; 
 
 	/// Buffer usage

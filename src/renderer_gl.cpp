@@ -197,14 +197,15 @@ vector<DrawCommand> getCommands(
 
 	for (size_t i=0;i<infos.size();++i)
 	{
-		ranges[i] = make_pair(
-			vertexBuffer.assignVertices(infos[i].vertices.size(), sizeof(Vertex)),
-			indexBuffer.assignIndices(infos[i].indices.size(), sizeof(Index)));
+		BufferRange vertexRange = vertexBuffer.assignVertices(infos[i].vertices.size(), sizeof(Vertex));
+		BufferRange indexRange = indexBuffer.assignIndices(infos[i].indices.size(), sizeof(Index));
+		ranges[i] = make_pair(vertexRange, indexRange);
 		commands[i] = DrawCommand(
 			vao, infos[i].mode, indexType,
-			sizeof(Vertex), sizeof(Index),
-			ranges[i].first,
-			ranges[i].second);
+			{
+				{0, vertexBuffer.getId(), vertexRange, sizeof(Vertex)}
+			},
+			{indexBuffer.getId(), indexRange, infos[i].indices.size()});
 	}
 
 	vertexBuffer.validate();
@@ -228,8 +229,6 @@ void RendererGL::createModels()
 	indexBuffer = Buffer(
 		Buffer::Usage::STATIC, 
 		Buffer::Access::WRITE_ONLY);
-
-	createVertexArray();
 
 	const int modelCount = 3;
 	const int fsTriModelId  = 0;
@@ -328,6 +327,7 @@ void RendererGL::init(const InitInfo &info)
 	this->planetData.resize(planetCount);
 	this->fences.resize(bufferFrames);
 
+	createVertexArray();
 	createModels();
 	createUBO();
 	createShaders();
@@ -441,8 +441,6 @@ void RendererGL::createVertexArray()
 	// Vertex Array Object creation
 	const int VERTEX_BINDING = 0;
 	glCreateVertexArrays(1, &vertexArray);
-	glVertexArrayVertexBuffer(vertexArray, VERTEX_BINDING, vertexBuffer.getId(), 0, sizeof(Vertex));
-	glVertexArrayElementBuffer(vertexArray, indexBuffer.getId());
 
 	const int VERTEX_ATTRIB_POS     = 0;
 	const int VERTEX_ATTRIB_UV      = 1;
