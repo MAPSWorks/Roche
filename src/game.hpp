@@ -59,6 +59,11 @@ private:
 	/// Returns planets in the vicinity of the given planet
 	std::vector<size_t> getFocusedPlanets(size_t focusedPlanetId);
 
+	void displayProfiling(const std::vector<std::pair<std::string, uint64_t>> &a);
+	void updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &a);
+	std::vector<std::pair<std::string, uint64_t>> computeAverage(
+		const std::vector<std::pair<std::string, uint64_t>> &a, int frames);
+
 	/// Renderer
 	std::unique_ptr<Renderer> renderer;
 	/// Exposure coefficient
@@ -93,6 +98,13 @@ private:
 	/// Timewarp factors
 	std::vector<double> timeWarpValues 
 		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};
+
+	// PROFILING
+	/// Total times
+	std::vector<std::pair<std::string, uint64_t>> fullTimes;
+	/// Max times
+	std::vector<std::pair<std::string, uint64_t>> maxTimes;
+	int numFrames = 0;
 
 	// VIEW CONTROL
 	/// Mouse position of previous update cycle

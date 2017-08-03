@@ -3,6 +3,7 @@
 ### Important stuff
 
 ### Minor stuff
+- [ ] Better synchronize textures
 - [ ] Frustum culling
 - [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
 - [ ] Better focus transitions
@@ -14,6 +15,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Better profiler
 - [x] Change VAO / DrawCommand behavior for easier creation
 - [x] Full warning check and comments
 - [x] Toggleable bloom

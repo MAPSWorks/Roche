@@ -552,25 +552,18 @@ void Game::update(const double dt)
 
 	auto a = renderer->getProfilerTimes();
 
+	updateProfiling(a);
+
 	// Display profiler in console
 	if (isPressedOnce(GLFW_KEY_F5) && !a.empty())
 	{
-		uint64_t full = a[0].second;
-		size_t largestName = 0;
-		for (auto p : a)
-		{
-			if (p.first.size() > largestName) largestName = p.first.size();
-		}
-		for (auto p : a)
-		{
-			std::cout.width(largestName);
-			std::cout << std::left << p.first;
-			uint64_t nano = (double)p.second;
-			double percent = 100*nano/(double)full;
-			double micro = nano/1E6;
-			std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl; 
-		}
-		std::cout << "-------------------------" << std::endl;
+		std::cout << "Current Frame: " << std::endl;
+		displayProfiling(a);
+		auto b = computeAverage(fullTimes, numFrames);
+		std::cout << "Average: " << std::endl;
+		displayProfiling(b);
+		std::cout << "Max: " << std::endl;
+		displayProfiling(maxTimes);
 	}
 
 	glfwSwapBuffers(win);
@@ -659,7 +652,6 @@ std::vector<size_t> Game::getFocusedPlanets(size_t focusedPlanetId)
 	return v;
 }
 
-
 std::string generateScreenshotName()
 {
 	time_t t = time(0);
@@ -674,4 +666,60 @@ std::string generateScreenshotName()
 		(now->tm_min) << "-" << 
 		(now->tm_sec) << ".png";
 	return filenameBuilder.str();
+}
+
+void Game::displayProfiling(const std::vector<std::pair<std::string, uint64_t>> &a)
+{
+	uint64_t full = a[0].second;
+	size_t largestName = 0;
+	for (auto p : a)
+	{
+		if (p.first.size() > largestName) largestName = p.first.size();
+	}
+	for (auto p : a)
+	{
+		std::cout.width(largestName);
+		std::cout << std::left << p.first;
+		uint64_t nano = (double)p.second;
+		double percent = 100*nano/(double)full;
+		double micro = nano/1E6;
+		std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl; 
+	}
+	std::cout << "-------------------------" << std::endl;
+}
+
+void Game::updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &a)
+{
+	for (auto p : a)
+	{
+		// Full time update
+		{
+			auto it = std::find_if(fullTimes.begin(), fullTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+				return pa.first == p.first;
+			});
+			if (it == fullTimes.end()) fullTimes.push_back(p);
+			else it->second += p.second;
+		}
+
+		// Max time update
+		{
+			auto it = std::find_if(maxTimes.begin(), maxTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+				return pa.first == p.first;
+			});
+			if (it == maxTimes.end()) maxTimes.push_back(p);
+			else it->second = std::max(it->second, p.second);
+		}
+	}
+	numFrames += 1;
+}
+
+std::vector<std::pair<std::string, uint64_t>> Game::computeAverage(
+	const std::vector<std::pair<std::string, uint64_t>> &a, int frames)
+{
+	std::vector<std::pair<std::string, uint64_t>> result = a;
+	for (auto &p : result)
+	{
+		p.second /= (float)frames;
+	}
+	return result;
 }
