@@ -3,9 +3,8 @@
 ### Important stuff
 
 ### Minor stuff
-- [ ] Better synchronize textures
+- [ ] Remove per-mipmap completeness check, wait for fences to unlock before tagging as complete
 - [ ] Frustum culling
-- [ ] Add option to reduce texture upload stutter (at the cost of pop-ins)
 - [ ] Better focus transitions
 
 ### Stuff for later
