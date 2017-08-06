@@ -1,6 +1,7 @@
 ## To Do
 
 ### Important stuff
+- [ ] Prettier flares
 
 ### Minor stuff
 - [ ] Remove per-mipmap completeness check, wait for fences to unlock before tagging as complete
