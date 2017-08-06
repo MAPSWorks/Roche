@@ -132,7 +132,7 @@ private:
 		/// Size in bytes of data to update
 		int imageSize;
 		/// Unique id for this tile of this level
-		int completenessId;
+		int tileId;
 		/// Pointer of assigned buffer range (-1 when not yet assigned)
 		int ptrOffset = -1;
 	};
@@ -158,8 +158,13 @@ private:
 		/// Point of assigned buffer range
 		int ptrOffset;
 		/// Unique id for this tile of this level
-		int completenessId;
+		int tileId;
 	};
+
+	/** Returns an approximation of the time cost of a texture update 
+	 * @param info loading info
+	 * @return arbitrary cost for the texture update operation */
+	int getCost(const LoadData &data);
 
 	/**
 	 * Acquires one or several free pages
@@ -180,6 +185,10 @@ private:
 	 */
 	LoadData load(const LoadInfo &info);
 
+	/**
+	 * Updates texture data
+	 * @param data data that has been loaded
+	 */
 	void updateTile(const LoadData &data);
 
 	/**
@@ -220,6 +229,7 @@ private:
 	/** Completeness of each mip level of each texture (when a mip is complete, 
 	 * the sampler's min LOD is lowered) **/
 	std::map<Handle, std::vector<bool>> _completeness;
+
 	/// Textures to be deleted in next update() call
 	std::vector<Handle> _texDeleted;
 	/// Dummy texture to indicate inexistent texture

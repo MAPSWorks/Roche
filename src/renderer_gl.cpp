@@ -739,9 +739,11 @@ void RendererGL::render(const RenderInfo &info)
 	}
 
 	// Manage stream textures
-	profiler.begin("Texture management");
+	profiler.begin("Texture creation/deletion");
 	loadTextures(texLoadPlanets);
 	unloadTextures(texUnloadPlanets);
+	profiler.end();
+	profiler.begin("Texture updating");
 	uploadLoadedTextures();
 	profiler.end();
 

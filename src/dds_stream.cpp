@@ -184,7 +184,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 	_texs.insert(make_pair(h, StreamTexture(texId)));
 
 	// Unique for each tile
-	int completenessId = 0;
+	int tileId = 0;
 
 	// Tail mipmaps (level0)
 	const int tailMipsFile = mipmapCount(info.size);
@@ -200,9 +200,9 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		tailInfo.offsetY = 0;
 		tailInfo.level = info.levels-1+i;
 		tailInfo.imageSize = tailLoader.getImageSize(tailInfo.fileLevel);
-		tailInfo.completenessId = completenessId;
+		tailInfo.tileId = tileId;
 		jobs.push_back(tailInfo);
-		completenessId += 1;
+		tileId += 1;
 	}
 
 	for (int i=1;i<info.levels;++i)
@@ -235,14 +235,14 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 				loadInfo.offsetY = y*info.size;
 				loadInfo.level = level;
 				loadInfo.imageSize = imageSize;
-				loadInfo.completenessId = completenessId;
+				loadInfo.tileId = tileId;
 				jobs.push_back(loadInfo);
-				completenessId += 1;
+				tileId += 1;
 			}
 		}
 	}
 
-	_completeness.insert(make_pair(h, vector<bool>(completenessId, false)));
+	_completeness.insert(make_pair(h, vector<bool>(tileId, false)));
 
 	if (_asynchronous)
 	{
@@ -260,6 +260,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 			updateTile(d);
 		}
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		_texs[h].setComplete();
 	}
 
 	return h;
@@ -338,12 +339,29 @@ void DDSStreamer::update()
 	_loadInfoWaiting = nonAssigned;
 	_texDeleted.clear();
 
-	// Get loaded slices
+	// Get loaded tiles
+	const int maxCost = 20000000;
 	vector<LoadData> data;
 	{
 		lock_guard<mutex> lk(_dataMtx);
-		data = _loadData;
-		_loadData.clear();
+		if (!_loadData.empty())
+		{
+			// Always accept first element
+			auto first = _loadData.begin();
+			data.push_back(*first);
+			int currentCost = getCost(*first);
+			_loadData.erase(first);
+			// Choose next elements with cost
+			_loadData.erase(std::remove_if(_loadData.begin(), _loadData.end(), [&](LoadData &d){
+				currentCost += getCost(d);
+				if (currentCost < maxCost)
+				{
+					data.push_back(d);
+					return true;
+				}
+				return false;
+			}), _loadData.end());
+		}
 	}
 	// Update
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo);
@@ -352,6 +370,12 @@ void DDSStreamer::update()
 		updateTile(d);
 	}
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+}
+
+int DDSStreamer::getCost(const LoadData &data)
+{
+	const int overheadCost = 2000;
+	return overheadCost + data.imageSize;
 }
 
 void DDSStreamer::updateTile(const LoadData &d)
@@ -375,7 +399,7 @@ void DDSStreamer::updateTile(const LoadData &d)
 
 		// Set completeness of slice
 		auto &texComp = _completeness[d.handle];
-		texComp[d.completenessId] = true;
+		texComp[d.tileId] = true;
 
 		// If all slices have been uploaded, set the texture as complete
 		if (all_of(texComp.begin(), texComp.end(), [](bool c){return c;}))
@@ -440,7 +464,7 @@ DDSStreamer::LoadData DDSStreamer::load(const LoadInfo &info)
 	s.format  = DDSFormatToGL(info.loader.getFormat());
 	s.imageSize = info.imageSize;
 	s.ptrOffset = ptrOffset;
-	s.completenessId = info.completenessId;
+	s.tileId = info.tileId;
 
 	info.loader.writeImageData(level, (char*)_pboPtr+ptrOffset);
 
