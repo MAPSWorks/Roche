@@ -4,7 +4,6 @@
 - [ ] Prettier flares
 
 ### Minor stuff
-- [ ] Wait for fences to unlock before tagging as complete
 - [ ] Frustum culling
 - [ ] Better focus transitions
 
@@ -15,6 +14,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Wait for fences to unlock before tagging as complete
 - [x] Add cost calculator to prevent too much texture updates at once
 - [x] Add option to choose between synchronous texture loading (no pop-ins but stutters) or asynchronous (smoother framerate but pop-ins)
 - [x] Better profiler

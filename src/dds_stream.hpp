@@ -133,8 +133,8 @@ private:
 		int imageSize;
 		/// Unique id for this tile of this level
 		int tileId;
-		/// Pointer of assigned buffer range (-1 when not yet assigned)
-		int ptrOffset = -1;
+		/// Index of assigned page
+		int pageOffset = -1;
 	};
 
 	struct LoadData
@@ -155,8 +155,8 @@ private:
 		GLenum format;
 		/// Size in bytes of incoming pixel data
 		int imageSize;
-		/// Point of assigned buffer range
-		int ptrOffset;
+		/// Index of assigned page
+		int pageOffset;
 		/// Unique id for this tile of this level
 		int tileId;
 	};
@@ -166,18 +166,24 @@ private:
 	 * @return arbitrary cost for the texture update operation */
 	int getCost(const LoadData &data);
 
+	int getPageSpan(int size);
+
+	std::vector<bool> areFencesSignaled();
+
+	void setTexturesAsComplete(const std::vector<bool> &fencesSignaled);
+
 	/**
 	 * Acquires one or several free pages
 	 * @param size in bytes to acquire
 	 * @return index of first page acquired
 	 */
-	int acquirePages(int size);
+	int acquirePages(int pages, const std::vector<bool> &fencesAvailable);
 	/**
 	 * Releases one or several pages corresponding to buffer range
 	 * @param offset offset in bytes of buffer range
 	 * @param size size in bytes of buffer range
 	 */
-	void releasePages(int offset, int size);
+	void releasePages(int pageStart, int pages);
 	/**
 	 * Loads an image from disk
 	 * @param info input loading information
@@ -197,7 +203,7 @@ private:
 	 */
 	Handle genHandle();
 
-	/** Asynchronous flag: if not set, a texture will be complete immediately when 
+	/** Asynchronous flag: if not set, a texture will be complete immediately when
 	 * createTexture() returns.*/
 	bool _asynchronous;
 
@@ -226,9 +232,9 @@ private:
 
 	/// Map of Handle->Stream Texture
 	std::map<Handle, StreamTexture> _texs;
-	/** Completeness of each mip level of each texture (when a mip is complete, 
-	 * the sampler's min LOD is lowered) **/
-	std::map<Handle, std::vector<bool>> _completeness;
+
+	std::map<Handle, std::vector<bool>> _tileUpdated;
+	std::map<std::pair<Handle,int>, std::pair<int, int>> _tileRanges;
 
 	/// Textures to be deleted in next update() call
 	std::vector<Handle> _texDeleted;

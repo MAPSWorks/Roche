@@ -153,6 +153,11 @@ TexInfo parseInfoFile(const string &filename, int maxSize)
 	}
 }
 
+int DDSStreamer::getPageSpan(int size)
+{
+	return ((size-1)/_pageSize)+1;
+}
+
 DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 {
 	// Get info file
@@ -242,7 +247,7 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		}
 	}
 
-	_completeness.insert(make_pair(h, vector<bool>(tileId, false)));
+	_tileUpdated.insert(make_pair(h, vector<bool>(tileId, false)));
 
 	if (_asynchronous)
 	{
@@ -254,10 +259,14 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo);
 		for (auto info : jobs)
 		{
-			while (info.ptrOffset == -1)
-				info.ptrOffset = acquirePages(info.imageSize);
+			while (info.pageOffset == -1)
+			{
+				auto fencesSignaled = areFencesSignaled();
+				info.pageOffset = acquirePages(getPageSpan(info.imageSize), fencesSignaled);
+			}
 			LoadData d =  load(info);
 			updateTile(d);
+			releasePages(info.pageOffset, getPageSpan(info.imageSize));
 		}
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 		_texs[h].setComplete();
@@ -265,6 +274,8 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 
 	return h;
 }
+
+
 
 const StreamTexture &DDSStreamer::getTex(Handle handle)
 {
@@ -279,9 +290,17 @@ void DDSStreamer::deleteTex(Handle handle)
 	if (handle)
 	{
 		_texDeleted.push_back(handle);
-		_completeness.erase(handle);
+		_tileUpdated.erase(handle);
 		_texs.erase(handle);
 	}
+}
+
+vector<bool> DDSStreamer::areFencesSignaled()
+{
+	vector<bool> fencesAvailable(_pageFences.size());
+	transform(_pageFences.begin(), _pageFences.end(), 
+		fencesAvailable.begin(), [](Fence &fence){return fence.waitClient(0);});
+	return fencesAvailable;
 }
 
 void DDSStreamer::update()
@@ -294,47 +313,61 @@ void DDSStreamer::update()
 		{
 			if (h == info.handle)
 			{
-				if (info.ptrOffset != -1) releasePages(info.ptrOffset, info.imageSize);
+				if (info.pageOffset != -1) 
+					releasePages(info.pageOffset, getPageSpan(info.imageSize));
 				return true;
 			}
 		}
 		return false;
 	};
+	// Invalidate deleted textures from pre-queue
 	_loadInfoWaiting.erase(
 		remove_if(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), isDeleted),
 		_loadInfoWaiting.end());
+	{
+		// Invalidate deleted textures from currently processing queue
+		lock_guard<mutex> lk(_mtx);
+		_loadInfoQueue.erase(
+			remove_if(_loadInfoQueue.begin(), _loadInfoQueue.end(), isDeleted),
+			_loadInfoQueue.end());
+	}
+
+	// Get fence state
+	auto fencesSignaled = areFencesSignaled();
+	// Mark textures as complete if fences are signaled
+	setTexturesAsComplete(fencesSignaled);
 
 	// Assign offsets
 	std::vector<LoadInfo> assigned;
 	std::vector<LoadInfo> nonAssigned;
 
 	for_each(_loadInfoWaiting.begin(), _loadInfoWaiting.end(), 
-		[&assigned, &nonAssigned, this](const LoadInfo &info) {
-			int ptrOffset = acquirePages(info.imageSize);
-			if (ptrOffset == -1)
+		[&assigned, &nonAssigned, &fencesSignaled, this](const LoadInfo &info) {
+			const int pages = getPageSpan(info.imageSize);
+			const int pageOffset = acquirePages(pages, fencesSignaled);
+			if (pageOffset == -1)
 			{
 				nonAssigned.push_back(info);
 			}
 			else
 			{
 				LoadInfo s = info;
-				s.ptrOffset = ptrOffset;
+				s.pageOffset = pageOffset;
 				assigned.push_back(s);
+				_tileRanges[make_pair(info.handle, info.tileId)] = 
+					make_pair(pageOffset, pages);
 			}
 		});
 
 	{
 		lock_guard<mutex> lk(_mtx);
-		// Invalidate deleted textures from queue
-		_loadInfoQueue.erase(
-			remove_if(_loadInfoQueue.begin(), _loadInfoQueue.end(), isDeleted),
-			_loadInfoQueue.end());
 		// Submit created textures
 		_loadInfoQueue.insert(
 			_loadInfoQueue.end(),
 			assigned.begin(),
 			assigned.end());
 	}
+
 	_cond.notify_one();
 	_loadInfoWaiting = nonAssigned;
 	_texDeleted.clear();
@@ -372,6 +405,38 @@ void DDSStreamer::update()
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
+void DDSStreamer::setTexturesAsComplete(const vector<bool> &fencesSignaled)
+{
+	for (auto p : _tileUpdated)
+	{
+		if (!_texs[p.first].isComplete())
+		{
+			// Get if all tiles have been set in the process of updating
+			if (all_of(p.second.begin(), p.second.end(), [](bool b){return b;}))
+			{
+				// Get if all fences have been signaled
+				bool signaled = true;
+				for (int i=0;(i<(int)p.second.size()) && signaled;++i)
+				{
+					auto range = _tileRanges[make_pair(p.first, i)];
+					for (int j=range.first; j<range.second && signaled; ++j)
+					{
+						if (!fencesSignaled[j]) signaled = false;
+					}
+				}
+				if (signaled)
+				{
+					_texs[p.first].setComplete();
+					for (int i=0;i<(int)p.second.size();++i)
+					{
+						_tileRanges.erase(make_pair(p.first, i));
+					}
+				}
+			}
+		}
+	}
+}
+
 int DDSStreamer::getCost(const LoadData &data)
 {
 	const int overheadCost = 2000;
@@ -381,7 +446,7 @@ int DDSStreamer::getCost(const LoadData &data)
 void DDSStreamer::updateTile(const LoadData &d)
 {
 #ifndef USE_COHERENT_MAPPING
-	glFlushMappedNamedBufferRange(_pbo, d.ptrOffset, d.imageSize);
+	glFlushMappedNamedBufferRange(_pbo, d.pageOffset*_pageSize, d.imageSize);
 #endif
 	auto it = _texs.find(d.handle);
 	if (it != _texs.end())
@@ -395,33 +460,24 @@ void DDSStreamer::updateTile(const LoadData &d)
 			d.height,
 			d.format,
 			d.imageSize,
-			(void*)(intptr_t)d.ptrOffset);
+			(void*)(intptr_t)(d.pageOffset*_pageSize));
 
-		// Set completeness of slice
-		auto &texComp = _completeness[d.handle];
-		texComp[d.tileId] = true;
-
-		// If all slices have been uploaded, set the texture as complete
-		if (all_of(texComp.begin(), texComp.end(), [](bool c){return c;}))
-		{
-			tex.setComplete();
-		}
+		_tileUpdated[d.handle][d.tileId] = true;
 	}
-	releasePages(d.ptrOffset, d.imageSize);
+	releasePages(d.pageOffset, getPageSpan(d.imageSize));
 }
 
-int DDSStreamer::acquirePages(int size)
+int DDSStreamer::acquirePages(int pages, const vector<bool> &fencesAvailable)
 {
-	const size_t pages = ((size-1)/_pageSize)+1;
-	if (pages > _numPages)
+	if (pages > (int)_numPages)
 	{
 		throw runtime_error("Not enough pages");
 	}
 
-	size_t start = 0;
-	for (size_t i=0;i<_usedPages.size();++i)
+	int start = 0;
+	for (int i=0;i<(int)_usedPages.size();++i)
 	{
-		if (_usedPages[i] || !_pageFences[i].waitClient(0))
+		if (_usedPages[i] || !fencesAvailable[i])
 		{
 			start = i+1;
 		}
@@ -429,20 +485,18 @@ int DDSStreamer::acquirePages(int size)
 		{
 			if (i-start+1 == pages)
 			{
-				for (size_t j=start;j<start+pages;++j)
+				for (int j=start;j<start+pages;++j)
 				{
 					_usedPages[j] = true;
 				}
-				return start*_pageSize;
+				return start;
 			}
 		}
 	}
 	return -1;
 }
-void DDSStreamer::releasePages(int offset, int size)
+void DDSStreamer::releasePages(int pageStart, int pages)
 {
-	const int pageStart = offset/_pageSize;
-	const int pages = ((size-1)/_pageSize)+1;
 	for (int i=pageStart;i<pageStart+pages;++i)
 	{
 		_pageFences[i].lock();
@@ -454,7 +508,7 @@ DDSStreamer::LoadData DDSStreamer::load(const LoadInfo &info)
 {
 	LoadData s{};
 	int level = info.fileLevel;
-	int ptrOffset = info.ptrOffset;
+	int pageOffset = info.pageOffset;
 	s.handle = info.handle;
 	s.level = info.level;
 	s.offsetX = info.offsetX;
@@ -463,10 +517,10 @@ DDSStreamer::LoadData DDSStreamer::load(const LoadInfo &info)
 	s.height = info.loader.getHeight(level);
 	s.format  = DDSFormatToGL(info.loader.getFormat());
 	s.imageSize = info.imageSize;
-	s.ptrOffset = ptrOffset;
+	s.pageOffset = pageOffset;
 	s.tileId = info.tileId;
 
-	info.loader.writeImageData(level, (char*)_pboPtr+ptrOffset);
+	info.loader.writeImageData(level, (char*)_pboPtr+pageOffset*_pageSize);
 
 	return s;
 }
