@@ -671,20 +671,28 @@ std::string generateScreenshotName()
 
 void Game::displayProfiling(const std::vector<std::pair<std::string, uint64_t>> &a)
 {
+	// First entry is full time of frame
 	uint64_t full = a[0].second;
+	// Compute which label has the largest width
 	size_t largestName = 0;
 	for (auto p : a)
 	{
 		if (p.first.size() > largestName) largestName = p.first.size();
 	}
+	// Display each entry
 	for (auto p : a)
 	{
 		std::cout.width(largestName);
 		std::cout << std::left << p.first;
-		uint64_t nano = (double)p.second;
+		uint64_t nano = p.second;
 		double percent = 100*nano/(double)full;
+		double fps = 1E9/(double)nano;
 		double micro = nano/1E6;
-		std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl; 
+		// If entry is full time, display fps instead of percentage of frame
+		if (nano == full)
+			std::cout << "  " << micro << "ms (" << fps << "FPS)" << std::endl;
+		else
+			std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl;
 	}
 	std::cout << "-------------------------" << std::endl;
 }
