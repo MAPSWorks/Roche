@@ -27,10 +27,8 @@ public:
 	StreamTexture() = default;
 	/** 
 	 * @param id GL texture id
-	 * @param samplerId GL sampler id
-	 * @param minLod minimum LOD for sampler
 	 */
-	StreamTexture(GLuint id, GLuint samplerId, int minLod);
+	StreamTexture(GLuint id);
 	StreamTexture(const StreamTexture &) = delete;
 	StreamTexture &operator=(const StreamTexture &) = delete;
 	StreamTexture(StreamTexture &&tex);
@@ -41,11 +39,6 @@ public:
 	 * Set to be usable in rendering
 	 */
 	void setComplete();
-	/**
-	 * Sets the minimum LOD value
-	 * @param minLod minimum LOD value
-	 */
-	void setMinLod(int minLod);
 	/**
 	 * Returns the GL texture id\n
 	 * WARNING: returns the GL texture id even if the texture isn't complete
@@ -58,30 +51,16 @@ public:
 	 */
 	bool isComplete() const;
 	/**
-	 * Returns the minimum LOD value
-	 */
-	int getMinLod() const;
-	/**
 	 * Returns the texture GL id if it is usable for rendering
 	 * @param def default value to return if the texture does not exist or
 	 * it is incomplete
 	 * @return GL texture id
 	 */
 	GLuint getCompleteTextureId(GLuint def=0) const;
-	/**
-	 * Returns the sampler id
-	 * @param def default value to return if the texture does not exist or it is
-	 * incomplete
-	 */
-	GLuint getSamplerId(GLuint def=0) const;
 
 private:
 	/// GL texture id
 	GLuint _texId = 0;
-	/// GL texture sampler
-	GLuint _samplerId = 0;
-	/// Minimum LOD
-	int _minLod = 1000;
 	/// Usable texture
 	bool _complete = false;
 };
@@ -106,7 +85,7 @@ public:
 	 * @param numPages Number of pages in the buffer
 	 * @param maxSize maximum texture width/height to load
 	 */
-	void init(int anisotropy, int pageSize, int numPages, int maxSize=0);
+	void init(int pageSize, int numPages, int maxSize=0);
 	~DDSStreamer();
 
 	/**
@@ -205,9 +184,6 @@ private:
 	 */
 	Handle genHandle();
 
-	/// Max anisotropy allowed
-	int _anisotropy = 1;
-
 	/// Maximum width/height of textures
 	int _maxSize = 0;
 	/// Size of pages in bytes
@@ -235,7 +211,7 @@ private:
 	std::map<Handle, StreamTexture> _texs;
 	/** Completeness of each mip level of each texture (when a mip is complete, 
 	 * the sampler's min LOD is lowered) **/
-	std::map<Handle, std::vector<std::vector<bool>>> _completeness;
+	std::map<Handle, std::vector<bool>> _completeness;
 	/// Textures to be deleted in next update() call
 	std::vector<Handle> _texDeleted;
 	/// Dummy texture to indicate inexistent texture

@@ -377,7 +377,7 @@ void RendererGL::createTextures()
 	textureAnisotropy = getAnisotropy(requestedAnisotropy);
 
 	// Streamer init
-	streamer.init(textureAnisotropy, 512*512, 200, maxTexSize);
+	streamer.init(512*512, 200, maxTexSize);
 
 	// Default textures 
 	diffuseTexDefault = create1PixTex({0,0,0,255});
@@ -916,10 +916,10 @@ void RendererGL::renderHdr(
 
 		// Bind samplers
 		const vector<GLuint> samplers = {
-			streamer.getTex(data.diffuse).getSamplerId(planetTexSampler),
-			streamer.getTex(data.cloud).getSamplerId(planetTexSampler),
-			streamer.getTex(data.night).getSamplerId(planetTexSampler),
-			streamer.getTex(data.specular).getSamplerId(planetTexSampler),
+			planetTexSampler,
+			planetTexSampler,
+			planetTexSampler,
+			planetTexSampler,
 			atmoSampler,
 			ringSampler
 		};
