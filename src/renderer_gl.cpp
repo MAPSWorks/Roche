@@ -335,6 +335,9 @@ void RendererGL::init(const InitInfo &info)
 	createTextures();
 	createScreenshot();
 
+		// Streamer init
+	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
+
 	// Backface culling
 	glFrontFace(GL_CCW);
 	glEnable(GL_CULL_FACE);
@@ -375,9 +378,6 @@ void RendererGL::createTextures()
 	// Anisotropy
 	const float requestedAnisotropy = 16.f;
 	textureAnisotropy = getAnisotropy(requestedAnisotropy);
-
-	// Streamer init
-	streamer.init(512*512, 200, maxTexSize);
 
 	// Default textures 
 	diffuseTexDefault = create1PixTex({0,0,0,255});

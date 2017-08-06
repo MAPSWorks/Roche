@@ -80,12 +80,14 @@ public:
 
 	DDSStreamer() = default;
 	/**
+	 * @param asynchronous If set, textures won't be immediately complete after
+	 * createTexture() returns
 	 * @param anisotropy Available anisotropy
 	 * @param pageSize Size of a page in bytes
 	 * @param numPages Number of pages in the buffer
 	 * @param maxSize maximum texture width/height to load
 	 */
-	void init(int pageSize, int numPages, int maxSize=0);
+	void init(bool asynchronous, int pageSize, int numPages, int maxSize=0);
 	~DDSStreamer();
 
 	/**
@@ -178,11 +180,17 @@ private:
 	 */
 	LoadData load(const LoadInfo &info);
 
+	void updateTile(const LoadData &data);
+
 	/**
 	 * Generates an unique handle
 	 * @return unique handle
 	 */
 	Handle genHandle();
+
+	/** Asynchronous flag: if not set, a texture will be complete immediately when 
+	 * createTexture() returns.*/
+	bool _asynchronous;
 
 	/// Maximum width/height of textures
 	int _maxSize = 0;

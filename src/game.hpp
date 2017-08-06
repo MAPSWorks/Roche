@@ -78,6 +78,8 @@ private:
 	bool wireframe = false;
 	/// Render with bloom or not
 	bool bloom = true;
+	/// Wait for whole texture to load before displaying (no pop-ins)
+	bool syncTexLoading = false;
 	
 	// Main planet collection
 	/// Number of planets

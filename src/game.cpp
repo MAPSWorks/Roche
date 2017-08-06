@@ -75,6 +75,7 @@ void Game::loadSettingsFile()
 		sweeper graphics(swp("graphics"));
 		maxTexSize = graphics("maxTexSize").value<number>();
 		msaaSamples = graphics("msaaSamples").value<number>();
+		syncTexLoading = graphics("syncTexLoading").value<boolean>();
 
 		sweeper controls(swp("controls"));
 		sensitivity = controls("sensitivity").value<number>();
@@ -127,7 +128,7 @@ void Game::init()
 	}
 
 	// Renderer init
-	renderer->init({planetParams, msaaSamples, maxTexSize, width, height});
+	renderer->init({planetParams, msaaSamples, maxTexSize, syncTexLoading, width, height});
 }
 
 template<class T>

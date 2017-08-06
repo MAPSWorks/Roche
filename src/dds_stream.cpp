@@ -35,9 +35,11 @@ GLenum DDSFormatToGL(DDSLoader::Format format)
 	}
 }
 
-void DDSStreamer::init(int pageSize, int numPages, int maxSize)
+void DDSStreamer::init(bool asynchronous, int pageSize, int numPages, int maxSize)
 {
+	_asynchronous = asynchronous;
 	_maxSize = (maxSize>0)?maxSize:numeric_limits<int>::max();
+
 	_pageSize = pageSize;
 	_numPages = numPages;
 	int pboSize = pageSize*numPages;
@@ -56,6 +58,9 @@ void DDSStreamer::init(int pageSize, int numPages, int maxSize)
 
 	_usedPages.resize(numPages, false);
 	_pageFences.resize(numPages);
+
+	// Don't need threading if synchronous
+	if (!_asynchronous) return;
 
 	_t = thread([this]{
 		while (true)
@@ -239,7 +244,23 @@ DDSStreamer::Handle DDSStreamer::createTex(const string &filename)
 
 	_completeness.insert(make_pair(h, vector<bool>(completenessId, false)));
 
-	_loadInfoWaiting.insert(_loadInfoWaiting.end(), jobs.begin(), jobs.end());
+	if (_asynchronous)
+	{
+		_loadInfoWaiting.insert(_loadInfoWaiting.end(), jobs.begin(), jobs.end());
+	}
+	else
+	{
+		// Synchronous mode : load whole texture now
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo);
+		for (auto info : jobs)
+		{
+			while (info.ptrOffset == -1)
+				info.ptrOffset = acquirePages(info.imageSize);
+			LoadData d =  load(info);
+			updateTile(d);
+		}
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	}
 
 	return h;
 }
@@ -264,6 +285,7 @@ void DDSStreamer::deleteTex(Handle handle)
 
 void DDSStreamer::update()
 {
+	if (!_asynchronous) return;
 	// Invalidate deleted textures from pre-queue
 	auto isDeleted = [this](const LoadInfo &info)
 	{
@@ -327,36 +349,41 @@ void DDSStreamer::update()
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo);
 	for (LoadData d : data)
 	{
-#ifndef USE_COHERENT_MAPPING
-		glFlushMappedNamedBufferRange(_pbo, d.ptrOffset, d.imageSize);
-#endif
-		auto it = _texs.find(d.handle);
-		if (it != _texs.end())
-		{
-			auto &tex = it->second;
-			glCompressedTextureSubImage2D(tex.getTextureId(),
-				d.level,
-				d.offsetX,
-				d.offsetY,
-				d.width,
-				d.height,
-				d.format,
-				d.imageSize,
-				(void*)(intptr_t)d.ptrOffset);
-
-			// Set completeness of slice
-			auto &texComp = _completeness[d.handle];
-			texComp[d.completenessId] = true;
-
-			// If all slices have been uploaded, set the texture as complete
-			if (all_of(texComp.begin(), texComp.end(), [](bool c){return c;}))
-			{
-				tex.setComplete();
-			}
-		}
-		releasePages(d.ptrOffset, d.imageSize);
+		updateTile(d);
 	}
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+}
+
+void DDSStreamer::updateTile(const LoadData &d)
+{
+#ifndef USE_COHERENT_MAPPING
+	glFlushMappedNamedBufferRange(_pbo, d.ptrOffset, d.imageSize);
+#endif
+	auto it = _texs.find(d.handle);
+	if (it != _texs.end())
+	{
+		auto &tex = it->second;
+		glCompressedTextureSubImage2D(tex.getTextureId(),
+			d.level,
+			d.offsetX,
+			d.offsetY,
+			d.width,
+			d.height,
+			d.format,
+			d.imageSize,
+			(void*)(intptr_t)d.ptrOffset);
+
+		// Set completeness of slice
+		auto &texComp = _completeness[d.handle];
+		texComp[d.completenessId] = true;
+
+		// If all slices have been uploaded, set the texture as complete
+		if (all_of(texComp.begin(), texComp.end(), [](bool c){return c;}))
+		{
+			tex.setComplete();
+		}
+	}
+	releasePages(d.ptrOffset, d.imageSize);
 }
 
 int DDSStreamer::acquirePages(int size)

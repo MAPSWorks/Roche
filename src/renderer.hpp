@@ -23,6 +23,8 @@ public:
 		int msaa;
 		/// Maximum texture width/height
 		int maxTexSize;
+		/// Wait for whole texture to load before displaying
+		int syncTexLoading;
 		/// Window width in pixels
 		unsigned windowWidth;
 		/// Window height in pixels

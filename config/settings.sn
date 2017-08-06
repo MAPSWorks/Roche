@@ -13,6 +13,7 @@ video:{
 graphics:{
   maxTexSize:0
   msaaSamples:8
+  syncTexLoading:false
 }
 
 controls:{
