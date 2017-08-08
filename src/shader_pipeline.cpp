@@ -163,9 +163,16 @@ ShaderPipeline ShaderFactory::createPipeline(
 
 		const GLenum type = stageFilename.first;
 		const string finalSource = preSource + source;
-		const GLuint shadId = createShader(type, finalSource);
-
-		glUseProgramStages(pipelineId, shaderTypeToStage(type), shadId);
+		try
+		{
+			const GLuint shadId = createShader(type, finalSource);
+			glUseProgramStages(pipelineId, shaderTypeToStage(type), shadId);
+		}
+		catch (const runtime_error &e)
+		{
+			throw runtime_error("Error in file " + filename + " : " + e.what());
+		}
+		
 	}
 	return ShaderPipeline(pipelineId);
 }

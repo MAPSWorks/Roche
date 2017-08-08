@@ -1,7 +1,6 @@
 ## To Do
 
 ### Important stuff
-- [ ] Prettier flares
 
 ### Minor stuff
 - [ ] Frustum culling
@@ -14,6 +13,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Prettier flares
 - [x] Wait for fences to unlock before tagging as complete
 - [x] Add cost calculator to prevent too much texture updates at once
 - [x] Add option to choose between synchronous texture loading (no pop-ins but stutters) or asynchronous (smoother framerate but pop-ins)

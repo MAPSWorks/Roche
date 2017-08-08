@@ -268,7 +268,13 @@ void Game::loadPlanetFiles()
 			sweeper starsw(pl("star"));
 			if (!starsw.is_null())
 			{
-				Planet::Star star(get<double>(starsw("brightness")));
+				Planet::Star star(
+					get<double>(starsw("brightness")),
+					get<double>(starsw("flareFadeInStart")),
+					get<double>(starsw("flareFadeInEnd")),
+					get<double>(starsw("flareAttenuation")),
+					get<double>(starsw("flareMinSize")),
+					get<double>(starsw("flareMaxSize")));
 				planet.setStar(star);
 			}
 

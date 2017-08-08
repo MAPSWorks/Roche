@@ -2,6 +2,8 @@ struct SceneUBO
 {
 	mat4 projMat;
 	mat4 viewMat;
+	mat4 flareMat;
+	float flareBrightness;
 	float ambientColor;
 	float exposure;
 	float logDepthFarPlane;
@@ -157,4 +159,48 @@ vec3 in_scattering_planet(
 	sum *= len / atmos_height;
 
 	return sum;
+}
+
+vec4 lerp(vec4 v[gl_MaxPatchVertices], vec3 coord)
+{
+	return mix(
+		mix(v[0],v[1],coord.x),
+		mix(v[2],v[3],coord.x),
+		coord.y);
+}
+
+vec3 lerp(vec3 v[gl_MaxPatchVertices], vec3 coord)
+{
+	return mix(
+		mix(v[0],v[1],coord.x),
+		mix(v[2],v[3],coord.x),
+		coord.y);
+}
+
+vec2 lerp(vec2 v[gl_MaxPatchVertices], vec3 coord)
+{
+	return mix(
+		mix(v[0],v[1],coord.x),
+		mix(v[2],v[3],coord.x),
+		coord.y);
+}
+
+float lerp(float v[gl_MaxPatchVertices], vec3 coord)
+{
+	return mix(
+		mix(v[0],v[1],coord.x),
+		mix(v[2],v[3],coord.x),
+		coord.y);
+}
+
+float sRGBToLinear(float s)
+{
+	if (s < 0.0404482362771082) return s/12.92;
+	else return pow((s+0.055)/1.055,2.4);
+}
+
+float linearToSRGB(float l)
+{
+	if (l < 0.00313066844250063) return l*12.92;
+	else return 1.055*pow(l,1.0/2.4)-0.055;
 }

@@ -10,13 +10,7 @@
 #include "ddsloader.hpp"
 #include "graphics_api.hpp"
 #include "fence.hpp"
-
-/**
- * Transforms a DDSLoader::Format to the corresponding GL format
- * @param format DDSLoader format
- * @return GL format
- */
-GLenum DDSFormatToGL(DDSLoader::Format format);
+#include "gl_util.hpp"
 
 /**
  * Texture streamed from the DDSStreamer class

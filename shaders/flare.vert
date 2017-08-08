@@ -5,23 +5,18 @@ out gl_PerVertex
   float gl_ClipDistance[];
 };
 
-layout(location = 0) in vec4 inPosition;
-layout(location = 1) in vec4 inUv;
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec2 inUv;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
 	SceneUBO sceneUBO;
 };
 
-layout (binding = 1, std140) uniform flareDynamicUBO
-{
-	FlareUBO flareUBO;
-};
-
-layout (location = 0) out vec4 passUv;
+layout (location = 0) out vec2 passUv;
 
 void main()
 {
 	passUv = inUv;
-	gl_Position = flareUBO.modelMat*inPosition;
+	gl_Position = sceneUBO.flareMat*vec4(inPosition, 1);
 }

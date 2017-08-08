@@ -1,6 +1,5 @@
-layout (location = 0) in vec4 passUv;
-layout (location = 1) in vec4 passNormal;
-layout (location = 2) in vec4 passPosition;
+layout (location = 0) in vec3 passPosition;
+layout (location = 1) in vec2 passUv;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -32,7 +31,7 @@ void main(void)
 	vec3 scat = color.rgb*mix(t1.g,t1.r,backscat);
 
 	// Shadow
-	vec3 pos = passPosition.xyz-planetUBO.planetPos.xyz;	
+	vec3 pos = passPosition-planetUBO.planetPos.xyz;	
 	float b = dot(pos, planetUBO.lightDir.xyz);
 	float c = dot(pos,pos) - planetUBO.radius*planetUBO.radius;
 	float d = b*b-c;

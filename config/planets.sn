@@ -1,5 +1,5 @@
 ambientColor:0.0002
-startingPlanet:"Earth"
+startingPlanet:"Neptune"
 planets: [
 {
 	name:"Sun"
@@ -15,6 +15,11 @@ planets: [
 	}
 	star:{
 		brightness:2.0
+		flareFadeInStart:2.0
+		flareFadeInEnd:10.0
+		flareAttenuation:0.000008
+		flareMinSize:0.1
+		flareMaxSize:1.0
 	}
 }
 {

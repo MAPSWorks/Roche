@@ -41,7 +41,6 @@ private:
 		BufferRange sceneUBO;
 
 		std::vector<BufferRange> planetUBOs;
-		std::vector<BufferRange> flareUBOs;
 	};
 
 	/// Dynamic parameters for the scene to be loaded in a UBO
@@ -51,6 +50,10 @@ private:
 		glm::mat4 projMat;
 		/// View matrix
 		glm::mat4 viewMat;
+		/// Sun flare matrix
+		glm::mat4 flareMat;
+		/// Sun flare brightness
+		float flareBrightness;
 		/// Ambient light coefficient
 		float ambientColor;
 		/// Exposure factor
@@ -100,17 +103,6 @@ private:
 		float atmoHeight;
 	};
 
-	/// Dynamic parameters for a single flare to be loaded in a UBO
-	struct FlareDynamicUBO
-	{
-		/// Model matrix
-		glm::mat4 modelMat;
-		/// Color factor
-		glm::vec4 color;
-		/// Brightness factor
-		float brightness;
-	};
-
 	/// Generates the vertex and index data and fill the static VBOs
 	void createModels();
 	/// Creates the UBO buffers and assigns buffer ranges for UBO structures
@@ -154,19 +146,15 @@ private:
 	 * @param data buffer ranges to use for rendering
 	 */
 	void renderBloom(const DynamicData &data);
-	/** Renders flares on top of the HDR rendertarget
-	 * @param farPlanets id of planets to render as flares
-	 * @param data buffer ranges to use for rendering
-	 */
-	void renderFlares(
-		const std::vector<uint32_t> &farPlanets, 
-		const DynamicData &data);
 	/** Tonemaps and resolves HDR rendertarget to screen
 	 * @param data buffer ranges to use for rendering
 	 * @param bloom whether to use bloom or not
 	 */
 	void renderTonemap(const DynamicData &data, bool bloom);
-
+	/** Renders sun flare on top of the screen
+	 *
+	 */
+	void renderFlare(const DynamicData &data);
 	/** Sets the textures of planets to be loaded asynchronouly
 	 * @param planets planets whose textures to load
 	 */
@@ -350,27 +338,15 @@ private:
 		const Planet &params, 
 		const PlanetData &data);
 
-	/** Fills DynamicFlareUBO structure from planet parametes and state
-	 * @param viewPos World space eye position
-	 * @param projMat Projection matrix
-	 * @param viewMat View matrix (not accounting translation)
-	 * @param fovy Vertical Field of View in radians
-	 * @param exp Exposure
-	 * @param state Dynamic planet state
-	 * @param params Fixed planet parameters
-	 * @returns UBO data
-	 */
-	FlareDynamicUBO getFlareUBO(
-		const glm::dvec3 &viewPos, 
-		const glm::mat4 &projMat,
-		const glm::mat4 &viewMat, 
-		float fovy,
-		float exp, 
-		const PlanetState &state, 
-		const Planet &params);
+	float getSunVisibility();
 
 	/// Rendering data for all planets
 	std::vector<PlanetData> planetData;
+	/// Index of sun in main planet collection
+	size_t sunId = 0;
+
+	GLuint sunOcclusionQueries[2] = {0, 0};
+	int occlusionQueryResults[2] = {0, 1};
 
 	// Textures
 	/// Default diffuse texture
@@ -382,12 +358,8 @@ private:
 	/// Default specular mask texture
 	GLuint specularTexDefault;
 
-	/// Flare intensity texture (white dot)
-	GLuint flareIntensityTex;
-	/// Flare lines texture (radial lines simulating eye)
-	GLuint flareLinesTex;
-	/// Flare Halo texture (rainbow-y halo)
-	GLuint flareHaloTex;
+	/// Flare texture (white dot)
+	GLuint flareTex;
 
 	// Samplers
 	/// Sampler for planet textures

@@ -1,7 +1,7 @@
-layout (location = 0) in vec4 passUv;
-layout (location = 1) in vec3 passNormal;
-layout (location = 2) in vec3 passPosition;
-layout (location = 3) in vec4 passScattering;
+layout (location = 0) in vec3 passPosition;
+layout (location = 1) in vec2 passUv;
+layout (location = 2) in vec3 passNormal;
+layout (location = 3) in vec3 passScattering;
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -30,10 +30,10 @@ layout (binding = 7) uniform sampler1D ringOcclusion;
 
 void main()
 {
-	vec3 day = texture(diffuse, passUv.st).rgb;
+	vec3 day = texture(diffuse, passUv).rgb;
 
 	// Light calculations
-	vec3 normal = normalize(passNormal.xyz);
+	vec3 normal = normalize(passNormal);
 	vec3 lightDir = planetUBO.lightDir.xyz;
 	vec3 planetPos = planetUBO.planetPos.xyz;
 	vec3 pp = normalize(passPosition-planetPos)*planetUBO.radius;
@@ -42,7 +42,7 @@ void main()
 	float lambert = clamp(max(dot(lightDir, normal), sceneUBO.ambientColor),0,1);
 
 	// Specular calculation
-	float spec = texture(specular, passUv.st).r;
+	float spec = texture(specular, passUv).r;
 	vec3 H = normalize(lightDir + viewDir);
 	float NdotH = clamp(dot(normal, H), 0, 1);
 
@@ -54,8 +54,8 @@ void main()
 	float specIntensity = mix(specIntensity0, specIntensity1, spec);
 
 	// Clouds & night
-	float nightTex = texture(night, passUv.st).r * planetUBO.nightIntensity;
-	float cloudTex = texture(cloud, passUv.st+vec2(planetUBO.cloudDisp, 0)).r;
+	float nightTex = texture(night, passUv).r * planetUBO.nightIntensity;
+	float cloudTex = texture(cloud, passUv+vec2(planetUBO.cloudDisp, 0)).r;
 
 	vec3 nightFinal = vec3(nightTex*clamp(-lambert*10+0.2,0,1)*(1-cloudTex));
 	float k = mix(specIntensity, 0, cloudTex);
@@ -71,7 +71,7 @@ void main()
 	float c = dot(viewDir,lightDir);
 	float cc = c*c;
 
-	vec3 scat = passScattering.rgb * (planetUBO.K.xyz*rayleigh(cc) + planetUBO.K.www*mie(c,cc));
+	vec3 scat = passScattering * (planetUBO.K.xyz*rayleigh(cc) + planetUBO.K.www*mie(c,cc));
 
 	scat = clamp(scat, vec3(0),vec3(2));
 

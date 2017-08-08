@@ -5,6 +5,14 @@
 #include <memory>
 
 #include "graphics_api.hpp"
+#include "ddsloader.hpp"
+
+/**
+ * Transforms a DDSLoader::Format to the corresponding GL format
+ * @param format DDSLoader format
+ * @return GL format
+ */
+GLenum DDSFormatToGL(DDSLoader::Format format);
 
 /** Computes the number of mips necessary to have a complete chain
  * @param size largest dimension of texture (max(width, height, depth))
@@ -74,7 +82,7 @@ public:
 	DrawCommand(GLuint vao, GLenum mode, GLenum type,
 		const std::vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo);
 	/** Draw model */
-	void draw() const;
+	void draw(bool tessellated = false) const;
 private:
 	GLenum _vao;
 	GLenum _mode;

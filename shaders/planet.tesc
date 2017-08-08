@@ -2,10 +2,9 @@ layout(vertices = 4) out;
 
 in int gl_InvocationID;
 
-layout(location = 0) in vec4 inPosition[];
-layout(location = 1) in vec4 inUv[];
-layout(location = 2) in vec4 inNormal[];
-layout(location = 4) in vec4 inTangent[];
+layout(location = 0) in vec3 inPosition[];
+layout(location = 1) in vec2 inUv[];
+layout(location = 2) in vec3 inNormal[];
 
 layout (binding = 0, std140) uniform sceneDynamicUBO
 {
@@ -17,10 +16,9 @@ layout (binding = 1, std140) uniform planetDynamicUBO
 	PlanetUBO planetUBO;
 };
 
-layout(location = 0) out vec4 passPosition[];
-layout(location = 1) out vec4 passUv[];
-layout(location = 2) out vec4 passNormal[];
-layout(location = 3) out vec4 passTangent[];
+layout(location = 0) out vec3 passPosition[];
+layout(location = 1) out vec2 passUv[];
+layout(location = 2) out vec3 passNormal[];
 
 patch out float gl_TessLevelOuter[4];
 patch out float gl_TessLevelInner[2];
@@ -35,10 +33,10 @@ float edgeTessLevel(vec3 pos0, vec3 pos1)
 void main()
 {
 	mat4 mMat = sceneUBO.projMat*sceneUBO.viewMat*getMatrix(planetUBO);
-	vec3 p0 = vec3(mMat*inPosition[0]);
-	vec3 p1 = vec3(mMat*inPosition[1]);
-	vec3 p2 = vec3(mMat*inPosition[2]);
-	vec3 p3 = vec3(mMat*inPosition[3]);
+	vec3 p0 = vec3(mMat*vec4(inPosition[0],1));
+	vec3 p1 = vec3(mMat*vec4(inPosition[1],1));
+	vec3 p2 = vec3(mMat*vec4(inPosition[2],1));
+	vec3 p3 = vec3(mMat*vec4(inPosition[3],1));
 
 	float tess0 = edgeTessLevel(p0, p2);
 	float tess1 = edgeTessLevel(p0, p1);
@@ -59,5 +57,4 @@ void main()
 	passPosition[gl_InvocationID] = inPosition[gl_InvocationID];
 	passUv[gl_InvocationID] = inUv[gl_InvocationID];
 	passNormal[gl_InvocationID] = inNormal[gl_InvocationID];
-	passTangent[gl_InvocationID] = inTangent[gl_InvocationID];
 }

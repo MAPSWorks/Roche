@@ -318,7 +318,16 @@ std::string Planet::Body::getDiffuseFilename() const
 	return _diffuseFilename;
 }
 
-Planet::Star::Star(const float brightness) : _brightness{brightness}
+Planet::Star::Star(const float brightness,
+	const float flareFadeInStart, const float flareFadeInEnd,
+	const float flareAttenuation, const float flareMinSize,
+	const float flareMaxSize) : 
+	_brightness{brightness},
+	_flareFadeInStart{flareFadeInStart},
+	_flareFadeInEnd{flareFadeInEnd},
+	_flareAttenuation{flareAttenuation},
+	_flareMinSize{flareMinSize},
+	_flareMaxSize{flareMaxSize}
 {
 
 }
@@ -326,6 +335,31 @@ Planet::Star::Star(const float brightness) : _brightness{brightness}
 float Planet::Star::getBrightness() const
 {
 	return _brightness;
+}
+
+float Planet::Star::getFlareFadeInStart() const
+{
+	return _flareFadeInStart;
+}
+
+float Planet::Star::getFlareFadeInEnd() const
+{
+	return _flareFadeInEnd;
+}
+
+float Planet::Star::getFlareAttenuation() const
+{
+	return _flareAttenuation;
+}
+
+float Planet::Star::getFlareMinSize() const
+{
+	return _flareMinSize;
+}
+
+float Planet::Star::getFlareMaxSize() const
+{
+	return _flareMaxSize;
 }
 
 Planet::Clouds::Clouds(const std::string &filename, const float period) :

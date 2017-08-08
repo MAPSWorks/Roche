@@ -175,10 +175,22 @@ public:
 	{
 	public:
 		Star() = default;
-		explicit Star(float brightness);
+		Star(float brightness, 
+			float flareFadeInStart, float flareFadeInEnd, float flareAttenuation,
+			float flareMinSize, float flareMaxSize);
 		float getBrightness() const;
+		float getFlareFadeInStart() const;
+		float getFlareFadeInEnd() const;
+		float getFlareAttenuation() const;
+		float getFlareMinSize() const;
+		float getFlareMaxSize() const;
 	private:
 		float _brightness;
+		float _flareFadeInStart;
+		float _flareFadeInEnd;
+		float _flareAttenuation;
+		float _flareMinSize;
+		float _flareMaxSize;
 	};
 
 	class Clouds

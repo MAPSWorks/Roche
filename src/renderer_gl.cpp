@@ -1,6 +1,6 @@
 #include "renderer_gl.hpp"
 #include "ddsloader.hpp"
-#include "flare.hpp"
+#include "mesh.hpp"
 
 #include <stdexcept>
 #include <cstring>
@@ -23,16 +23,6 @@ void RendererGL::windowHints()
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); 
 }
 
-struct Vertex
-{
-	vec4 position;
-	vec4 uv;
-	vec4 normal;
-	vec4 tangent;
-};
-
-typedef uint32_t Index;
-
 GLenum indexType()
 {
 	switch (sizeof(Index))
@@ -43,169 +33,27 @@ GLenum indexType()
 	}
 }
 
-struct ModelInfo
-{
-	GLenum mode;
-	vector<Vertex> vertices;
-	vector<Index> indices;
-};
-
-ModelInfo generateSphere(
-	const int meridians, 
-	const int rings)
-{
-	ModelInfo info{};
-	// Vertices
-	info.mode = GL_PATCHES;
-	info.vertices.resize((meridians+1)*(rings+1));
-	size_t offset = 0;
-	for (int i=0;i<=rings;++i)
-	{
-		const float phi = glm::pi<float>()*((float)i/(float)rings-0.5);
-		const float cp = cos(phi);
-		const float sp = sin(phi);
-		for (int j=0;j<=meridians;++j)
-		{
-			const float theta = 2*glm::pi<float>()*((float)j/(float)meridians);
-			const float ct = cos(theta);
-			const float st = sin(theta);
-			const vec3 pos = vec3(cp*ct,cp*st,sp);
-			const vec2 uv = vec2(j/(float)meridians, 1.f-i/(float)rings);
-			const vec3 normal = normalize(pos);
-			const vec3 tangent = cross(normal, vec3(0,0,1));
-			info.vertices[offset] = {
-				vec4(pos,1), 
-				vec4(uv,0,0),
-				vec4(normal,0),
-				vec4(tangent,0)
-			};
-			offset++;
-		}
-	}
-
-	// Indices
-	info.indices.resize(meridians*rings*4);
-	offset = 0;
-	for (int i=0;i<rings;++i)
-	{
-		for (int j=0;j<meridians;++j)
-		{
-			const Index i1 = i+1;
-			const Index j1 = j+1;
-			vector<Index> ind = {
-				(Index)(i *(rings+1)+j),
-				(Index)(i *(rings+1)+j1),
-				(Index)(i1*(rings+1)+j),
-				(Index)(i1*(rings+1)+j1)
-			};
-			// Copy to indices
-			memcpy(&info.indices[offset], ind.data(), ind.size()*sizeof(Index));
-			offset += 4;
-		}
-	}
-	return info;
-}
-
-ModelInfo generateFullscreenTri()
-{
-	ModelInfo info{};
-	info.mode = GL_TRIANGLES;
-	info.vertices.resize(3);
-	info.vertices[0].position = vec4(-2,-1,0,1);
-	info.vertices[1].position = vec4( 2,-1,0,1);
-	info.vertices[2].position = vec4( 0, 4,0,1);
-
-	info.indices = {0,1,2};
-	return info;
-}
-
-ModelInfo generateFlareModel()
-{
-	ModelInfo info{};
-	info.mode = GL_TRIANGLES;
-	const int detail = 32;
-	info.vertices.resize((detail+1)*2);
-
-	for (int i=0;i<=detail;++i)
-	{
-		const float f = i/(float)detail;
-		const vec2 pos = vec2(cos(f*2*glm::pi<float>()),sin(f*2*glm::pi<float>()));
-		info.vertices[i*2+0] = {vec4(0,0,0,1), vec4(f, 0, 0.5, 0.5)};
-		info.vertices[i*2+1] = {vec4(pos,0,1), vec4(f, 1, pos*vec2(0.5)+vec2(0.5))};
-	}
-
-	info.indices.resize(detail*6);
-	for (int i=0;i<detail;++i)
-	{
-		info.indices[i*6+0] = (i*2)+0;
-		info.indices[i*6+1] = (i*2)+1;
-		info.indices[i*6+2] = (i*2)+2;
-		info.indices[i*6+3] = (i*2)+2;
-		info.indices[i*6+4] = (i*2)+1;
-		info.indices[i*6+5] = (i*2)+3;
-	}
-	return info;
-}
-
-ModelInfo generateRingModel(
-	const int meridians,
-	const float near,
-	const float far)
-{
-	ModelInfo info{};
-	info.mode = GL_PATCHES;
-	info.vertices.resize((meridians+1)*2);
-	info.indices.resize(meridians*4);
-
-	{
-		int offset = 0;
-		for (int i=0;i<=meridians;++i)
-		{
-			float angle = (glm::pi<float>()*i)/(float)meridians;
-			vec2 pos = vec2(cos(angle),sin(angle));
-			info.vertices[offset+0] = {vec4(pos*near, 0.0,1.0), vec4(pos*1.f,0.0,0.0)};
-			info.vertices[offset+1] = {vec4(pos*far , 0.0,1.0), vec4(pos*2.f,0.0,0.0)};
-			offset += 2;
-		}
-	}
-
-	{
-		int offset = 0;
-		Index vert = 0;
-		for (int i=0;i<meridians;++i)
-		{
-			info.indices[offset+0] = vert+0;
-			info.indices[offset+1] = vert+1;
-			info.indices[offset+2] = vert+2;
-			info.indices[offset+3] = vert+3;
-			offset += 4;
-			vert += 2; 
-		}
-	}
-	return info;
-}
-
 vector<DrawCommand> getCommands(
 	GLuint vao, 
 	GLenum indexType,
 	Buffer &vertexBuffer,
 	Buffer &indexBuffer,
-	const vector<ModelInfo> &infos)
+	const vector<Model> &infos)
 {
 	vector<DrawCommand> commands(infos.size());
 	vector<pair<BufferRange, BufferRange>> ranges(infos.size());
 
 	for (size_t i=0;i<infos.size();++i)
 	{
-		BufferRange vertexRange = vertexBuffer.assignVertices(infos[i].vertices.size(), sizeof(Vertex));
-		BufferRange indexRange = indexBuffer.assignIndices(infos[i].indices.size(), sizeof(Index));
+		BufferRange vertexRange = vertexBuffer.assignVertices(infos[i].getVertices().size(), sizeof(Vertex));
+		BufferRange indexRange = indexBuffer.assignIndices(infos[i].getIndices().size(), sizeof(Index));
 		ranges[i] = make_pair(vertexRange, indexRange);
 		commands[i] = DrawCommand(
-			vao, infos[i].mode, indexType,
+			vao, GL_TRIANGLES, indexType,
 			{
 				{0, vertexBuffer.getId(), vertexRange, sizeof(Vertex)}
 			},
-			{indexBuffer.getId(), indexRange, infos[i].indices.size()});
+			{indexBuffer.getId(), indexRange, infos[i].getIndices().size()});
 	}
 
 	vertexBuffer.validate();
@@ -213,8 +61,8 @@ vector<DrawCommand> getCommands(
 
 	for (size_t i=0;i<infos.size();++i)
 	{
-		vertexBuffer.write(ranges[i].first, infos[i].vertices.data());
-		indexBuffer.write(ranges[i].second, infos[i].indices.data());
+		vertexBuffer.write(ranges[i].first, infos[i].getVertices().data());
+		indexBuffer.write(ranges[i].second, infos[i].getIndices().data());
 	}
 
 	return commands;
@@ -236,13 +84,14 @@ void RendererGL::createModels()
 	const int sphereModelId = 2;
 
 	// Static vertex & index data
-	vector<ModelInfo> modelInfos(modelCount);
+	vector<Model> modelInfos(modelCount);
 
 	// Fullscreen tri
 	modelInfos[fsTriModelId] = generateFullscreenTri();
 
 	// Flare
-	modelInfos[flareModelId] = generateFlareModel();
+	const int detail = 8;
+	modelInfos[flareModelId] = generateFlareModel(detail);
 
 	// Sphere
 	const int planetMeridians = 32;
@@ -280,7 +129,9 @@ void RendererGL::createModels()
 	{
 		auto &data = planetData[i];
 		data.planetModel = commands[planetModelId[i]];
-		data.ringModel   = commands[ringModelId[i]];
+		int ringId = ringModelId[i];
+		if (ringId != -1)
+			data.ringModel   = commands[ringId];
 	}
 }
 
@@ -302,12 +153,6 @@ void RendererGL::createUBO()
 		{
 			data.planetUBOs[j] = uboBuffer.assignUBO(sizeof(PlanetDynamicUBO));
 		}
-		// Flare UBOs
-		data.flareUBOs.resize(planetCount);
-		for (uint32_t j=0;j<planetCount;++j)
-		{
-			data.flareUBOs[j] = uboBuffer.assignUBO(sizeof(FlareDynamicUBO));
-		}
 	}
 
 	uboBuffer.validate();
@@ -322,6 +167,12 @@ void RendererGL::init(const InitInfo &info)
 	this->windowWidth = info.windowWidth;
 	this->windowHeight = info.windowHeight;
 
+	// Find the sun
+	for (size_t i=0;i<planetParams.size();++i)
+	{
+		if (planetParams[i].isStar()) sunId = i; 
+	}
+
 	this->bufferFrames = 3; // triple-buffering
 
 	this->planetData.resize(planetCount);
@@ -333,9 +184,10 @@ void RendererGL::init(const InitInfo &info)
 	createShaders();
 	createRendertargets();
 	createTextures();
+	createFlare();
 	createScreenshot();
 
-		// Streamer init
+	// Streamer init
 	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
 
 	// Backface culling
@@ -354,6 +206,9 @@ void RendererGL::init(const InitInfo &info)
 
 	// Patch primitives
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+	// Sun Occlusion query for flare
+	glCreateQueries(GL_SAMPLES_PASSED, 2, sunOcclusionQueries);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -385,8 +240,6 @@ void RendererGL::createTextures()
 	nightTexDefault = create1PixTex({0,0,0,0});
 	specularTexDefault = create1PixTex({0,0,0,0});
 
-	createFlare();
-
 	// Samplers
 	glCreateSamplers(1, &planetTexSampler);
 	glSamplerParameterf(planetTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
@@ -409,30 +262,23 @@ void RendererGL::createTextures()
 
 void RendererGL::createFlare()
 {
-	const int flareSize = 512;
-	const int mips = mipmapCount(flareSize);
+	DDSLoader flareFile("tex/star_glow.DDS");
+	const int mips = flareFile.getMipmapCount();
+	glCreateTextures(GL_TEXTURE_2D, 1, &flareTex);
+	glTextureStorage2D(
+		flareTex, 
+		mips, 
+		DDSFormatToGL(flareFile.getFormat()),
+		flareFile.getWidth(0),
+		flareFile.getHeight(0));
+	glTextureParameteri(flareTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+	for (int i=0;i<mips;++i)
 	{
-		vector<uint16_t> pixelData = generateFlareIntensityTex(flareSize);
-		glCreateTextures(GL_TEXTURE_1D, 1, &flareIntensityTex);
-		glTextureStorage1D(flareIntensityTex, mips, GL_R16F, flareSize);
-		glTextureSubImage1D(flareIntensityTex, 0, 0, flareSize, GL_RED, GL_HALF_FLOAT, pixelData.data());
-		glTextureParameteri(flareIntensityTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glGenerateTextureMipmap(flareIntensityTex);
-	}
-	{
-		vector<uint8_t> pixelData = generateFlareLinesTex(flareSize);
-		glCreateTextures(GL_TEXTURE_2D, 1, &flareLinesTex);
-		glTextureStorage2D(flareLinesTex, mips, GL_R8, flareSize, flareSize);
-		glTextureSubImage2D(flareLinesTex, 0, 0, 0, flareSize, flareSize, GL_RED, GL_UNSIGNED_BYTE, pixelData.data());
-		glGenerateTextureMipmap(flareLinesTex);
-	}
-	{
-		vector<uint16_t> pixelData = generateFlareHaloTex(flareSize);
-		glCreateTextures(GL_TEXTURE_1D, 1, &flareHaloTex);
-		glTextureStorage1D(flareHaloTex, mips, GL_RGBA16F, flareSize);
-		glTextureSubImage1D(flareHaloTex, 0, 0, flareSize, GL_RGBA, GL_HALF_FLOAT, pixelData.data());
-		glTextureParameteri(flareHaloTex, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glGenerateTextureMipmap(flareHaloTex);
+		glCompressedTextureSubImage2D(flareTex,
+			i, 0, 0, flareFile.getWidth(i), flareFile.getHeight(i), 
+			DDSFormatToGL(flareFile.getFormat()),
+			flareFile.getImageSize(i), flareFile.getImageData(i).data());
 	}
 }
 
@@ -445,27 +291,21 @@ void RendererGL::createVertexArray()
 	const int VERTEX_ATTRIB_POS     = 0;
 	const int VERTEX_ATTRIB_UV      = 1;
 	const int VERTEX_ATTRIB_NORMAL  = 2;
-	const int VERTEX_ATTRIB_TANGENT = 3;
 
 	// Position
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_POS);
 	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_POS, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_POS, 4, GL_FLOAT, false, offsetof(Vertex, position));
+	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_POS, 3, GL_FLOAT, false, offsetof(Vertex, position));
 
 	// UVs
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_UV);
 	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_UV, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_UV, 4, GL_FLOAT, false, offsetof(Vertex, uv));
+	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_UV, 2, GL_FLOAT, false, offsetof(Vertex, uv));
 
 	// Normals
 	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_NORMAL);
 	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_NORMAL, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_NORMAL, 4, GL_FLOAT, false, offsetof(Vertex, normal));
-
-	// Tangents
-	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_TANGENT);
-	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_TANGENT, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_TANGENT, 4, GL_FLOAT, false, offsetof(Vertex, tangent));
+	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_NORMAL, 3, GL_FLOAT, false, offsetof(Vertex, normal));
 }
 
 void RendererGL::createRendertargets()
@@ -686,7 +526,6 @@ void RendererGL::render(const RenderInfo &info)
 
 	// Planet classification
 	vector<uint32_t> closePlanets;
-	vector<uint32_t> farPlanets;
 	vector<uint32_t> translucentPlanets;
 
 	vector<uint32_t> texLoadPlanets;
@@ -720,20 +559,15 @@ void RendererGL::render(const RenderInfo &info)
 		// Don't render planets behind the view
 		if ((viewMat*vec4(pos - info.viewPos,1.0)).z < maxRadius)
 		{
-			if (dist < closePlanetMaxDistance)
+			// Render if is range, always render sun
+			if (dist < closePlanetMaxDistance || param.isStar())
 			{
-				// Detailed model
 				closePlanets.push_back(i);
 				// Planet atmospheres
 				if (param.hasAtmo() || param.hasRing())
 				{
 					translucentPlanets.push_back(i);
 				}
-			}
-			if (dist > farPlanetMinDistance || param.isStar())
-			{
-				// Flares
-				farPlanets.push_back(i);
 			}
 		}
 	}
@@ -753,6 +587,38 @@ void RendererGL::render(const RenderInfo &info)
 	SceneDynamicUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
+
+	const float visibility = getSunVisibility();
+
+	const vec3 planetPos = vec3(
+		info.planetStates[sunId].getPosition() - info.viewPos);
+	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
+	const vec3 screen = vec3(clip)/clip.w;
+	const bool visible = clip.w > 0;
+
+	if (visible)
+	{
+		const auto star = planetParams[sunId].getStar();
+		const float dist = length(planetPos);
+		const float radius = planetParams[sunId].getBody().getRadius();
+		const float flareSize = clamp((2.f/glm::tan(info.fovy))*
+			(star.getBrightness()*radius*radius)/
+			(star.getFlareAttenuation()*dist*dist),
+			star.getFlareMinSize(), star.getFlareMaxSize()*exp)*visibility;
+		sceneUBO.flareMat = 
+			translate(mat4(), screen)*
+			scale(mat4(), 
+				vec3(windowHeight/(float)windowWidth,1.0,0.0)*flareSize);
+		sceneUBO.flareBrightness = glm::clamp(
+				(dist/radius-star.getFlareFadeInStart())/
+				(star.getFlareFadeInEnd()-star.getFlareFadeInStart()),
+				0.f,1.f);
+	}
+	else
+	{
+		sceneUBO.flareBrightness = 0.0;
+	}
+
 	sceneUBO.ambientColor = info.ambientColor;
 	sceneUBO.exposure = exp;
 	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));
@@ -766,13 +632,6 @@ void RendererGL::render(const RenderInfo &info)
 		planetUBOs[i] = getPlanetUBO(info.viewPos, viewMat, 
 			info.planetStates[i], planetParams[i], planetData[i]);
 	}
-	// Far away planets (flare)
-	vector<FlareDynamicUBO> flareUBOs(planetCount);
-	for (uint32_t i : farPlanets)
-	{
-		flareUBOs[i] = getFlareUBO(info.viewPos, projMat, viewMat, info.fovy, exp,
-			info.planetStates[i], planetParams[i]);
-	}
 
 	// Dynamic data upload
 	profiler.begin("Sync wait");
@@ -783,10 +642,6 @@ void RendererGL::render(const RenderInfo &info)
 	for (uint32_t i=0;i<planetUBOs.size();++i)
 	{
 		uboBuffer.write(currentData.planetUBOs[i], &planetUBOs[i]);
-	}
-	for (uint32_t i=0;i<flareUBOs.size();++i)
-	{
-		uboBuffer.write(currentData.flareUBOs[i], &flareUBOs[i]);
 	}
 
 	// Planet sorting from front to back
@@ -812,9 +667,9 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
+	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	if (info.bloom)
 	{
-		if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		profiler.begin("Highpass");
 		renderHighpass(currentData);
 		profiler.end();
@@ -825,13 +680,11 @@ void RendererGL::render(const RenderInfo &info)
 		renderBloom(currentData);
 		profiler.end();
 	}
-	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	profiler.begin("Flares");
-	renderFlares(farPlanets, currentData);
-	profiler.end();
-	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	profiler.begin("Tonemapping");
 	renderTonemap(currentData, info.bloom);
+	profiler.end();
+	profiler.begin("Flare");
+	renderFlare(currentData);
 	profiler.end();
 
 	if (takeScreen)
@@ -845,7 +698,17 @@ void RendererGL::render(const RenderInfo &info)
 	fences[frameId].lock();
 
 	frameId = (frameId+1)%bufferFrames;
+}
 
+float RendererGL::getSunVisibility()
+{
+	for (int i=0;i<2;++i)
+	{
+		glGetQueryObjectiv(sunOcclusionQueries[i], GL_QUERY_RESULT_NO_WAIT, 
+			&occlusionQueryResults[i]);
+	}
+
+	return occlusionQueryResults[0]/(float)std::max(1,occlusionQueryResults[1]);
 }
 
 void RendererGL::saveScreenshot()
@@ -867,7 +730,7 @@ void RendererGL::renderHdr(
 	const vector<uint32_t> &closePlanets,
 	const DynamicData &ddata)
 {
-	// Wiewport
+	// Viewport
 	glViewport(0,0, windowWidth, windowHeight);
 
 	// Depth test/write
@@ -937,8 +800,22 @@ void RendererGL::renderHdr(
 
 		glBindSamplers(2, samplers.size(), samplers.data());
 		glBindTextures(2, texs.size(), texs.data());
-		
-		data.planetModel.draw();
+
+		if (star) glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[0]);
+		data.planetModel.draw(true);
+		if (star)
+		{
+			glEndQuery(GL_SAMPLES_PASSED);
+			glDepthFunc(GL_ALWAYS);
+			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+			glDepthMask(GL_FALSE);
+			glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[1]);
+			data.planetModel.draw(true);
+			glEndQuery(GL_SAMPLES_PASSED);
+			glDepthFunc(GL_LESS);
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glDepthMask(GL_TRUE);
+		}
 	}
 }
 
@@ -946,7 +823,7 @@ void RendererGL::renderTranslucent(
 	const vector<uint32_t> &translucentPlanets,
 	const DynamicData &data)
 {
-	// Wiewport
+	// Viewport
 	glViewport(0,0, windowWidth, windowHeight);
 	// Only depth test
 	glDepthMask(GL_FALSE);
@@ -993,28 +870,28 @@ void RendererGL::renderTranslucent(
 		if (hasRing)
 		{
 			pipelineRingFar.bind();
-			ringModel.draw();
+			ringModel.draw(true);
 		}
 
 		// Atmosphere
 		if (hasAtmo)
 		{
 			pipelineAtmo.bind();
-			data.planetModel.draw();
+			data.planetModel.draw(true);
 		}
 
 		// Near rings
 		if (hasRing)
 		{
 			pipelineRingNear.bind();
-			ringModel.draw();
+			ringModel.draw(true);
 		}
 	}
 }
 
 void RendererGL::renderHighpass(const DynamicData &data)
 {
-	// Wiewport
+	// Viewport
 	glViewport(0,0, windowWidth, windowHeight);
 
 	// No depth test/write
@@ -1052,7 +929,7 @@ void RendererGL::renderDownsample(const DynamicData &data)
 	pipelineDownsample.bind();
 	for (int i=0;i<bloomDepth;++i)
 	{
-		// Wiewport
+		// Viewport
 		glViewport(0,0, windowWidth>>(i+1), windowHeight>>(i+1));
 		glInvalidateNamedFramebufferData(highpassFBOs[i+1], invalidateAttach.size(), invalidateAttach.data());
 		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i+1]);
@@ -1077,7 +954,7 @@ void RendererGL::renderBloom(const DynamicData &data)
 	glBindSamplers(0, samplers.size(), samplers.data());
 	for (int i=bloomDepth;i>=1;--i)
 	{
-		// Wiewport
+		// Viewport
 		glViewport(0,0, windowWidth>>i, windowHeight>>i);
 		// Blur horizontally
 		pipelineBlurW.bind();
@@ -1096,7 +973,7 @@ void RendererGL::renderBloom(const DynamicData &data)
 		// Add blur with higher res
 		if (i>1)
 		{
-			// Wiewport
+			// Viewport
 			glViewport(0,0, windowWidth>>(i-1), windowHeight>>(i-1));
 			pipelineBloomAdd.bind();
 			glInvalidateNamedFramebufferData(bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
@@ -1108,51 +985,9 @@ void RendererGL::renderBloom(const DynamicData &data)
 	}
 }
 
-void RendererGL::renderFlares(
-	const vector<uint32_t> &farPlanets, 
-	const DynamicData &data)
-{
-	// Wiewport
-	glViewport(0,0, windowWidth, windowHeight);
-	// Only depth test
-	glDepthMask(GL_FALSE);
-	glDepthFunc(GL_LESS);
-
-	// Blending add
-	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_ONE, GL_ONE);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-
-	pipelineFlare.bind();
-
-	for (uint32_t i : farPlanets)
-	{
-		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-			data.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
-
-		// Bind planet UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			data.flareUBOs[i].getOffset(),
-			sizeof(PlanetDynamicUBO));
-
-		// Bind textures
-		const vector<GLuint> samplers = {0,0,0};
-		const vector<GLuint> texs = {
-			flareIntensityTex, flareLinesTex, flareHaloTex
-		};
-		glBindSamplers(2, samplers.size(), samplers.data());
-		glBindTextures(2, texs.size(), texs.data());
-
-		flareModel.draw();
-	}
-}
-
 void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 {
-	// Wiewport
+	// Viewport
 	glViewport(0,0, windowWidth, windowHeight);
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
@@ -1184,6 +1019,35 @@ void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 	glBindTextures(1, texs.size(), texs.data());
 
 	fullscreenTri.draw();
+}
+
+void RendererGL::renderFlare(
+	const DynamicData &data)
+{
+	// Viewport
+	glViewport(0,0, windowWidth, windowHeight);
+	// No depth test/write
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_ALWAYS);
+
+	// Blending add
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	pipelineFlare.bind();
+
+	// Bind Scene UBO
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+		data.sceneUBO.getOffset(),
+		sizeof(SceneDynamicUBO));
+
+	// Bind textures
+	glBindSampler(1, 0);
+	glBindTextureUnit(1, flareTex);
+
+	flareModel.draw();
 }
 
 void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
@@ -1400,50 +1264,6 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		?params.getStar().getBrightness():0.0;
 	ubo.radius = params.getBody().getRadius();
 	ubo.atmoHeight = params.hasAtmo()?params.getAtmo().getMaxHeight():0.0;
-
-	return ubo;
-}
-
-RendererGL::FlareDynamicUBO RendererGL::getFlareUBO(
-	const dvec3 &viewPos, const mat4 &projMat,
-	const mat4 &viewMat, const float fovy, const float exp, 
-	const PlanetState &state, const Planet &params)
-{
-	const vec3 planetPos = vec3(state.getPosition() - viewPos);
-	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
-	const vec2 screen = vec2(clip)/clip.w;
-	const float FLARE_SIZE_SCREEN = 0.5;
-	const mat4 modelMat = 
-		translate(mat4(), vec3(screen, 0.999))*
-		scale(mat4(), 
-			vec3(windowHeight/(float)windowWidth,1.0,0.0)*FLARE_SIZE_SCREEN);
-
-	const float phaseAngle = acos(dot(
-		(vec3)normalize(state.getPosition()), 
-		normalize(planetPos)));
-	const float phase = 
-		(1-phaseAngle/glm::pi<float>())*cos(phaseAngle)+
-		(1/glm::pi<float>())*sin(phaseAngle);
-	const float radius = params.getBody().getRadius();
-	const double dist = distance(viewPos, state.getPosition())/radius;
-	const float fade = clamp(params.isStar()?
-		(float)   dist/10:
-		(float) ((dist-farPlanetMinDistance)/
-		(farPlanetOptimalDistance-farPlanetMinDistance)),0.f,1.f);
-	const vec3 cutDist = planetPos*0.005f;
-	
-	const float brightness = std::min(4.0f,
-		exp*
-		radius*radius*
-		(params.isStar()?params.getStar().getBrightness():
-		0.2f*phase)
-		/dot(cutDist,cutDist))
-		*fade;
-
-	FlareDynamicUBO ubo{};
-	ubo.modelMat = modelMat;
-	ubo.color = vec4(params.getBody().getMeanColor(),1.0);
-	ubo.brightness = brightness;
 
 	return ubo;
 }

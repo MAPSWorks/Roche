@@ -9,7 +9,7 @@ set(SOURCE
 	planet.cpp
 	ddsloader.cpp
 	screenshot.cpp
-	flare.cpp
+	mesh.cpp
 	thirdparty/shaun/shaun.cpp
 	thirdparty/shaun/sweeper.cpp)
 
