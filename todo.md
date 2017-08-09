@@ -13,6 +13,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Star map
 - [x] Prettier flares
 - [x] Wait for fences to unlock before tagging as complete
 - [x] Add cost calculator to prevent too much texture updates at once
