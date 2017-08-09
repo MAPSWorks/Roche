@@ -128,7 +128,14 @@ void Game::init()
 	}
 
 	// Renderer init
-	renderer->init({planetParams, msaaSamples, maxTexSize, syncTexLoading, width, height});
+	renderer->init({
+		planetParams, 
+		starMapFilename, 
+		starMapIntensity, 
+		msaaSamples, 
+		maxTexSize, 
+		syncTexLoading, 
+		width, height});
 }
 
 template<class T>
@@ -192,6 +199,10 @@ void Game::loadPlanetFiles()
 
 		ambientColor = (float)get<double>(swp("ambientColor"));
 		std::string startingPlanet = std::string(swp("startingPlanet").value<string>());
+
+		sweeper starMap(swp("starMap"));
+		starMapFilename = get<std::string>(starMap("diffuse"));
+		starMapIntensity = (float)get<double>(starMap("intensity"));
 
 		sweeper planetsSweeper(swp("planets"));
 		planetCount = planetsSweeper.value<list>().elements().size();
@@ -405,11 +416,11 @@ void Game::update(const double dt)
 	// Exposure adjustement
 	if (glfwGetKey(win, GLFW_KEY_I))
 	{
-		exposure = std::max(-8.f,exposure-0.1f);
+		exposure = std::max(-4.f,exposure-0.1f);
 	}
 	if (glfwGetKey(win, GLFW_KEY_O))
 	{
-		exposure = std::min(+8.f, exposure+0.1f);
+		exposure = std::min(+4.f, exposure+0.1f);
 	}
 
 	// Fovy adjustement

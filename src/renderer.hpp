@@ -19,6 +19,10 @@ public:
 	{
 		/// All of the planets fixed parameters
 		std::vector<Planet> planetParams;
+		/// Star map texture filename
+		std::string starMapFilename;
+		/// Star map brightness
+		float starMapIntensity;
 		/// MSAA samples per pixel
 		int msaa;
 		/// Maximum texture width/height

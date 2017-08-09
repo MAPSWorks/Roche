@@ -52,6 +52,10 @@ private:
 		glm::mat4 viewMat;
 		/// Sun flare matrix
 		glm::mat4 flareMat;
+		/// Star map matrix
+		glm::mat4 starMapMat;
+		/// Star map intensity
+		float starMapIntensity;
 		/// Sun flare brightness
 		float flareBrightness;
 		/// Ambient light coefficient
@@ -261,6 +265,8 @@ private:
 	ShaderPipeline pipelinePlanetAtmo;
 	/// Planet with atmo and rings
 	ShaderPipeline pipelinePlanetAtmoRing;
+		/// Star map
+	ShaderPipeline pipelineStarMap;
 	/// Atmosphere
 	ShaderPipeline pipelineAtmo;
 	/// Star
@@ -347,6 +353,9 @@ private:
 
 	GLuint sunOcclusionQueries[2] = {0, 0};
 	int occlusionQueryResults[2] = {0, 1};
+
+	DDSStreamer::Handle starMapTexHandle{};
+	float starMapIntensity = 1.0;
 
 	// Textures
 	/// Default diffuse texture

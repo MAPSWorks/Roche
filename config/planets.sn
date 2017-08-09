@@ -1,5 +1,9 @@
 ambientColor:0.0002
-startingPlanet:"Neptune"
+startingPlanet:"Sun"
+starMap:{
+	diffuse:"tex/starmap"
+	intensity:0.05
+}
 planets: [
 {
 	name:"Sun"

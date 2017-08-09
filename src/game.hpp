@@ -80,6 +80,9 @@ private:
 	bool bloom = true;
 	/// Wait for whole texture to load before displaying (no pop-ins)
 	bool syncTexLoading = false;
+
+	std::string starMapFilename = "";
+	float starMapIntensity = 1.0;
 	
 	// Main planet collection
 	/// Number of planets

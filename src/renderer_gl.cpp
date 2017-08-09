@@ -190,6 +190,10 @@ void RendererGL::init(const InitInfo &info)
 	// Streamer init
 	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
 
+	// Create starMap texture
+	starMapTexHandle = streamer.createTex(info.starMapFilename);
+	starMapIntensity = info.starMapIntensity;
+
 	// Backface culling
 	glFrontFace(GL_CCW);
 	glEnable(GL_CULL_FACE);
@@ -206,6 +210,11 @@ void RendererGL::init(const InitInfo &info)
 
 	// Patch primitives
 	glPatchParameteri(GL_PATCH_VERTICES, 4);
+	// Default patch values
+	float outerLevel[] = {1.0,1.0,1.0,1.0};
+	glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, outerLevel);
+	float innerLevel[] = {1.0,1.0};
+	glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, innerLevel);
 
 	// Sun Occlusion query for flare
 	glCreateQueries(GL_SAMPLES_PASSED, 2, sunOcclusionQueries);
@@ -387,6 +396,7 @@ void RendererGL::createShaders()
 
 	// Vert shaders
 	const shader planetVert = {GL_VERTEX_SHADER, "planet.vert"};
+	const shader starMapVert = {GL_VERTEX_SHADER, "starmap.vert"};
 	const shader flareVert = {GL_VERTEX_SHADER, "flare.vert"};
 	const shader deferred = {GL_VERTEX_SHADER, "deferred.vert"};
 
@@ -395,9 +405,11 @@ void RendererGL::createShaders()
 
 	// Tese shaders
 	const shader planetTese = {GL_TESS_EVALUATION_SHADER, "planet.tese"};
+	const shader starMapTese = {GL_TESS_EVALUATION_SHADER, "starmap.tese"};
 	
 	// Frag shaders
 	const shader planetFrag = {GL_FRAGMENT_SHADER, "planet.frag"};
+	const shader starMapFrag = {GL_FRAGMENT_SHADER, "starmap.frag"};
 	const shader atmo = {GL_FRAGMENT_SHADER, "atmo.frag"};
 	const shader ringFrag = {GL_FRAGMENT_SHADER, "ring.frag"};
 	const shader highpass = {GL_FRAGMENT_SHADER, "highpass.frag"};
@@ -434,6 +446,9 @@ void RendererGL::createShaders()
 	pipelinePlanetAtmoRing = factory.createPipeline(
 		planetFilenames,
 		{hasAtmo, hasRing});
+
+	pipelineStarMap = factory.createPipeline(
+		{starMapVert, starMapTese, starMapFrag});
 
 	pipelineAtmo = factory.createPipeline(
 		{planetVert, planetTesc, planetTese, atmo},
@@ -618,6 +633,9 @@ void RendererGL::render(const RenderInfo &info)
 	{
 		sceneUBO.flareBrightness = 0.0;
 	}
+
+	sceneUBO.starMapMat = viewMat*scale(mat4(), vec3(-1));
+	sceneUBO.starMapIntensity = starMapIntensity;
 
 	sceneUBO.ambientColor = info.ambientColor;
 	sceneUBO.exposure = exp;
@@ -816,6 +834,21 @@ void RendererGL::renderHdr(
 			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 			glDepthMask(GL_TRUE);
 		}
+	}
+
+	// Star map rendering
+	// Don't render if star map texture not loaded
+	auto &starMapTex = streamer.getTex(starMapTexHandle);
+	if (starMapTex.isComplete())
+	{
+		pipelineStarMap.bind();
+		// Bind Scene UBO
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			ddata.sceneUBO.getOffset(),
+			sizeof(SceneDynamicUBO));
+		glBindSampler(1, planetTexSampler);
+		glBindTextureUnit(1, starMapTex.getCompleteTextureId());
+		sphere.draw(true);
 	}
 }
 
