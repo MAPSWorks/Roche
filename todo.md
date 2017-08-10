@@ -1,6 +1,7 @@
 ## To Do
 
 ### Important stuff
+- [ ] Create atmo & ring textures at startup
 
 ### Minor stuff
 - [ ] Frustum culling
