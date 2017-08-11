@@ -123,6 +123,10 @@ private:
 	void createShaders();
 	/// Create Screenshot object
 	void createScreenshot();
+	/// Create atmo lookup textures for all planets with atmosphere
+	void createAtmoLookups();
+	/// Create ring textures for all planets with rings
+	void createRingTextures();
 
 	/** Renders opaque parts of detailed planets to HDR rendertarget
 	 * @param closePlanets id of planets to render

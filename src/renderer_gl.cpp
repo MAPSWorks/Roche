@@ -186,6 +186,8 @@ void RendererGL::init(const InitInfo &info)
 	createTextures();
 	createFlare();
 	createScreenshot();
+	createAtmoLookups();
+	createRingTextures();
 
 	// Streamer init
 	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
@@ -509,6 +511,89 @@ void RendererGL::createScreenshot()
 		screenBestFormat = Screenshot::Format::RGBA8;
 	else if (screenBestFormatGL == GL_BGRA) 
 		screenBestFormat = Screenshot::Format::BGRA8;
+}
+
+void RendererGL::createAtmoLookups()
+{
+	for (uint32_t i=0;i<planetParams.size();++i)
+	{
+		const Planet param = planetParams[i];
+		auto &data = planetData[i];
+
+		// Generate atmospheric scattering lookup texture
+		if (param.hasAtmo())
+		{
+			const int size = 128;
+			vector<float> table = 
+				planetParams[i].getAtmo().generateLookupTable(size, param.getBody().getRadius());
+
+			GLuint &tex = data.atmoLookupTable;
+
+			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
+			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
+			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
+			glGenerateTextureMipmap(tex);
+		}
+	}
+}
+
+void RendererGL::createRingTextures()
+{
+	for (uint32_t i=0;i<planetParams.size();++i)
+	{
+		const Planet param = planetParams[i];
+		auto &data = planetData[i];
+
+		// Load ring textures
+		if (param.hasRing())
+		{
+			// Load files
+			const Planet::Ring &ring = param.getRing();
+			vector<float> backscat = ring.loadFile(ring.getBackscatFilename());
+			vector<float> forwardscat = ring.loadFile(ring.getForwardscatFilename());
+			vector<float> unlit = ring.loadFile(ring.getUnlitFilename());
+			vector<float> transparency = ring.loadFile(ring.getTransparencyFilename());
+			vector<float> color = ring.loadFile(ring.getColorFilename());
+
+			size_t size = backscat.size();
+
+			// Check sizes
+			if (size != forwardscat.size() &&
+				size != unlit.size() &&
+				size != transparency.size() &&
+				size*3 != color.size())
+			{
+				throw runtime_error("Ring texture sizes don't match");
+			}
+
+			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
+			vector<float> t1(size*3);
+			vector<float> t2(size*4);
+			for (size_t i=0;i<size;++i)
+			{
+				t1[i*3+0] = backscat[i];
+				t1[i*3+1] = forwardscat[i];
+				t1[i*3+2] = unlit[i];
+				t2[i*4+0] = color[i*3+0];
+				t2[i*4+1] = color[i*3+1];
+				t2[i*4+2] = color[i*3+2];
+				t2[i*4+3] = transparency[i];
+			}
+
+			GLuint &tex1 = data.ringTex1;
+			GLuint &tex2 = data.ringTex2;
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
+			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
+			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
+			glGenerateTextureMipmap(tex1);
+
+			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
+			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
+			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
+			glGenerateTextureMipmap(tex2);
+		}
+	}
 }
 
 void RendererGL::destroy()
@@ -1099,71 +1184,6 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 		if (param.hasSpecular())
 			data.specular = streamer.createTex(param.getSpecular().getFilename());
 
-		// Generate atmospheric scattering lookup texture
-		if (param.hasAtmo())
-		{
-			const int size = 128;
-			vector<float> table = 
-				planetParams[i].getAtmo().generateLookupTable(size, param.getBody().getRadius());
-
-			GLuint &tex = data.atmoLookupTable;
-
-			glCreateTextures(GL_TEXTURE_2D, 1, &tex);
-			glTextureStorage2D(tex, mipmapCount(size), GL_RG32F, size, size);
-			glTextureSubImage2D(tex, 0, 0, 0, size, size, GL_RG, GL_FLOAT, table.data());
-			glGenerateTextureMipmap(tex);
-		}
-
-		// Load ring textures
-		if (param.hasRing())
-		{
-			// Load files
-			const Planet::Ring &ring = param.getRing();
-			vector<float> backscat = ring.loadFile(ring.getBackscatFilename());
-			vector<float> forwardscat = ring.loadFile(ring.getForwardscatFilename());
-			vector<float> unlit = ring.loadFile(ring.getUnlitFilename());
-			vector<float> transparency = ring.loadFile(ring.getTransparencyFilename());
-			vector<float> color = ring.loadFile(ring.getColorFilename());
-
-			size_t size = backscat.size();
-
-			// Check sizes
-			if (size != forwardscat.size() &&
-				size != unlit.size() &&
-				size != transparency.size() &&
-				size*3 != color.size())
-			{
-				throw runtime_error("Ring texture sizes don't match");
-			}
-
-			// Assemble values into two textures (t1 for back, forward and unlit, t2 for color+transparency)
-			vector<float> t1(size*3);
-			vector<float> t2(size*4);
-			for (size_t i=0;i<size;++i)
-			{
-				t1[i*3+0] = backscat[i];
-				t1[i*3+1] = forwardscat[i];
-				t1[i*3+2] = unlit[i];
-				t2[i*4+0] = color[i*3+0];
-				t2[i*4+1] = color[i*3+1];
-				t2[i*4+2] = color[i*3+2];
-				t2[i*4+3] = transparency[i];
-			}
-
-			GLuint &tex1 = data.ringTex1;
-			GLuint &tex2 = data.ringTex2;
-
-			glCreateTextures(GL_TEXTURE_1D, 1, &tex1);
-			glTextureStorage1D(tex1, mipmapCount(size), GL_RGB32F, size);
-			glTextureSubImage1D(tex1, 0, 0, size, GL_RGB, GL_FLOAT, t1.data());
-			glGenerateTextureMipmap(tex1);
-
-			glCreateTextures(GL_TEXTURE_1D, 1, &tex2);
-			glTextureStorage1D(tex2, mipmapCount(size), GL_RGBA32F, size);
-			glTextureSubImage1D(tex2, 0, 0, size, GL_RGBA, GL_FLOAT, t2.data());
-			glGenerateTextureMipmap(tex2);
-		}
-
 		data.texLoaded = true;
 	}
 }
@@ -1175,15 +1195,6 @@ void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 	{
 		auto &data = planetData[i];
 
-		if (data.atmoLookupTable)
-			glDeleteTextures(1, &data.atmoLookupTable);
-
-		if (data.ringTex1)
-			glDeleteTextures(1, &data.ringTex1);
-
-		if (data.ringTex2)
-			glDeleteTextures(2, &data.ringTex2);
-
 		// Reset variables
 		data.texLoaded = false;
 		streamer.deleteTex(data.diffuse);
@@ -1194,9 +1205,6 @@ void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
 		data.cloud = 0;
 		data.night = 0;
 		data.specular = 0;
-		data.atmoLookupTable = 0;
-		data.ringTex1 = 0;
-		data.ringTex2 = 0;
 	}
 }
 

@@ -1,11 +1,11 @@
 ## To Do
 
 ### Important stuff
-- [ ] Create atmo & ring textures at startup
 
 ### Minor stuff
 - [ ] Frustum culling
 - [ ] Better focus transitions
+- [ ] Profiling graphs
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
@@ -14,6 +14,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Create atmo & ring textures at startup
 - [x] Star map
 - [x] Prettier flares
 - [x] Wait for fences to unlock before tagging as complete
