@@ -13,11 +13,10 @@
 - [ ] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
 
 #### Once text rendering available
-- [ ] Opening screen with controls (can be closed with any input after 1 sec)
+- [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
 - [ ] Body name displayed on top left, with mention of parent body and time
 - [ ] Names of distant planets next to them (fade in when planet into view for 1~2sec)
 - [ ] Streaming indicator on top right of window
-- [ ] Profiling graphs
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
