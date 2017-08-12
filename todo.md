@@ -1,15 +1,27 @@
 ## To Do
 
 ### Important stuff
+- [ ] Text rendering with stb_truetype
+- [ ] Automatic exposure
+- [ ] Fix atmospheric shaders (fireflies, flickering at high distances)
 
 ### Minor stuff
+- [ ] Don't allow to skip transitions
+- [ ] Flares for planets (data in planet UBO)
+- [ ] Better focus transitions (pan to target body, if body in the way move back, then move towards target)
 - [ ] Frustum culling
-- [ ] Better focus transitions
+- [ ] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
+
+#### Once text rendering available
+- [ ] Opening screen with controls (can be closed with any input after 1 sec)
+- [ ] Body name displayed on top left, with mention of parent body and time
+- [ ] Names of distant planets next to them (fade in when planet into view for 1~2sec)
+- [ ] Streaming indicator on top right of window
 - [ ] Profiling graphs
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
-- [ ] Some kind of HUD (imgui)
+- [ ] Heightmap applied in tese shader
 - [ ] Vulkan implementation, one day
 - [ ] Auto-pilot tour
 
