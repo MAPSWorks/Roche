@@ -8,7 +8,6 @@
 ### Minor stuff
 - [ ] Choose between absolute and rotative frame of reference
 - [ ] Better focus transitions (pan to target body, if body in the way move back, then move towards target)
-- [ ] Flares for planets (data in planet UBO)
 - [ ] Frustum culling
 
 #### Once text rendering available
@@ -24,6 +23,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Flares for planets (data in planet UBO)
 - [x] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
 - [x] Don't allow to skip transitions
 - [x] Create atmo & ring textures at startup
