@@ -128,27 +128,28 @@ private:
 	// SWITCHING PLANETS
 	/// Indicates if the view is switching from a planet to another
 	bool isSwitching = false;
-	/// Number of frames for a switch
-	int switchFrames = 100; 
 	/// Current frame of switching
-	int switchFrameCurrent = 0;
+	float switchTime = 0.0;
 	/// Zoom transition amount
 	float switchPreviousDist = 0;
 	/// Index in main collection of planet switching from
 	int switchPreviousPlanet = -1; 
+	glm::vec2 switchPreviousPan{};
 
 	/// Mouse sensitivity
 	float sensitivity = 0.0004;
 
 	// VIEW COORDINATES
 	/// Polar coordinates (theta, phi, distance)
-	glm::vec3 cameraPolar;
-	/// Where the camera is looking at
-	glm::dvec3 cameraCenter;
+	glm::vec3 viewPolar;
+	/// View panning polar coordinates (theta, phi)
+	glm::vec2 panPolar;
+	/// Where the view is looking at
+	glm::dvec3 viewCenter;
 	/// Camera position in cartesian coordinates
-	glm::dvec3 cameraPos;
+	glm::dvec3 viewPos;
 	/// Vertical Field of view in radians
-	float cameraFovy = glm::radians(40.f);
+	float viewFovy = glm::radians(40.f);
 
 	/// GLFW Window pointer
 	GLFWwindow *win = nullptr;

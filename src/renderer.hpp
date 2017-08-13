@@ -41,10 +41,8 @@ public:
 		glm::dvec3 viewPos;
 		/// Vertical field of view in radians
 		float fovy;
-		/// Where the view points to in world space
-		glm::dvec3 viewCenter;
-		/// Up direction in world space
-		glm::vec3 viewUp;
+		/// View direction matrix
+		glm::mat3 viewDir;
 		/// Exposure factor
 		float exposure;
 		/// Ambient light coefficient

@@ -86,12 +86,14 @@ void Game::loadSettingsFile()
 	}
 }
 
+std::function<void(int)> uglyScrollWorkaround;
+
 void Game::init()
 {
 	loadSettingsFile();
 	loadPlanetFiles();
 
-	cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
+	viewPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
 
 	// Window & context creation
 	if (!glfwInit())
@@ -111,12 +113,36 @@ void Game::init()
 		width = mode->width;
 		height = mode->height;
 	}
-	win = glfwCreateWindow(width, height, "Roche", fullscreen?monitor:nullptr, nullptr);
+	win = glfwCreateWindow(width, height, "Roche", 
+		fullscreen?monitor:nullptr, 
+		nullptr);
+
+	uglyScrollWorkaround = [this](int offset){
+		if (!isSwitching)
+		{
+			// FOV zoom/unzoom when alt key held
+			if (glfwGetKey(win, GLFW_KEY_LEFT_ALT))
+			{
+				viewFovy = glm::clamp(viewFovy*glm::pow(0.5f, 
+					(float)offset*sensitivity*100),
+					glm::radians(0.1f), glm::radians(40.f));
+			}
+			// Distance zoom/unzoom
+			else
+			{
+				viewSpeed.z -= 40*offset*sensitivity;
+			}
+		}
+	};
+
+	glfwSetScrollCallback(win, [](GLFWwindow* win, double, double yoffset){
+		uglyScrollWorkaround(yoffset);
+	});
 
 	if (!win)
 	{
 		glfwTerminate();
-		exit(-1);
+		throw std::runtime_error("Can't open window");
 	}
 	glfwMakeContextCurrent(win);
 
@@ -360,6 +386,14 @@ bool Game::isPressedOnce(const int key)
 	}
 }
 
+glm::vec3 polarToCartesian(const glm::vec2 &p)
+{
+	return glm::vec3(
+		cos(p.x)*cos(p.y), 
+		sin(p.x)*cos(p.y), 
+		sin(p.y));
+}
+
 void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
@@ -423,16 +457,6 @@ void Game::update(const double dt)
 		exposure = std::min(+4.f, exposure+0.1f);
 	}
 
-	// Fovy adjustement
-	if (glfwGetKey(win, GLFW_KEY_Y))
-	{
-		cameraFovy = std::max(glm::radians(0.1f), cameraFovy/1.1f);
-	}
-	if (glfwGetKey(win, GLFW_KEY_U))
-	{
-		cameraFovy = std::min(glm::radians(60.f), cameraFovy*1.1f);
-	}
-
 	// Wireframe on/off
 	if (isPressedOnce(GLFW_KEY_W))
 	{
@@ -448,43 +472,44 @@ void Game::update(const double dt)
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
-		if (isSwitching)
+		if (!isSwitching)
 		{
-			// Instant switch
-			isSwitching = false;
-			cameraPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*0.04
-				/tan(glm::radians(cameraFovy)/2.f);
-		}
-		else
-		{
-			// Slow switch
+			// Kill timewarp
+			const int nextPlanet = focusedPlanetId+
+			(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
+			const size_t nextPlanetWrap = (nextPlanet>=(int)planetCount)?0:
+				((nextPlanet<0?(planetCount-1):nextPlanet));
+			timeWarpIndex = 0;
 			switchPreviousPlanet = focusedPlanetId;
-			focusedPlanetId = (focusedPlanetId+1)%planetCount;
-			switchPreviousDist = cameraPolar.z;
+			focusedPlanetId = nextPlanetWrap;
+			switchPreviousDist = viewPolar.z;
+			switchPreviousPan = panPolar;
 			isSwitching = true;
 		} 
 	}
 
 	if (isSwitching)
 	{
-		const float t = switchFrameCurrent/(float)switchFrames;
+		const float totalSwitchTime = 2.0;
+		const float t = switchTime/totalSwitchTime;
 		const double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
 		const glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].getPosition();
-		cameraCenter = (planetStates[focusedPlanetId].getPosition() - previousPlanetPos)*f + previousPlanetPos;
+		viewCenter = (planetStates[focusedPlanetId].getPosition() - previousPlanetPos)*f + previousPlanetPos;
 		const float targetDist = planetParams[focusedPlanetId].getBody().getRadius()*4;
-		cameraPolar.z = (targetDist - switchPreviousDist)*f + switchPreviousDist;
+		viewPolar.z = (targetDist - switchPreviousDist)*f + switchPreviousDist;
+		panPolar = switchPreviousPan*(1-f);
+		switchTime += dt;
 
-		++switchFrameCurrent;
+		if (t > 1.0)
+		{
+			isSwitching = false;
+			switchTime = 0.0;
+			panPolar = glm::vec2(0,0);
+		}
 	}
 	else
 	{
-		cameraCenter = planetStates[focusedPlanetId].getPosition();
-	}
-
-	if (switchFrameCurrent > switchFrames)
-	{
-		isSwitching = false;
-		switchFrameCurrent = 0;
+		viewCenter = planetStates[focusedPlanetId].getPosition();
 	}
 
 	// Mouse move
@@ -505,7 +530,7 @@ void Game::update(const double dt)
 	}
 
 	// Drag view around
-	if (dragging)
+	if (dragging && !isSwitching)
 	{
 		if (mouseButton1)
 		{	
@@ -519,28 +544,35 @@ void Game::update(const double dt)
 		}
 		else if (mouseButton2)
 		{
-			viewSpeed.z += (move.y*sensitivity);
+			panPolar += move*sensitivity;
 		}
 	}
 
-	cameraPolar.x += viewSpeed.x;
-	cameraPolar.y += viewSpeed.y;
-	cameraPolar.z *= 1.0+viewSpeed.z;
+	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
+
+	viewPolar.x += viewSpeed.x;
+	viewPolar.y += viewSpeed.y;
+	viewPolar.z += viewSpeed.z*(viewPolar.z-radius);
 
 	viewSpeed *= viewSmoothness;
 
-	if (cameraPolar.y > glm::pi<float>()/2 - 0.001)
+	const float maxVerticalAngle = glm::pi<float>()/2 - 0.001;
+
+	if (viewPolar.y > maxVerticalAngle)
 	{
-		cameraPolar.y = glm::pi<float>()/2 - 0.001;
+		viewPolar.y = maxVerticalAngle;
 		viewSpeed.y = 0;
 	}
-	if (cameraPolar.y < -glm::pi<float>()/2 + 0.001)
+	if (viewPolar.y < -maxVerticalAngle)
 	{
-		cameraPolar.y = -glm::pi<float>()/2 + 0.001;
+		viewPolar.y = -maxVerticalAngle;
 		viewSpeed.y = 0;
 	}
-	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
-	if (cameraPolar.z < radius) cameraPolar.z = radius;
+	if (viewPolar.z < radius) viewPolar.z = radius;
+
+	panPolar.y = glm::clamp(panPolar.y, 
+		-maxVerticalAngle, 
+		maxVerticalAngle);
 
 	// Mouse reset
 	preMousePosX = posX;
@@ -552,19 +584,26 @@ void Game::update(const double dt)
 		renderer->takeScreenshot(generateScreenshotName());
 	}
 
-	// Shift scene so view is at (0,0,0)
-	cameraPos = glm::dvec3(
-		cos(cameraPolar.x)*cos(cameraPolar.y), 
-		sin(cameraPolar.x)*cos(cameraPolar.y), 
-		sin(cameraPolar.y))*(double)cameraPolar.z +
-		cameraCenter;
+	// Position around center
+	const glm::vec3 relViewPos = polarToCartesian(glm::vec2(viewPolar))*
+		viewPolar.z;
 
+	// View space position
+	viewPos = glm::dvec3(relViewPos) + viewCenter;
+
+	glm::mat3 viewDir = glm::mat3(
+		glm::rotate(panPolar.x, glm::vec3(0,-1,0))*
+		glm::rotate(panPolar.y, glm::vec3(1,0,0))*
+		glm::lookAt(
+			glm::vec3(0), 
+			-relViewPos, 
+			glm::vec3(0,0,1)));
 	// Focused planets
 	std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
 		
 	// Scene rendering
 	renderer->render({
-		cameraPos, cameraFovy, cameraCenter, glm::vec3(0,0,1),
+		viewPos, viewFovy, viewDir,
 		exposure, ambientColor, wireframe, bloom, 
 		planetStates, visiblePlanetsId});
 

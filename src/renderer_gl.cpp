@@ -622,7 +622,7 @@ void RendererGL::render(const RenderInfo &info)
 
 	// Projection and view matrices
 	const mat4 projMat = perspective(info.fovy, windowWidth/(float)windowHeight, 0.f,1.f);
-	const mat4 viewMat = lookAt(vec3(0), (vec3)(info.viewCenter-info.viewPos), info.viewUp);
+	const mat4 viewMat = mat4(info.viewDir);
 
 	// Planet classification
 	vector<uint32_t> closePlanets;

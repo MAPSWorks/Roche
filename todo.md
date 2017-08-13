@@ -6,11 +6,10 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances)
 
 ### Minor stuff
-- [ ] Don't allow to skip transitions
-- [ ] Flares for planets (data in planet UBO)
+- [ ] Choose between absolute and rotative frame of reference
 - [ ] Better focus transitions (pan to target body, if body in the way move back, then move towards target)
+- [ ] Flares for planets (data in planet UBO)
 - [ ] Frustum culling
-- [ ] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
 
 #### Once text rendering available
 - [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
@@ -25,6 +24,8 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
+- [x] Don't allow to skip transitions
 - [x] Create atmo & ring textures at startup
 - [x] Star map
 - [x] Prettier flares
