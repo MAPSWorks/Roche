@@ -127,6 +127,11 @@ void Game::init()
 					(float)offset*sensitivity*100),
 					glm::radians(0.1f), glm::radians(40.f));
 			}
+			// Exposure +/-
+			else if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL))
+			{
+				exposure = glm::clamp(exposure+0.1f*offset, -4.f, 4.f);
+			}
 			// Distance zoom/unzoom
 			else
 			{
@@ -446,17 +451,7 @@ void Game::update(const double dt)
 	{
 		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
 	}
-
-	// Exposure adjustement
-	if (glfwGetKey(win, GLFW_KEY_I))
-	{
-		exposure = std::max(-4.f,exposure-0.1f);
-	}
-	if (glfwGetKey(win, GLFW_KEY_O))
-	{
-		exposure = std::min(+4.f, exposure+0.1f);
-	}
-
+	
 	// Wireframe on/off
 	if (isPressedOnce(GLFW_KEY_W))
 	{
