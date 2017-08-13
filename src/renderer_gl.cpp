@@ -611,8 +611,8 @@ void RendererGL::render(const RenderInfo &info)
 {
 	const float closePlanetMinSizePixels = 1;
 	this->closePlanetMaxDistance =windowHeight/(closePlanetMinSizePixels*tan(info.fovy/2));
-	this->farPlanetMinDistance = closePlanetMaxDistance*0.35;
-	this->farPlanetOptimalDistance = closePlanetMaxDistance*2.0;
+	this->flareMinDistance = closePlanetMaxDistance*0.35;
+	this->flareOptimalDistance = closePlanetMaxDistance*1.0;
 	this->texLoadDistance = closePlanetMaxDistance*1.4;
 	this->texUnloadDistance = closePlanetMaxDistance*1.6;
 
@@ -627,6 +627,7 @@ void RendererGL::render(const RenderInfo &info)
 	// Planet classification
 	vector<uint32_t> closePlanets;
 	vector<uint32_t> translucentPlanets;
+	vector<uint32_t> flares;
 
 	vector<uint32_t> texLoadPlanets;
 	vector<uint32_t> texUnloadPlanets;
@@ -645,12 +646,11 @@ void RendererGL::render(const RenderInfo &info)
 			info.focusedPlanetsId.begin(), 
 			info.focusedPlanetsId.end(), i)>0;
 
-		if (dist < texLoadDistance && !data.texLoaded)
+		if ((focused || dist < texLoadDistance) && !data.texLoaded)
 		{
-			// Textures need to be loaded
-			if (focused) texLoadPlanets.push_back(i);
+			texLoadPlanets.push_back(i);
 		}
-		else if (dist > texUnloadDistance && data.texLoaded)
+		else if (!focused && data.texLoaded && dist > texUnloadDistance)
 		{
 			// Textures need to be unloaded
 			texUnloadPlanets.push_back(i);
@@ -668,6 +668,10 @@ void RendererGL::render(const RenderInfo &info)
 				{
 					translucentPlanets.push_back(i);
 				}
+			}
+			if (dist > flareMinDistance && !param.isStar())
+			{
+				flares.push_back(i);
 			}
 		}
 	}
@@ -687,38 +691,6 @@ void RendererGL::render(const RenderInfo &info)
 	SceneDynamicUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
-
-	const float visibility = getSunVisibility();
-
-	const vec3 planetPos = vec3(
-		info.planetStates[sunId].getPosition() - info.viewPos);
-	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
-	const vec3 screen = vec3(clip)/clip.w;
-	const bool visible = clip.w > 0;
-
-	if (visible)
-	{
-		const auto star = planetParams[sunId].getStar();
-		const float dist = length(planetPos);
-		const float radius = planetParams[sunId].getBody().getRadius();
-		const float flareSize = clamp((2.f/glm::tan(info.fovy))*
-			(star.getBrightness()*radius*radius)/
-			(star.getFlareAttenuation()*dist*dist),
-			star.getFlareMinSize(), star.getFlareMaxSize()*exp)*visibility;
-		sceneUBO.flareMat = 
-			translate(mat4(), screen)*
-			scale(mat4(), 
-				vec3(windowHeight/(float)windowWidth,1.0,0.0)*flareSize);
-		sceneUBO.flareBrightness = glm::clamp(
-				(dist/radius-star.getFlareFadeInStart())/
-				(star.getFlareFadeInEnd()-star.getFlareFadeInStart()),
-				0.f,1.f);
-	}
-	else
-	{
-		sceneUBO.flareBrightness = 0.0;
-	}
-
 	sceneUBO.starMapMat = viewMat*scale(mat4(), vec3(-1));
 	sceneUBO.starMapIntensity = starMapIntensity;
 
@@ -728,11 +700,10 @@ void RendererGL::render(const RenderInfo &info)
 	sceneUBO.logDepthC = logDepthC;
 
 	// Planet uniform update
-	// Close planets (detailed model)
 	vector<PlanetDynamicUBO> planetUBOs(planetCount);
-	for (uint32_t i : closePlanets)
+	for (uint32_t i=0;i<planetCount;++i)
 	{
-		planetUBOs[i] = getPlanetUBO(info.viewPos, viewMat, 
+		planetUBOs[i] = getPlanetUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
 			info.planetStates[i], planetParams[i], planetData[i]);
 	}
 
@@ -767,6 +738,9 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.begin("Planets");
 	renderHdr(closePlanets, currentData);
 	profiler.end();
+	profiler.begin("Flares");
+	renderPlanetFlares(flares, currentData);
+	profiler.end();
 	profiler.begin("Translucent objects");
 	renderTranslucent(translucentPlanets, currentData);
 	profiler.end();
@@ -786,8 +760,8 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.begin("Tonemapping");
 	renderTonemap(currentData, info.bloom);
 	profiler.end();
-	profiler.begin("Flare");
-	renderFlare(currentData);
+	profiler.begin("Sun Flare");
+	renderSunFlare(currentData);
 	profiler.end();
 
 	if (takeScreen)
@@ -926,6 +900,7 @@ void RendererGL::renderHdr(
 	auto &starMapTex = streamer.getTex(starMapTexHandle);
 	if (starMapTex.isComplete())
 	{
+		glDepthMask(GL_FALSE);
 		pipelineStarMap.bind();
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
@@ -934,6 +909,35 @@ void RendererGL::renderHdr(
 		glBindSampler(1, planetTexSampler);
 		glBindTextureUnit(1, starMapTex.getCompleteTextureId());
 		sphere.draw(true);
+	}
+}
+
+void RendererGL::renderPlanetFlares(
+	const vector<uint32_t> &flares,
+	const DynamicData &data)
+{
+	glViewport(0,0, windowWidth, windowHeight);
+	// Only depth test
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LESS);
+	// Blending
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+
+	pipelineFlare.bind();
+
+	glBindSampler(1, 0);
+	glBindTextureUnit(1, flareTex);
+
+	for (uint32_t i : flares)
+	{
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+			data.planetUBOs[i].getOffset(),
+			sizeof(PlanetDynamicUBO));
+
+		flareModel.draw();
 	}
 }
 
@@ -1139,7 +1143,7 @@ void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 	fullscreenTri.draw();
 }
 
-void RendererGL::renderFlare(
+void RendererGL::renderSunFlare(
 	const DynamicData &data)
 {
 	// Viewport
@@ -1158,8 +1162,8 @@ void RendererGL::renderFlare(
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-		data.sceneUBO.getOffset(),
-		sizeof(SceneDynamicUBO));
+		data.planetUBOs[sunId].getOffset(),
+		sizeof(PlanetDynamicUBO));
 
 	// Bind textures
 	glBindSampler(1, 0);
@@ -1215,7 +1219,8 @@ void RendererGL::uploadLoadedTextures()
 }
 
 RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
-	const dvec3 &viewPos, const mat4 &viewMat,
+	const float fovy, const float exp,
+	const dvec3 &viewPos, const mat4 &projMat, const mat4 &viewMat,
 	const PlanetState &state, const Planet &params,
 	const PlanetData &data)
 {
@@ -1266,6 +1271,60 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		return make_pair(ringFarMat, ringNearMat);
 	}();
 
+	// Flare
+	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
+	const vec3 screen = vec3(vec2((clip)/clip.w),0.999);
+	const bool visible = clip.w > 0;
+
+	mat4 flareMat = mat4(0);
+	vec4 flareColor = vec4(0);
+
+	if (visible)
+	{
+		const float dist = length(planetPos);
+		const float radius = params.getBody().getRadius();
+		float flareSize = 1.f/glm::tan(fovy/2.f);
+		if (params.isStar())
+		{
+			const float visibility = getSunVisibility();
+			const auto star = params.getStar();
+			flareSize = clamp(radius*radius/(dist*dist)*
+				star.getBrightness()/star.getFlareAttenuation(),
+				star.getFlareMinSize(), star.getFlareMaxSize()*exp)*
+				visibility*flareSize;
+
+			flareColor = vec4(vec3(clamp(
+					(dist/radius-star.getFlareFadeInStart())/
+					(star.getFlareFadeInEnd()-star.getFlareFadeInStart()),
+					0.f,1.f)), 1.f);
+		}
+		else
+		{
+			// Smooth transition to detailed planet to flare
+			const float fadeIn = clamp((dist/radius-flareMinDistance)/
+				(flareOptimalDistance-flareMinDistance),0.f,1.f);
+			flareSize = flareSize*fadeIn*(2.f/(float)windowHeight);
+
+			// Angle between view and light 
+			const float phaseAngle = acos(dot(
+				(vec3)normalize(state.getPosition()), 
+				normalize(planetPos)));
+			// Illumination compared to fully lit disk
+			const float phase = 
+				(1-phaseAngle/pi<float>())*cos(phaseAngle)+
+				(1/pi<float>())*sin(phaseAngle);
+			
+			const float cutDist = dist*0.00008f;
+			
+			flareColor = vec4(
+				clamp(20.f*radius*radius*phase/(cutDist*cutDist),0.f,10.f)*
+				params.getBody().getMeanColor()
+				,1.0);
+		}
+		flareMat = translate(mat4(), screen)*
+			scale(mat4(), vec3(windowHeight/(float)windowWidth,1.0,0.0)*flareSize);
+	}
+
 	const mat3 viewNormalMat = transpose(inverse(mat3(viewMat)));
 	
 
@@ -1277,11 +1336,13 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	ubo.atmoMat = atmoMat;
 	ubo.ringFarMat = ringMatrices.first;
 	ubo.ringNearMat = ringMatrices.second;
+	ubo.flareMat = flareMat;
+	ubo.flareColor = flareColor;
 	ubo.planetPos = viewMat*vec4(planetPos, 1.0);
 	ubo.lightDir = viewMat*vec4(lightDir,0.0);
 	ubo.K = params.hasAtmo()
 		?params.getAtmo().getScatteringConstant()
-		:glm::vec4(0.0);
+		:vec4(0.0);
 
 	if (params.hasSpecular())
 	{

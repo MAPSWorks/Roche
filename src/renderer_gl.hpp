@@ -50,14 +50,10 @@ private:
 		glm::mat4 projMat;
 		/// View matrix
 		glm::mat4 viewMat;
-		/// Sun flare matrix
-		glm::mat4 flareMat;
 		/// Star map matrix
 		glm::mat4 starMapMat;
 		/// Star map intensity
 		float starMapIntensity;
-		/// Sun flare brightness
-		float flareBrightness;
 		/// Ambient light coefficient
 		float ambientColor;
 		/// Exposure factor
@@ -79,6 +75,10 @@ private:
 		glm::mat4 ringFarMat;
 		/// Model matrix of the near half ring
 		glm::mat4 ringNearMat;
+		/// flare matrix
+		glm::mat4 flareMat;
+		/// flare color
+		glm::vec4 flareColor;
 		/// Planet position in view space
 		glm::vec4 planetPos;
 		/// Light direction in view space
@@ -135,6 +135,13 @@ private:
 	void renderHdr(
 		const std::vector<uint32_t> &closePlanets, 
 		const DynamicData &data);
+	/** Renders flares to HDR rendertarget
+	 * @param flares id of planets to render as flares
+	 * @param buffer ranges to use for rendering
+	 */
+	void renderPlanetFlares(
+		const std::vector<uint32_t> &flares,
+		const DynamicData &data);
 	/** Renders translucent parts of detailed planets to HDR rendertarget
 	 * @param translucentPlanets id of planets to render
 	 * @param buffer ranges to use for rendering
@@ -162,7 +169,7 @@ private:
 	/** Renders sun flare on top of the screen
 	 *
 	 */
-	void renderFlare(const DynamicData &data);
+	void renderSunFlare(const DynamicData &data);
 	/** Sets the textures of planets to be loaded asynchronouly
 	 * @param planets planets whose textures to load
 	 */
@@ -211,9 +218,9 @@ private:
 	/// Max distance at which a planet is considered 'close' (detailed render)
 	float closePlanetMaxDistance;
 	/// Min distance at which a planet is considered 'far' (flare render)
-	float farPlanetMinDistance;
+	float flareMinDistance;
 	/// Optimal distance at which a planet is considered 'far' (no flare fade in)
-	float farPlanetOptimalDistance;
+	float flareOptimalDistance;
 	/// Distance at which a planet's textures will be loaded
 	float texLoadDistance;
 	/// Distance at which a planet's textures will be unloaded
@@ -342,7 +349,10 @@ private:
 	 * @returns UBO data
 	 */
 	PlanetDynamicUBO getPlanetUBO(
-		const glm::dvec3 &viewPos, 
+		float fovy,
+		float exp,
+		const glm::dvec3 &viewPos,
+		const glm::mat4 &projMat, 
 		const glm::mat4 &viewMat,
 		const PlanetState &state, 
 		const Planet &params, 

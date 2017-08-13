@@ -97,7 +97,7 @@ void Game::init()
 
 	// Window & context creation
 	if (!glfwInit())
-		exit(-1);
+		throw std::runtime_error("Can't init GLFW");
 
 	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 	const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -592,8 +592,8 @@ void Game::update(const double dt)
 	viewPos = glm::dvec3(relViewPos) + viewCenter;
 
 	glm::mat3 viewDir = glm::mat3(
-		glm::rotate(panPolar.x, glm::vec3(0,-1,0))*
 		glm::rotate(panPolar.y, glm::vec3(1,0,0))*
+		glm::rotate(panPolar.x, glm::vec3(0,-1,0))*
 		glm::lookAt(
 			glm::vec3(0), 
 			-relViewPos, 

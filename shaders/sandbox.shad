@@ -2,10 +2,8 @@ struct SceneUBO
 {
 	mat4 projMat;
 	mat4 viewMat;
-	mat4 flareMat;
 	mat4 starMapMat;
 	float starMapIntensity;
-	float flareBrightness;
 	float ambientColor;
 	float exposure;
 	float logDepthFarPlane;
@@ -18,6 +16,8 @@ struct PlanetUBO
 	mat4 atmoMat;
 	mat4 ringFarMat;
 	mat4 ringNearMat;
+	mat4 flareMat;
+	vec4 flareColor;
 	vec4 planetPos;
 	vec4 lightDir;
 	vec4 K;

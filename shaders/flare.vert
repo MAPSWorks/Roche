@@ -8,9 +8,9 @@ out gl_PerVertex
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inUv;
 
-layout (binding = 0, std140) uniform sceneDynamicUBO
+layout (binding = 0, std140) uniform planetDynamicUBO
 {
-	SceneUBO sceneUBO;
+	PlanetUBO planetUBO;
 };
 
 layout (location = 0) out vec2 passUv;
@@ -18,5 +18,5 @@ layout (location = 0) out vec2 passUv;
 void main()
 {
 	passUv = inUv;
-	gl_Position = sceneUBO.flareMat*vec4(inPosition, 1);
+	gl_Position = planetUBO.flareMat*vec4(inPosition, 1);
 }
