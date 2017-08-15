@@ -9,6 +9,7 @@
 - [ ] Choose between absolute and rotative frame of reference
 - [ ] Better focus transitions (pan to target body, if body in the way move back, then move towards target)
 - [ ] Frustum culling
+- [ ] Fix atmosphere when view inside
 
 #### Once text rendering available
 - [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
