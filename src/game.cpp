@@ -26,6 +26,8 @@
 
 #include <glm/ext.hpp>
 
+using namespace glm;
+
 std::string generateScreenshotName();
 
 Game::Game()
@@ -118,19 +120,19 @@ void Game::init()
 		nullptr);
 
 	uglyScrollWorkaround = [this](int offset){
-		if (!isSwitching)
+		if (switchPhase == SwitchPhase::IDLE)
 		{
 			// FOV zoom/unzoom when alt key held
 			if (glfwGetKey(win, GLFW_KEY_LEFT_ALT))
 			{
-				viewFovy = glm::clamp(viewFovy*glm::pow(0.5f, 
+				viewFovy = clamp(viewFovy*pow(0.5f, 
 					(float)offset*sensitivity*100),
-					glm::radians(0.1f), glm::radians(40.f));
+					radians(0.1f), radians(40.f));
 			}
 			// Exposure +/-
 			else if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL))
 			{
-				exposure = glm::clamp(exposure+0.1f*offset, -4.f, 4.f);
+				exposure = clamp(exposure+0.1f*offset, -4.f, 4.f);
 			}
 			// Distance zoom/unzoom
 			else
@@ -191,9 +193,9 @@ bool get(shaun::sweeper swp)
 }
 
 template<>
-glm::vec3 get(shaun::sweeper swp)
+vec3 get(shaun::sweeper swp)
 {
-	glm::vec3 ret;
+	vec3 ret;
 	if (swp.is_null()) return ret;
 	for (int i=0;i<3;++i)
 		ret[i] = swp[i].value<shaun::number>();
@@ -201,18 +203,18 @@ glm::vec3 get(shaun::sweeper swp)
 }
 
 template<>
-glm::vec4 get(shaun::sweeper swp)
+vec4 get(shaun::sweeper swp)
 {
-	glm::vec4 ret;
+	vec4 ret;
 	if (swp.is_null()) return ret;
 	for (int i=0;i<4;++i)
 		ret[i] = swp[i].value<shaun::number>();
 	return ret;
 }
 
-glm::vec3 axis(const float rightAscension, const float declination)
+vec3 axis(const float rightAscension, const float declination)
 {
-	return glm::vec3(
+	return vec3(
 		-sin(rightAscension)*cos(declination),
 		 cos(rightAscension)*cos(declination),
 		 sin(declination));
@@ -258,10 +260,10 @@ void Game::loadPlanetFiles()
 				const Planet::Orbit orbit(
 					get<double>(orbitsw("ecc")),
 					get<double>(orbitsw("sma")),
-					glm::radians(get<double>(orbitsw("inc"))),
-					glm::radians(get<double>(orbitsw("lan"))),
-					glm::radians(get<double>(orbitsw("arg"))),
-					glm::radians(get<double>(orbitsw("m0"))));
+					radians(get<double>(orbitsw("inc"))),
+					radians(get<double>(orbitsw("lan"))),
+					radians(get<double>(orbitsw("arg"))),
+					radians(get<double>(orbitsw("m0"))));
 				planet.setOrbit(orbit);
 			}
 			sweeper bodysw(pl("body"));
@@ -271,10 +273,10 @@ void Game::loadPlanetFiles()
 					get<double>(bodysw("radius")),
 					get<double>(bodysw("GM")),
 					axis(
-						glm::radians(get<double>(bodysw("rightAscension"))),
-						glm::radians(get<double>(bodysw("declination")))),
+						radians(get<double>(bodysw("rightAscension"))),
+						radians(get<double>(bodysw("declination")))),
 					get<double>(bodysw("rotPeriod")),
-					get<glm::vec3>(bodysw("meanColor"))*
+					get<vec3>(bodysw("meanColor"))*
 					(float)get<double>(bodysw("albedo")),
 					get<std::string>(bodysw("diffuse")));
 				planet.setBody(body);
@@ -283,7 +285,7 @@ void Game::loadPlanetFiles()
 			if (!atmosw.is_null())
 			{
 				Planet::Atmo atmo(
-					get<glm::vec4>(atmosw("K")),
+					get<vec4>(atmosw("K")),
 					get<double>(atmosw("density")),
 					get<double>(atmosw("maxHeight")),
 					get<double>(atmosw("scaleHeight")));
@@ -297,8 +299,8 @@ void Game::loadPlanetFiles()
 					get<double>(ringsw("inner")),
 					get<double>(ringsw("outer")),
 					axis(
-						glm::radians(get<double>(ringsw("rightAscension"))),
-						glm::radians(get<double>(ringsw("declination")))),
+						radians(get<double>(ringsw("rightAscension"))),
+						radians(get<double>(ringsw("declination")))),
 					get<std::string>(ringsw("backscat")),
 					get<std::string>(ringsw("forwardscat")),
 					get<std::string>(ringsw("unlit")),
@@ -345,9 +347,9 @@ void Game::loadPlanetFiles()
 				sweeper mask1(specsw("mask1"));
 				Planet::Specular spec(
 					get<std::string>(specsw("filename")),
-					{get<glm::vec3>(mask0("color")), 
+					{get<vec3>(mask0("color")), 
 					 (float)get<double>(mask0("hardness"))},
-					{get<glm::vec3>(mask1("color")),
+					{get<vec3>(mask1("color")),
 					 (float)get<double>(mask1("hardness"))});
 				planet.setSpecular(spec);
 			}
@@ -391,9 +393,9 @@ bool Game::isPressedOnce(const int key)
 	}
 }
 
-glm::vec3 polarToCartesian(const glm::vec2 &p)
+vec3 polarToCartesian(const vec2 &p)
 {
-	return glm::vec3(
+	return vec3(
 		cos(p.x)*cos(p.y), 
 		sin(p.x)*cos(p.y), 
 		sin(p.y));
@@ -403,14 +405,14 @@ void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
 
-	std::vector<glm::dvec3> relativePositions(planetCount);
+	std::vector<dvec3> relativePositions(planetCount);
 	// Planet state update
 	for (uint32_t i=0;i<planetCount;++i)
 	{
 		// Relative position update
 		relativePositions[i] = 
 			(getParent(i) == -1 || !planetParams[i].hasOrbit())?
-			glm::dvec3(0.0):
+			dvec3(0.0):
 			planetParams[i].getOrbit().computePosition(
 				epoch, planetParams[getParent(i)].getBody().getGM());
 	}
@@ -418,7 +420,7 @@ void Game::update(const double dt)
 	// Planet absolute position update
 	for (uint32_t i=0;i<planetCount;++i)
 	{
-		glm::dvec3 absPosition = relativePositions[i];
+		dvec3 absPosition = relativePositions[i];
 		int parent = getParent(i);
 		while (parent != -1)
 		{
@@ -428,9 +430,9 @@ void Game::update(const double dt)
 
 		// Planet Angle
 		const float rotationAngle = 
-			(2.0*glm::pi<float>())*
+			(2.0*pi<float>())*
 			fmod(epoch/planetParams[i].getBody().getRotationPeriod(),1.f)
-			+ glm::pi<float>();
+			+ pi<float>();
 
 		// Cloud Displacement
 		const float cloudDisp = [&]{
@@ -440,16 +442,6 @@ void Game::update(const double dt)
 		}();
 
 		planetStates[i] = PlanetState(absPosition, rotationAngle, cloudDisp);
-	}
-
-	// Time warping
-	if (isPressedOnce(GLFW_KEY_K))
-	{
-		if (timeWarpIndex > 0) timeWarpIndex--;
-	}
-	if (isPressedOnce(GLFW_KEY_L))
-	{
-		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
 	}
 	
 	// Wireframe on/off
@@ -464,110 +456,22 @@ void Game::update(const double dt)
 		bloom = !bloom;
 	}
 
-	// Switching
-	if (isPressedOnce(GLFW_KEY_TAB))
-	{
-		if (!isSwitching)
-		{
-			// Kill timewarp
-			const int nextPlanet = focusedPlanetId+
-			(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
-			const size_t nextPlanetWrap = (nextPlanet>=(int)planetCount)?0:
-				((nextPlanet<0?(planetCount-1):nextPlanet));
-			timeWarpIndex = 0;
-			switchPreviousPlanet = focusedPlanetId;
-			focusedPlanetId = nextPlanetWrap;
-			switchPreviousDist = viewPolar.z;
-			switchPreviousPan = panPolar;
-			isSwitching = true;
-		} 
-	}
-
-	if (isSwitching)
-	{
-		const float totalSwitchTime = 2.0;
-		const float t = switchTime/totalSwitchTime;
-		const double f = 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
-		const glm::dvec3 previousPlanetPos = planetStates[switchPreviousPlanet].getPosition();
-		viewCenter = (planetStates[focusedPlanetId].getPosition() - previousPlanetPos)*f + previousPlanetPos;
-		const float targetDist = planetParams[focusedPlanetId].getBody().getRadius()*4;
-		viewPolar.z = (targetDist - switchPreviousDist)*f + switchPreviousDist;
-		panPolar = switchPreviousPan*(1-f);
-		switchTime += dt;
-
-		if (t > 1.0)
-		{
-			isSwitching = false;
-			switchTime = 0.0;
-			panPolar = glm::vec2(0,0);
-		}
-	}
-	else
-	{
-		viewCenter = planetStates[focusedPlanetId].getPosition();
-	}
-
 	// Mouse move
 	double posX, posY;
 	glfwGetCursorPos(win, &posX, &posY);
-	const glm::vec2 move = {-posX+preMousePosX, posY-preMousePosY};
 
-	bool mouseButton1 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1);
-	bool mouseButton2 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2);
-
-	if ((mouseButton1 || mouseButton2) && !dragging)
+	if (switchPhase == SwitchPhase::IDLE)
 	{
-		dragging = true;
+		updateIdle(dt, posX, posY);
 	}
-	else if (dragging && !(mouseButton1 || mouseButton2))
+	else if (switchPhase == SwitchPhase::TRACK)
 	{
-		dragging = false;
+		updateTrack(dt);
 	}
-
-	// Drag view around
-	if (dragging && !isSwitching)
+	else if (switchPhase == SwitchPhase::MOVE)
 	{
-		if (mouseButton1)
-		{	
-			viewSpeed.x += move.x*sensitivity;
-			viewSpeed.y += move.y*sensitivity;
-			for (int i=0;i<2;++i)
-			{
-				if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
-				if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
-			}
-		}
-		else if (mouseButton2)
-		{
-			panPolar += move*sensitivity;
-		}
+		updateMove(dt);
 	}
-
-	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
-
-	viewPolar.x += viewSpeed.x;
-	viewPolar.y += viewSpeed.y;
-	viewPolar.z += viewSpeed.z*(viewPolar.z-radius);
-
-	viewSpeed *= viewSmoothness;
-
-	const float maxVerticalAngle = glm::pi<float>()/2 - 0.001;
-
-	if (viewPolar.y > maxVerticalAngle)
-	{
-		viewPolar.y = maxVerticalAngle;
-		viewSpeed.y = 0;
-	}
-	if (viewPolar.y < -maxVerticalAngle)
-	{
-		viewPolar.y = -maxVerticalAngle;
-		viewSpeed.y = 0;
-	}
-	if (viewPolar.z < radius) viewPolar.z = radius;
-
-	panPolar.y = glm::clamp(panPolar.y, 
-		-maxVerticalAngle, 
-		maxVerticalAngle);
 
 	// Mouse reset
 	preMousePosX = posX;
@@ -579,22 +483,8 @@ void Game::update(const double dt)
 		renderer->takeScreenshot(generateScreenshotName());
 	}
 
-	// Position around center
-	const glm::vec3 relViewPos = polarToCartesian(glm::vec2(viewPolar))*
-		viewPolar.z;
-
-	// View space position
-	viewPos = glm::dvec3(relViewPos) + viewCenter;
-
-	glm::mat3 viewDir = glm::mat3(
-		glm::rotate(panPolar.y, glm::vec3(1,0,0))*
-		glm::rotate(panPolar.x, glm::vec3(0,-1,0))*
-		glm::lookAt(
-			glm::vec3(0), 
-			-relViewPos, 
-			glm::vec3(0,0,1)));
 	// Focused planets
-	std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
+	const std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
 		
 	// Scene rendering
 	renderer->render({
@@ -625,6 +515,194 @@ void Game::update(const double dt)
 bool Game::isRunning()
 {
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
+}
+
+void Game::updateIdle(float dt, int posX, int posY)
+{
+	const vec2 move = {-posX+preMousePosX, posY-preMousePosY};
+
+	const bool mouseButton1 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1);
+	const bool mouseButton2 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2);
+
+	if ((mouseButton1 || mouseButton2) && !dragging)
+	{
+		dragging = true;
+	}
+	else if (dragging && !(mouseButton1 || mouseButton2))
+	{
+		dragging = false;
+	}
+
+	// Drag view around
+	if (dragging)
+	{
+		if (mouseButton1)
+		{	
+			viewSpeed.x += move.x*sensitivity;
+			viewSpeed.y += move.y*sensitivity;
+			for (int i=0;i<2;++i)
+			{
+				if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
+				if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
+			}
+		}
+		else if (mouseButton2)
+		{
+			panPolar += move*sensitivity;
+		}
+	}
+
+	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
+
+	viewPolar.x += viewSpeed.x;
+	viewPolar.y += viewSpeed.y;
+	viewPolar.z += viewSpeed.z*(viewPolar.z-radius);
+
+	viewSpeed *= viewSmoothness;
+
+	const float maxVerticalAngle = pi<float>()/2 - 0.001;
+
+	if (viewPolar.y > maxVerticalAngle)
+	{
+		viewPolar.y = maxVerticalAngle;
+		viewSpeed.y = 0;
+	}
+	if (viewPolar.y < -maxVerticalAngle)
+	{
+		viewPolar.y = -maxVerticalAngle;
+		viewSpeed.y = 0;
+	}
+	if (viewPolar.z < radius) viewPolar.z = radius;
+
+	if (viewPolar.y + panPolar.y > maxVerticalAngle)
+	{
+		panPolar.y = maxVerticalAngle - viewPolar.y;
+	}
+	if (viewPolar.y + panPolar.y < -maxVerticalAngle)
+	{
+		panPolar.y = -maxVerticalAngle - viewPolar.y;
+	}
+
+	// Position around center
+	const vec3 relViewPos = polarToCartesian(vec2(viewPolar))*
+		viewPolar.z;
+
+	viewPos = dvec3(relViewPos) + 
+		planetStates[focusedPlanetId].getPosition();
+
+	viewDir = mat3(
+		lookAt(
+			vec3(0), 
+			-polarToCartesian(vec2(viewPolar)+panPolar), 
+			vec3(0,0,1)));
+
+	// Time warping
+	if (isPressedOnce(GLFW_KEY_K))
+	{
+		if (timeWarpIndex > 0) timeWarpIndex--;
+	}
+	if (isPressedOnce(GLFW_KEY_L))
+	{
+		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
+	}
+
+	// Switching
+	if (isPressedOnce(GLFW_KEY_TAB))
+	{
+		// Kill timewarp
+		const int nextPlanet = focusedPlanetId+
+		(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
+		const size_t nextPlanetWrap = (nextPlanet>=(int)planetCount)?0:
+			((nextPlanet<0?(planetCount-1):nextPlanet));
+		timeWarpIndex = 0;
+		switchPreviousPlanet = focusedPlanetId;
+		switchPreviousViewDir = viewDir;
+		focusedPlanetId = nextPlanetWrap;
+		switchPhase = SwitchPhase::TRACK;
+	}
+}
+
+float ease(float t)
+{
+	return 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
+}
+
+void Game::updateTrack(float dt)
+{
+	const float totalTime = 1.0;
+	const float t = min(1.f, switchTime/totalTime);
+	const float f = ease(t);
+
+	// Aim at next body
+	const vec3 targetDir = 
+		normalize(planetStates[focusedPlanetId].getPosition() - viewPos);
+	// Find the angles
+	const float targetPhi = asin(targetDir.z);
+	const float targetTheta = atan2(targetDir.y, targetDir.x);
+
+	// Find the angles of original direction
+	const vec3 sourceDir = -(transpose(switchPreviousViewDir)[2]);
+	const float sourcePhi = asin(sourceDir.z);
+	const float sourceTheta = atan2(sourceDir.y, sourceDir.x);
+
+	// Wrap around theta
+	float deltaTheta = targetTheta-sourceTheta;
+	if (deltaTheta < -pi<float>()) deltaTheta += 2*pi<float>();
+	else if (deltaTheta > pi<float>()) deltaTheta -= 2*pi<float>();
+
+	// Interpolate angles
+	const float phi = f*targetPhi+(1-f)*sourcePhi;
+	const float theta = f*(sourceTheta+deltaTheta)+(1-f)*sourceTheta;
+
+	// Reconstruct direction from angles
+	const vec3 dir = polarToCartesian(vec2(theta, phi));
+
+	// Update position as in idle
+	viewPos = planetStates[switchPreviousPlanet].getPosition()+
+		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
+	viewDir = lookAt(vec3(0), dir, vec3(0,0,1));
+
+	switchTime += dt;
+	if (switchTime > totalTime)
+	{
+		switchPhase = SwitchPhase::MOVE;
+		switchTime = 0.f;
+	}
+}
+
+void Game::updateMove(float dt)
+{
+	const float totalTime = 1.0;
+	const float t = min(1.f, switchTime/totalTime);
+	const double f = ease(t);
+
+	// Old position to move from
+	const dvec3 sourcePos = planetStates[switchPreviousPlanet].getPosition()+
+		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
+
+	// Distance from planet at arrival
+	const float targetDist = 4*planetParams[focusedPlanetId].getBody().getRadius();
+	// Direction from old position to new planet
+	const glm::vec3 direction = 
+		normalize(planetStates[focusedPlanetId].getPosition()-sourcePos);
+	// New position (subtract direction to not be inside planet)
+	const dvec3 targetPos = planetStates[focusedPlanetId].getPosition()-
+		dvec3(direction*targetDist);
+
+	// Interpolate positions
+	viewPos = f*targetPos+(1-f)*sourcePos;
+	viewDir = lookAt(vec3(0), direction, vec3(0,0,1));
+
+	switchTime += dt;
+	if (switchTime > totalTime)
+	{
+		switchPhase = SwitchPhase::IDLE;
+		switchTime = 0.f;
+		// Reconstruct new polar angles from direction
+		viewPolar = vec3(
+			atan2(-direction.y, -direction.x), asin(-direction.z), targetDist);
+		panPolar = vec2(0);
+	}
 }
 
 int Game::getParent(size_t planetId)

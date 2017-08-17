@@ -45,6 +45,14 @@ private:
 	/// Loads settings file
 	void loadSettingsFile();
 
+	enum class SwitchPhase
+	{
+		IDLE, TRACK, MOVE 
+	};
+	void updateIdle(float dt, int mousePosX, int mousePosY);
+	void updateTrack(float dt);
+	void updateMove(float dt);
+
 	/// Returns the id of planet's parent (-1 if no parent)
 	int getParent(size_t planetId);
 	/// Returns all parents (recursive) until there is no parent
@@ -102,7 +110,8 @@ private:
 	size_t timeWarpIndex = 0;
 	/// Timewarp factors
 	std::vector<double> timeWarpValues 
-		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 3600*24*10, 3600*24*365.2499};
+		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 
+			3600*24*10, 3600*24*28, 3600*24*365.2499, 3600*24*365.2499*8};
 
 	// PROFILING
 	/// Total times
@@ -124,17 +133,19 @@ private:
 	float maxViewSpeed = 0.2;
 	/// View speed damping for smooth effect
 	float viewSmoothness = 0.85;
+	/// View position
+	glm::dvec3 viewPos;
+	/// View matrix
+	glm::mat3 viewDir;
 
 	// SWITCHING PLANETS
 	/// Indicates if the view is switching from a planet to another
-	bool isSwitching = false;
-	/// Current frame of switching
+	SwitchPhase switchPhase = SwitchPhase::IDLE;
+	/// Time of switching
 	float switchTime = 0.0;
-	/// Zoom transition amount
-	float switchPreviousDist = 0;
 	/// Index in main collection of planet switching from
 	int switchPreviousPlanet = -1; 
-	glm::vec2 switchPreviousPan{};
+	glm::mat3 switchPreviousViewDir;
 
 	/// Mouse sensitivity
 	float sensitivity = 0.0004;
@@ -144,10 +155,6 @@ private:
 	glm::vec3 viewPolar;
 	/// View panning polar coordinates (theta, phi)
 	glm::vec2 panPolar;
-	/// Where the view is looking at
-	glm::dvec3 viewCenter;
-	/// Camera position in cartesian coordinates
-	glm::dvec3 viewPos;
 	/// Vertical Field of view in radians
 	float viewFovy = glm::radians(40.f);
 
