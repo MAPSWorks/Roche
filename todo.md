@@ -6,9 +6,7 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
-- [ ] Choose between frames of reference (absolute, axis towards sun, towards parent, following rotation), transition should be smooth and should only change the roll and reset pan angles.
 - [ ] Frustum culling (only apply for rendering, not texture loading)
-- [ ] Implementation of some "free cam" (look around, not constrained by parent body)
 - [ ] Fix atmosphere when view inside (gpu gems trick by subtracting rays)
 
 #### Once text rendering available
@@ -23,22 +21,12 @@
 - [ ] Auto-pilot tour
 
 ## Done
-- [x] Better focus transitions
-- [x] Flares for planets (data in planet UBO)
-- [x] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
-- [x] Don't allow to skip transitions
-- [x] Create atmo & ring textures at startup
-- [x] Star map
-- [x] Prettier flares
-- [x] Wait for fences to unlock before tagging as complete
-- [x] Add cost calculator to prevent too much texture updates at once
-- [x] Add option to choose between synchronous texture loading (no pop-ins but stutters) or asynchronous (smoother framerate but pop-ins)
-- [x] Better profiler
-- [x] Change VAO / DrawCommand behavior for easier creation
-- [x] Full warning check and comments
-- [x] Toggleable bloom
-- [x] Fix atmosphere artifacts at high distances
-- [x] Better loading predictions
-- [x] Put glViewport() where necessary
 
 ## Feature summary
+- [x] Add option to choose between synchronous texture loading (no pop-ins but stutters) or asynchronous (smoother framerate but pop-ins)
+- [x] Better trackball controls (left click for move, wheel for distance, right click for pan, alt+wheel for fov, ctrl+wheel for exposure)
+- [x] Less atmosphere artifacts
+- [x] Changed how flares looked, settled on a more "camera" feel
+- [x] Background star map
+- [x] Better performance
+- [x] Misc improvements
