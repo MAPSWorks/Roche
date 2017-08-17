@@ -7,7 +7,6 @@
 
 ### Minor stuff
 - [ ] Choose between frames of reference (absolute, axis towards sun, towards parent, following rotation), transition should be smooth and should only change the roll and reset pan angles.
-- [ ] Better focus transitions (trace ray from view to target, if planet in the way move the camera along the shortest path to get no intersection, pan the camera towards the target at the same time)
 - [ ] Frustum culling (only apply for rendering, not texture loading)
 - [ ] Implementation of some "free cam" (look around, not constrained by parent body)
 - [ ] Fix atmosphere when view inside (gpu gems trick by subtracting rays)
@@ -24,6 +23,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Better focus transitions
 - [x] Flares for planets (data in planet UBO)
 - [x] Better trackball controls (left click for move, wheel for distance, right click for pan, ?+wheel for fov)
 - [x] Don't allow to skip transitions

@@ -145,7 +145,10 @@ private:
 	float switchTime = 0.0;
 	/// Index in main collection of planet switching from
 	int switchPreviousPlanet = -1; 
+	/// View dir when switching started 
 	glm::mat3 switchPreviousViewDir;
+	/// When view is obstructed when switching, interpolate to this new position
+	glm::vec3 switchNewViewPolar;
 
 	/// Mouse sensitivity
 	float sensitivity = 0.0004;

@@ -548,7 +548,7 @@ void Game::updateIdle(float dt, int posX, int posY)
 		}
 		else if (mouseButton2)
 		{
-			panPolar += move*sensitivity;
+			panPolar += move*sensitivity*viewFovy;
 		}
 	}
 
@@ -590,11 +590,9 @@ void Game::updateIdle(float dt, int posX, int posY)
 	viewPos = dvec3(relViewPos) + 
 		planetStates[focusedPlanetId].getPosition();
 
-	viewDir = mat3(
-		lookAt(
-			vec3(0), 
-			-polarToCartesian(vec2(viewPolar)+panPolar), 
-			vec3(0,0,1)));
+	const vec3 direction = -polarToCartesian(vec2(viewPolar)+panPolar);
+
+	viewDir = mat3(lookAt(vec3(0), direction, vec3(0,0,1)));
 
 	// Time warping
 	if (isPressedOnce(GLFW_KEY_K))
@@ -609,16 +607,52 @@ void Game::updateIdle(float dt, int posX, int posY)
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
-		// Kill timewarp
+		switchPhase = SwitchPhase::TRACK;
+		// Save previous planet
+		switchPreviousPlanet = focusedPlanetId;
+		// Choose next planet
 		const int nextPlanet = focusedPlanetId+
 		(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
-		const size_t nextPlanetWrap = (nextPlanet>=(int)planetCount)?0:
+		focusedPlanetId = (nextPlanet>=(int)planetCount)?0:
 			((nextPlanet<0?(planetCount-1):nextPlanet));
+		// Kill timewarp
 		timeWarpIndex = 0;
-		switchPreviousPlanet = focusedPlanetId;
+		// Save previous orientation
 		switchPreviousViewDir = viewDir;
-		focusedPlanetId = nextPlanetWrap;
-		switchPhase = SwitchPhase::TRACK;
+		// Ray test
+		switchNewViewPolar = viewPolar;
+		// Get direction from view to target body
+		const dvec3 target = planetStates[focusedPlanetId].getPosition() - 
+				planetStates[switchPreviousPlanet].getPosition();
+		const vec3 targetDir = normalize(target-dvec3(relViewPos));
+		// Get t as origin+dir*t = closest point to body
+		const float b = dot(relViewPos, targetDir);
+		// Dont care if behind view
+		if (b < 0)
+		{
+			// Get closest point coordinates
+			const vec3 closestPoint = relViewPos-b*targetDir;
+			// Get compare closest distance with radius of body
+			const float closestDist = length(closestPoint);
+			const float closestMinDist = radius*1.1;
+			if (closestDist < closestMinDist)
+			{
+				// Vector to shift view to not have obstructed target body
+				const vec3 tangent = normalize(closestPoint);
+				// Thales to get amount to shift
+				const double totalDist = length(target-dvec3(relViewPos));
+				const double targetClosestDist = length(target-dvec3(tangent*closestMinDist));
+				const double tangentCoef = totalDist*(closestMinDist-closestDist)/targetClosestDist;
+				// New cartesian position
+				const glm::vec3 newRelPos = polarToCartesian(vec2(viewPolar))*viewPolar.z + 
+					vec3(tangentCoef*tangent);
+				// Convert to polar coordinates & set as interpolation target
+				const float newDist = length(newRelPos);
+				const glm::vec3 newRelDir = - normalize(newRelPos);
+				switchNewViewPolar = vec3(
+					atan2(-newRelDir.y, -newRelDir.x), asin(-newRelDir.z), newDist);
+			}
+		}
 	}
 }
 
@@ -627,11 +661,28 @@ float ease(float t)
 	return 6*t*t*t*t*t-15*t*t*t*t+10*t*t*t;
 }
 
+float ease2(float t, float alpha)
+{
+	float a = pow(t, alpha);
+	return a/(a+pow(1-t, alpha));
+}
+
 void Game::updateTrack(float dt)
 {
 	const float totalTime = 1.0;
 	const float t = min(1.f, switchTime/totalTime);
 	const float f = ease(t);
+
+	// Interpolate positions
+	float posDeltaTheta = switchNewViewPolar.x-viewPolar.x;
+	if (posDeltaTheta < -pi<float>()) posDeltaTheta += 2*pi<float>();
+	else if (posDeltaTheta > pi<float>()) posDeltaTheta -= 2*pi<float>();
+
+	const vec3 interpPolar = (1-f)*viewPolar+f*
+		vec3(viewPolar.x+posDeltaTheta, switchNewViewPolar.y, switchNewViewPolar.z);
+
+	viewPos = planetStates[switchPreviousPlanet].getPosition()+
+		dvec3(polarToCartesian(vec2(interpPolar))*interpPolar.z);
 
 	// Aim at next body
 	const vec3 targetDir = 
@@ -647,8 +698,8 @@ void Game::updateTrack(float dt)
 
 	// Wrap around theta
 	float deltaTheta = targetTheta-sourceTheta;
-	if (deltaTheta < -pi<float>()) deltaTheta += 2*pi<float>();
-	else if (deltaTheta > pi<float>()) deltaTheta -= 2*pi<float>();
+	if (deltaTheta < -pi<float>()+0.001) deltaTheta += 2*pi<float>();
+	else if (deltaTheta > pi<float>()-0.001) deltaTheta -= 2*pi<float>();
 
 	// Interpolate angles
 	const float phi = f*targetPhi+(1-f)*sourcePhi;
@@ -656,10 +707,6 @@ void Game::updateTrack(float dt)
 
 	// Reconstruct direction from angles
 	const vec3 dir = polarToCartesian(vec2(theta, phi));
-
-	// Update position as in idle
-	viewPos = planetStates[switchPreviousPlanet].getPosition()+
-		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
 	viewDir = lookAt(vec3(0), dir, vec3(0,0,1));
 
 	switchTime += dt;
@@ -667,6 +714,7 @@ void Game::updateTrack(float dt)
 	{
 		switchPhase = SwitchPhase::MOVE;
 		switchTime = 0.f;
+		viewPolar = interpPolar;
 	}
 }
 
@@ -674,7 +722,7 @@ void Game::updateMove(float dt)
 {
 	const float totalTime = 1.0;
 	const float t = min(1.f, switchTime/totalTime);
-	const double f = ease(t);
+	const double f = ease2(t, 4);
 
 	// Old position to move from
 	const dvec3 sourcePos = planetStates[switchPreviousPlanet].getPosition()+
@@ -702,6 +750,7 @@ void Game::updateMove(float dt)
 		viewPolar = vec3(
 			atan2(-direction.y, -direction.x), asin(-direction.z), targetDist);
 		panPolar = vec2(0);
+		viewSpeed = vec3(0);
 	}
 }
 
