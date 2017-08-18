@@ -169,7 +169,7 @@ planets: [
 	atmo:{
 		maxHeight:170
 		scaleHeight:11.1
-		K:[0.3,0.24,0.20,0.00001]
+		K:[0.3,0.12,0.05,0.00001]
 		density:0.009
 	}
 }
