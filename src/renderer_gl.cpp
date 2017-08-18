@@ -607,6 +607,11 @@ void RendererGL::takeScreenshot(const string &filename)
 	screenFilename = filename;
 }
 
+bool testSpherePlane(const vec3 &sphereCenter, float radius, const vec4 &plane)
+{
+	return dot(sphereCenter, vec3(plane))+plane.w < radius;
+}
+
 void RendererGL::render(const RenderInfo &info)
 {
 	const float closePlanetMinSizePixels = 1;
@@ -623,6 +628,19 @@ void RendererGL::render(const RenderInfo &info)
 	// Projection and view matrices
 	const mat4 projMat = perspective(info.fovy, windowWidth/(float)windowHeight, 0.f,1.f);
 	const mat4 viewMat = mat4(info.viewDir);
+
+	// Frustum construction
+	const float f = tan(info.fovy/2.0);
+	const float aspect = windowWidth/(float)windowHeight;
+
+	// (Don't need far plane)
+	array<vec4, 5> frustum = {
+		vec4(0,0,1,0), // near plane
+		vec4(normalize(vec3( 1, 0, f*aspect)), 0), // Side planes
+		vec4(normalize(vec3(-1, 0, f*aspect)), 0),
+		vec4(normalize(vec3(0,  1, f)), 0),
+		vec4(normalize(vec3(0, -1, f)), 0)
+	};
 
 	// Planet classification
 	vector<uint32_t> closePlanets;
@@ -656,8 +674,16 @@ void RendererGL::render(const RenderInfo &info)
 			texUnloadPlanets.push_back(i);
 		}
 
-		// Don't render planets behind the view
-		if ((viewMat*vec4(pos - info.viewPos,1.0)).z < maxRadius)
+		// Frustum test
+		const vec3 viewSpacePos = vec3(viewMat*vec4(pos - info.viewPos,1.0));
+		bool visible = true;
+		for (vec4 plane : frustum)
+		{
+			visible = visible && testSpherePlane(viewSpacePos, maxRadius, plane);
+		}
+
+		// Render planets inside the frustum
+		if (visible)
 		{
 			// Render if is range, always render sun
 			if (dist < closePlanetMaxDistance || param.isStar())
@@ -669,10 +695,11 @@ void RendererGL::render(const RenderInfo &info)
 					translucentPlanets.push_back(i);
 				}
 			}
-			if (dist > flareMinDistance && !param.isStar())
-			{
-				flares.push_back(i);
-			}
+		}
+
+		if (dist > flareMinDistance && !param.isStar())
+		{
+			flares.push_back(i); 
 		}
 	}
 

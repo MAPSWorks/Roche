@@ -5,7 +5,6 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
-- [ ] Frustum culling (only apply for rendering, not texture loading)
 - [ ] Fix atmosphere when view inside (gpu gems trick by subtracting rays)
 
 #### Once text rendering available
@@ -20,6 +19,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Frustum culling (only apply for rendering, not texture loading)
 
 ## Feature summary
 - [x] Add option to choose between synchronous texture loading (no pop-ins but stutters) or asynchronous (smoother framerate but pop-ins)
