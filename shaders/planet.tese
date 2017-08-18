@@ -50,8 +50,10 @@ void main()
 		gl_Position.w, sceneUBO.logDepthFarPlane, sceneUBO.logDepthC);
 
 #if defined(HAS_ATMO)
-	vec3 view_dir = normalize(-passPosition);
-	passScattering = in_scattering_planet(passPosition-planetUBO.planetPos.xyz, view_dir,
+	float dist = length(passPosition);
+	vec3 view_dir = -passPosition/dist;
+	passScattering = in_scattering_planet(
+		passPosition-planetUBO.planetPos.xyz, view_dir, dist,
 		planetUBO.lightDir.xyz, planetUBO.radius, planetUBO.atmoHeight,
 		atmo, planetUBO.K);
 #endif

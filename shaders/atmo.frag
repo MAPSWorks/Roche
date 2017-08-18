@@ -18,11 +18,13 @@ void main()
 {
 	vec3 norm_v = normalize(passPosition-planetUBO.planetPos.xyz);
 	vec3 localPos = norm_v*(planetUBO.radius+planetUBO.atmoHeight);
-	vec3 view_dir = normalize(-passPosition);
+	float view_dist = length(passPosition);
+	vec3 view_dir = -passPosition/view_dist;
 	float c = dot(view_dir, planetUBO.lightDir.xyz);
 	float cc = c*c;
 
-	vec3 scat = in_scattering_atmo(localPos, view_dir, planetUBO.lightDir.xyz, 
+	vec3 scat = in_scattering_atmo(localPos, view_dir, view_dist,
+		planetUBO.lightDir.xyz, 
 		planetUBO.radius, planetUBO.atmoHeight,
 		atmo, planetUBO.K)
 		* (planetUBO.K.xyz*rayleigh(cc) + planetUBO.K.www*mie(c,cc));

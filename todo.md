@@ -5,7 +5,6 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
-- [ ] Fix atmosphere when view inside (gpu gems trick by subtracting rays)
 
 #### Once text rendering available
 - [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
@@ -19,6 +18,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Fix atmosphere when view inside
 - [x] Frustum culling (only apply for rendering, not texture loading)
 
 ## Feature summary

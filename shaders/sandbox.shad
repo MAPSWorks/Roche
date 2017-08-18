@@ -91,13 +91,14 @@ const int IN_SAMPLES_ATMO = 10;
 vec3 in_scattering_atmo(
 	vec3 pos,
 	vec3 view_dir,
+	float view_dist,
 	vec3 light_dir,
 	float radius,
 	float atmos_height,
 	sampler2D atmo,
 	vec4 K)
 {
-	float far = ray_sphere(pos, view_dir, radius+atmos_height).y;
+	float far = min(view_dist, ray_sphere(pos, view_dir, radius+atmos_height).y);
 	if (far < 0) return vec3(0);
 	float len = far/float(IN_SAMPLES_ATMO);
 	vec3 step = view_dir*len;
@@ -130,13 +131,14 @@ const int IN_SAMPLES_PLANET = 50;
 vec3 in_scattering_planet(
 	vec3 pos,
 	vec3 view_dir,
+	float view_dist,
 	vec3 light_dir,
 	float radius,
 	float atmos_height,
 	sampler2D atmo,
 	vec4 K)
 {
-	float far = ray_sphere(pos, view_dir, radius+atmos_height).y;
+	float far = min(view_dist, ray_sphere(pos, view_dir, radius+atmos_height).y);
 	float len = far/float(IN_SAMPLES_PLANET);
 	vec3 step = view_dir*len;
 	vec3 v = pos+step*0.5;
