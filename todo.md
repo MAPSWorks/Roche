@@ -2,7 +2,6 @@
 
 ### Important stuff
 - [ ] Text rendering with stb_truetype
-- [ ] Automatic exposure
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
