@@ -1310,7 +1310,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	{
 		const float dist = length(planetPos);
 		const float radius = params.getBody().getRadius();
-		float flareSize = 1.f/glm::tan(fovy/2.f);
+		float flareSize = 0.0;
 		if (params.isStar())
 		{
 			const float visibility = getSunVisibility();
@@ -1318,7 +1318,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 			flareSize = clamp(radius*radius/(dist*dist)*
 				star.getBrightness()/star.getFlareAttenuation(),
 				star.getFlareMinSize(), star.getFlareMaxSize()*exp)*
-				visibility*flareSize;
+				visibility;
 
 			flareColor = vec4(vec3(clamp(
 					(dist/radius-star.getFlareFadeInStart())/
@@ -1330,7 +1330,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 			// Smooth transition to detailed planet to flare
 			const float fadeIn = clamp((dist/radius-flareMinDistance)/
 				(flareOptimalDistance-flareMinDistance),0.f,1.f);
-			flareSize = flareSize*fadeIn*(2.f/(float)windowHeight);
+			flareSize = fadeIn*(4.f/(float)windowHeight);
 
 			// Angle between view and light 
 			const float phaseAngle = acos(dot(

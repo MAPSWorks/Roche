@@ -22,8 +22,8 @@ planets: [
 		flareFadeInStart:2.0
 		flareFadeInEnd:10.0
 		flareAttenuation:0.000008
-		flareMinSize:0.05
-		flareMaxSize:0.5
+		flareMinSize:0.1
+		flareMaxSize:1.0
 	}
 }
 {
