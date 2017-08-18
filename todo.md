@@ -5,6 +5,7 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
+- [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 #### Once text rendering available
 - [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
