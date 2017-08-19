@@ -5,6 +5,7 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
+- [ ] Split up other textures
 - [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 #### Once text rendering available
@@ -19,6 +20,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Changed for a whiter sun texture
 - [x] Fix atmosphere when view inside
 - [x] Frustum culling (only apply for rendering, not texture loading)
 
