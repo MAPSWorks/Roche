@@ -644,11 +644,11 @@ void Game::updateIdle(float dt, int posX, int posY)
 				const double targetClosestDist = length(target-dvec3(tangent*closestMinDist));
 				const double tangentCoef = totalDist*(closestMinDist-closestDist)/targetClosestDist;
 				// New cartesian position
-				const glm::vec3 newRelPos = polarToCartesian(vec2(viewPolar))*viewPolar.z + 
-					vec3(tangentCoef*tangent);
+				const vec3 newRelPos = polarToCartesian(vec2(viewPolar))*viewPolar.z + 
+					vec3((float)tangentCoef*tangent);
 				// Convert to polar coordinates & set as interpolation target
 				const float newDist = length(newRelPos);
-				const glm::vec3 newRelDir = - normalize(newRelPos);
+				const vec3 newRelDir = - normalize(newRelPos);
 				switchNewViewPolar = vec3(
 					atan2(-newRelDir.y, -newRelDir.x), asin(-newRelDir.z), newDist);
 			}
@@ -731,7 +731,7 @@ void Game::updateMove(float dt)
 	// Distance from planet at arrival
 	const float targetDist = 4*planetParams[focusedPlanetId].getBody().getRadius();
 	// Direction from old position to new planet
-	const glm::vec3 direction = 
+	const vec3 direction = 
 		normalize(planetStates[focusedPlanetId].getPosition()-sourcePos);
 	// New position (subtract direction to not be inside planet)
 	const dvec3 targetPos = planetStates[focusedPlanetId].getPosition()-
