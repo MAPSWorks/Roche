@@ -49,7 +49,7 @@ private:
 	{
 		IDLE, TRACK, MOVE 
 	};
-	void updateIdle(float dt, int mousePosX, int mousePosY);
+	void updateIdle(float dt, double mousePosX, double mousePosY);
 	void updateTrack(float dt);
 	void updateMove(float dt);
 
@@ -71,6 +71,8 @@ private:
 	void updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &a);
 	std::vector<std::pair<std::string, uint64_t>> computeAverage(
 		const std::vector<std::pair<std::string, uint64_t>> &a, int frames);
+
+	void scrollFun(int offsetY);
 
 	/// Renderer
 	std::unique_ptr<Renderer> renderer;

@@ -10,7 +10,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vector>
-#include <functional>
 #include <memory>
 #include <algorithm>
 #include <sstream>
@@ -88,7 +87,29 @@ void Game::loadSettingsFile()
 	}
 }
 
-std::function<void(int)> uglyScrollWorkaround;
+void Game::scrollFun(int offset)
+{
+	if (switchPhase == SwitchPhase::IDLE)
+	{
+		// FOV zoom/unzoom when alt key held
+		if (glfwGetKey(win, GLFW_KEY_LEFT_ALT))
+		{
+			viewFovy = clamp(viewFovy*pow(0.5f, 
+				(float)offset*sensitivity*100),
+				radians(0.1f), radians(40.f));
+		}
+		// Exposure +/-
+		else if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL))
+		{
+			exposure = clamp(exposure+0.1f*offset, -4.f, 4.f);
+		}
+		// Distance zoom/unzoom
+		else
+		{
+			viewSpeed.z -= 40*offset*sensitivity;
+		}
+	}
+}
 
 void Game::init()
 {
@@ -119,31 +140,10 @@ void Game::init()
 		fullscreen?monitor:nullptr, 
 		nullptr);
 
-	uglyScrollWorkaround = [this](int offset){
-		if (switchPhase == SwitchPhase::IDLE)
-		{
-			// FOV zoom/unzoom when alt key held
-			if (glfwGetKey(win, GLFW_KEY_LEFT_ALT))
-			{
-				viewFovy = clamp(viewFovy*pow(0.5f, 
-					(float)offset*sensitivity*100),
-					radians(0.1f), radians(40.f));
-			}
-			// Exposure +/-
-			else if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL))
-			{
-				exposure = clamp(exposure+0.1f*offset, -4.f, 4.f);
-			}
-			// Distance zoom/unzoom
-			else
-			{
-				viewSpeed.z -= 40*offset*sensitivity;
-			}
-		}
-	};
+	glfwSetWindowUserPointer(win, this);
 
 	glfwSetScrollCallback(win, [](GLFWwindow* win, double, double yoffset){
-		uglyScrollWorkaround(yoffset);
+		((Game*)glfwGetWindowUserPointer(win))->scrollFun(yoffset);
 	});
 
 	if (!win)
@@ -517,7 +517,7 @@ bool Game::isRunning()
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
 }
 
-void Game::updateIdle(float dt, int posX, int posY)
+void Game::updateIdle(float dt, double posX, double posY)
 {
 	const vec2 move = {-posX+preMousePosX, posY-preMousePosY};
 
