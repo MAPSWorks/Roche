@@ -9,6 +9,7 @@
 #include "dds_stream.hpp"
 #include "screenshot.hpp"
 #include "shader_pipeline.hpp"
+#include "gui_gl.hpp"
 
 #include <condition_variable>
 #include <thread>
@@ -167,9 +168,11 @@ private:
 	 */
 	void renderTonemap(const DynamicData &data, bool bloom);
 	/** Renders sun flare on top of the screen
-	 *
+	 * @param data buffer ranges to use for rendering
 	 */
 	void renderSunFlare(const DynamicData &data);
+	/** Renders Gui elements */
+	void renderGui();
 	/** Sets the textures of planets to be loaded asynchronouly
 	 * @param planets planets whose textures to load
 	 */
@@ -405,4 +408,7 @@ private:
 
 	/// Stream texture loader
 	DDSStreamer streamer;
+
+	GuiGL gui;
+	Gui::FontSize mainFont80;
 };

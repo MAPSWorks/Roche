@@ -267,6 +267,7 @@ DrawCommand::DrawCommand(
 	GLenum type,
 	const vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo)
 {
+	_indexed = true;
 	_vao = vao;
 	_mode = mode;
 	_count = indexInfo.count;
@@ -276,13 +277,34 @@ DrawCommand::DrawCommand(
 	_vertexInfo = vertexInfo;
 }
 
+DrawCommand::DrawCommand(
+	GLuint vao,
+	GLenum mode,
+	size_t count, 
+	const vector<VertexInfo> &vertexInfo)
+{
+	_indexed = false;
+	_vao = vao;
+	_mode = mode;
+	_count = count;
+	_vertexInfo = vertexInfo;
+}
+
 void DrawCommand::draw(bool tessellated) const
 {
 	glBindVertexArray(_vao);
 	for (const auto &info : _vertexInfo)
 		glBindVertexBuffer(info.binding, info.buffer, info.range.getOffset(), info.stride);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _elementBuffer);
-	glDrawElements(tessellated?GL_PATCHES:_mode, _count, _type, _indices);
+	const GLenum mode = tessellated?GL_PATCHES:_mode;
+	if (_indexed)
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _elementBuffer);
+		glDrawElements(mode, _count, _type, _indices);
+	}
+	else
+	{
+		glDrawArrays(mode, 0, _count);
+	}
 }
 
 BufferRange::BufferRange(uint32_t offset, uint32_t size) :

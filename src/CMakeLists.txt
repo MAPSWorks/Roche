@@ -10,6 +10,7 @@ set(SOURCE
 	ddsloader.cpp
 	screenshot.cpp
 	mesh.cpp
+	gui.cpp
 	thirdparty/shaun/shaun.cpp
 	thirdparty/shaun/sweeper.cpp)
 
@@ -19,7 +20,8 @@ set(SOURCE_GL
 	gl_util.cpp
 	gl_profiler.cpp
 	dds_stream.cpp
-	shader_pipeline.cpp)
+	shader_pipeline.cpp
+	gui_gl.cpp)
 
 project (roche)
 

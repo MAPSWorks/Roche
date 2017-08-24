@@ -189,6 +189,11 @@ void RendererGL::init(const InitInfo &info)
 	createAtmoLookups();
 	createRingTextures();
 
+	// Gui init
+	Gui::Font f = gui.loadFont("fonts/Lato-Regular.ttf");
+	mainFont80 = gui.loadFontSize(f, 80.f);
+	gui.init();
+
 	// Streamer init
 	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
 
@@ -790,6 +795,9 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.begin("Sun Flare");
 	renderSunFlare(currentData);
 	profiler.end();
+	profiler.begin("GUI");
+	renderGui();
+	profiler.end();
 
 	if (takeScreen)
 	{
@@ -1197,6 +1205,14 @@ void RendererGL::renderSunFlare(
 	glBindTextureUnit(1, flareTex);
 
 	flareModel.draw();
+}
+
+void RendererGL::renderGui()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gui.setText(mainFont80, 10, 80, 
+		"The quick brown fox jumps over the lazy dog.", 255, 255, 255, 255);
+	gui.display(windowWidth, windowHeight);
 }
 
 void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)

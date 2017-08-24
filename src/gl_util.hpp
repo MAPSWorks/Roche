@@ -56,15 +56,6 @@ class DrawCommand
 
 public:
 	DrawCommand() = default;
-	/** Complete constructor
-	 * @param vao GL VAO
-	 * @param mode GL rendering mode (GL_POINTS, GL_LINES, GL_TRIANGLES, GL_PATCHES)
-	 * @param count number of indices
-	 * @param type type of indices (GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT)
-	 * @param indexOffset offset in bytes of first index in index buffer bound to vao
-	 * @param baseVertex offset in vertices of first vertex in vertex buffer bound to vao
-	 */
-
 	struct VertexInfo
 	{
 		GLuint binding;
@@ -79,11 +70,16 @@ public:
 		BufferRange range;
 		size_t count;
 	};
+	/** Indexed */
 	DrawCommand(GLuint vao, GLenum mode, GLenum type,
 		const std::vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo);
+	/** Not Indexed */
+	DrawCommand(GLuint vao, GLenum mode, size_t count, 
+		const std::vector<VertexInfo> &vertexInfo);
 	/** Draw model */
 	void draw(bool tessellated = false) const;
 private:
+	bool _indexed;
 	GLenum _vao;
 	GLenum _mode;
 	GLsizei _count;
