@@ -410,5 +410,6 @@ private:
 	DDSStreamer streamer;
 
 	GuiGL gui;
-	Gui::FontSize mainFont80;
+	Gui::FontSize mainFontBig;
+	Gui::FontSize mainFontMedium;
 };

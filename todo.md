@@ -1,17 +1,15 @@
 ## To Do
 
 ### Important stuff
-- [ ] Text rendering with stb_truetype
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
+- [ ] Fix planet orientations at epoch
+- [ ] Display some kind of planet description
 - [ ] Split up other textures
-- [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
-
-#### Once text rendering available
 - [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
-- [ ] Body name displayed on top left, with mention of parent body and time
 - [ ] Names of distant planets next to them (fade in when planet into view for 1~2sec)
+- [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 ### Stuff for later
 - [ ] Support custom models (asteroids, phobos, deimos)
@@ -20,6 +18,10 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Ecliptic reference frame instead of equator
+- [x] Get more recent orbital parameters
+- [x] Body name displayed on top left, with mention of parent body and time
+- [x] Text rendering with stb_truetype
 - [x] Changed for a whiter sun texture
 - [x] Fix atmosphere when view inside
 - [x] Frustum culling (only apply for rendering, not texture loading)

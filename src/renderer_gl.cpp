@@ -191,7 +191,8 @@ void RendererGL::init(const InitInfo &info)
 
 	// Gui init
 	Gui::Font f = gui.loadFont("fonts/Lato-Regular.ttf");
-	mainFont80 = gui.loadFontSize(f, 80.f);
+	mainFontBig = gui.loadFontSize(f, 40.f);
+	mainFontMedium = gui.loadFontSize(f, 20.f);
 	gui.init();
 
 	// Streamer init
@@ -619,6 +620,13 @@ bool testSpherePlane(const vec3 &sphereCenter, float radius, const vec4 &plane)
 
 void RendererGL::render(const RenderInfo &info)
 {
+	// GUI
+	const uint8_t textFade = clamp(info.planetNameFade,0.f,1.f)*255;
+	gui.setText(mainFontBig, 5, 25, info.focusedPlanetName, 
+		textFade, textFade, textFade, textFade);
+	gui.setText(mainFontMedium, 2, windowHeight-8, info.currentTime, 
+		255, 255, 255, 255);
+
 	const float closePlanetMinSizePixels = 1;
 	this->closePlanetMaxDistance =windowHeight/(closePlanetMinSizePixels*tan(info.fovy/2));
 	this->flareMinDistance = closePlanetMaxDistance*0.35;
@@ -1210,8 +1218,6 @@ void RendererGL::renderSunFlare(
 void RendererGL::renderGui()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	gui.setText(mainFont80, 10, 80, 
-		"The quick brown fox jumps over the lazy dog.", 255, 255, 255, 255);
 	gui.display(windowWidth, windowHeight);
 }
 

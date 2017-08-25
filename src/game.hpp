@@ -106,7 +106,7 @@ private:
 
 	/// Index in the main collection of planet the view follows
 	size_t focusedPlanetId = 0; 
-	/// Seconds since January 1st 1950 00:00
+	/// Seconds since January 1st 1950 00:00:00 UTC
 	double epoch = 0.0;
 	/// Index in the timeWarpValues collection which indicates the current timewarp factor
 	size_t timeWarpIndex = 0;
@@ -114,6 +114,11 @@ private:
 	std::vector<double> timeWarpValues 
 		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 
 			3600*24*10, 3600*24*28, 3600*24*365.2499, 3600*24*365.2499*8};
+
+	/// Planet name display
+	size_t planetNameId = focusedPlanetId;
+	/// Planet name display in/out
+	float planetNameFade = 1.f;
 
 	// PROFILING
 	/// Total times

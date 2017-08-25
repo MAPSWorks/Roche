@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <fstream>
 #include <stdexcept>
+#include <ctime>
 
 #include "renderer.hpp"
 #include "renderer_gl.hpp"
@@ -160,6 +161,9 @@ void Game::init()
 		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
 
+	// Set epoch as current time (get time since 1970 + adjust for 2017)
+	epoch = (long)time(NULL) - 1483228800;
+
 	// Renderer init
 	renderer->init({
 		planetParams, 
@@ -237,6 +241,9 @@ void Game::loadPlanetFiles()
 		starMapFilename = get<std::string>(starMap("diffuse"));
 		starMapIntensity = (float)get<double>(starMap("intensity"));
 
+		const float axialTilt = radians(get<double>(swp("axialTilt")));
+		const mat3 axialMat = mat3(rotate(mat4(), axialTilt, vec3(0,-1,0)));
+
 		sweeper planetsSweeper(swp("planets"));
 		planetCount = planetsSweeper.value<list>().elements().size();
 		planetParams.resize(planetCount);
@@ -272,6 +279,7 @@ void Game::loadPlanetFiles()
 				const Planet::Body body(
 					get<double>(bodysw("radius")),
 					get<double>(bodysw("GM")),
+					axialMat*
 					axis(
 						radians(get<double>(bodysw("rightAscension"))),
 						radians(get<double>(bodysw("declination")))),
@@ -298,6 +306,7 @@ void Game::loadPlanetFiles()
 				Planet::Ring ring(
 					get<double>(ringsw("inner")),
 					get<double>(ringsw("outer")),
+					axialMat*
 					axis(
 						radians(get<double>(ringsw("rightAscension"))),
 						radians(get<double>(ringsw("declination")))),
@@ -401,6 +410,72 @@ vec3 polarToCartesian(const vec2 &p)
 		sin(p.y));
 }
 
+std::string format(int value)
+{
+	return std::string(1, (char)('0'+(value/10))) +
+		std::string(1, (char)('0'+(value%10)));
+}
+
+bool isLeapYear(int year)
+{
+	return ((year%4==0) && (year%100!=0)) || (year%400==0);
+}
+
+std::string getFormattedTime(long epochInSeconds)
+{
+	const int seconds = epochInSeconds%60;
+	const int minutes = (epochInSeconds/60)%60;
+	const int hours = (epochInSeconds/3600)%24;
+	const int days = epochInSeconds/86400;
+
+	int year = 2017;
+	int i = 0;
+	while (true)
+	{
+		const int daysInYear = 365+((isLeapYear(year))?1:0);
+		if (i+daysInYear <= days)
+		{
+			i += daysInYear;
+			year += 1;
+		}
+		else break;
+	}
+
+	int remainingDays = days-i;
+
+	std::vector<int> monthLength = {
+		31,28+(isLeapYear(year)?1:0), 31,
+		30, 31, 30,
+		31, 31, 30,
+		31, 30, 31};
+
+	int j=0;
+	int month = 0;
+	while (true)
+	{
+		const int daysInMonth = monthLength[month];
+		if (j+daysInMonth <= remainingDays)
+		{
+			j += daysInMonth;
+			month += 1;
+		}
+		else break;
+	}
+
+	std::vector<std::string> monthNames = {
+		"Jan", "Feb", "Mar", 
+		"Apr", "May", "Jun", 
+		"Jul", "Aug", "Sep", 
+		"Oct", "Nov", "Dec"};
+
+	return monthNames[month] + ". " + 
+		std::to_string(remainingDays-j+1) + " " + 
+		std::to_string(year) + " " + 
+		format(hours) + ':' + 
+		format(minutes) + ':' +
+		format(seconds) + " UTC";
+}
+
 void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
@@ -485,12 +560,17 @@ void Game::update(const double dt)
 
 	// Focused planets
 	const std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
+
+	// Time formatting
+	const long epochInSeconds = floor(epoch);
+	const std::string formattedTime = getFormattedTime(epochInSeconds);
 		
 	// Scene rendering
 	renderer->render({
 		viewPos, viewFovy, viewDir,
 		exposure, ambientColor, wireframe, bloom, 
-		planetStates, visiblePlanetsId});
+		planetStates, visiblePlanetsId, planetParams[planetNameId].getName(),
+		planetNameFade, formattedTime});
 
 	auto a = renderer->getProfilerTimes();
 
@@ -604,6 +684,10 @@ void Game::updateIdle(float dt, double posX, double posY)
 		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
 	}
 
+	// Planet name display
+	planetNameId = focusedPlanetId;
+	planetNameFade = 1.f;
+
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
@@ -673,6 +757,10 @@ void Game::updateTrack(float dt)
 	const float t = min(1.f, switchTime/totalTime);
 	const float f = ease(t);
 
+	// Planet name display
+	planetNameId = switchPreviousPlanet;
+	planetNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
+
 	// Interpolate positions
 	float posDeltaTheta = switchNewViewPolar.x-viewPolar.x;
 	if (posDeltaTheta < -pi<float>()) posDeltaTheta += 2*pi<float>();
@@ -723,6 +811,10 @@ void Game::updateMove(float dt)
 	const float totalTime = 1.0;
 	const float t = min(1.f, switchTime/totalTime);
 	const double f = ease2(t, 4);
+
+	// Planet name fade
+	planetNameId = focusedPlanetId;
+	planetNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
 
 	// Old position to move from
 	const dvec3 sourcePos = planetStates[switchPreviousPlanet].getPosition()+

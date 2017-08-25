@@ -55,6 +55,12 @@ public:
 		std::vector<PlanetState> planetStates;
 		/// Ids of planets currently in focus
 		std::vector<size_t> focusedPlanetsId;
+		/// Name of focused body
+		std::string focusedPlanetName;
+		/// Fade in/out of focused body name
+		float planetNameFade;
+		/// Formatted time
+		std::string currentTime;
 	};
 
 	/** Initializes the renderer
