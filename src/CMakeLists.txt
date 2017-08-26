@@ -6,7 +6,7 @@ find_package(OpenGL REQUIRED)
 set(SOURCE
 	game.cpp
 	main.cpp
-	planet.cpp
+	entity.cpp
 	ddsloader.cpp
 	screenshot.cpp
 	mesh.cpp

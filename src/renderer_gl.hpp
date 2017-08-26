@@ -40,12 +40,11 @@ private:
 	struct DynamicData
 	{
 		BufferRange sceneUBO;
-
-		std::vector<BufferRange> planetUBOs;
+		std::vector<BufferRange> bodyUBOs;
 	};
 
 	/// Dynamic parameters for the scene to be loaded in a UBO
-	struct SceneDynamicUBO
+	struct SceneUBO
 	{
 		/// Projection matrix
 		glm::mat4 projMat;
@@ -65,10 +64,10 @@ private:
 		float logDepthC;
 	};
 
-	/// Dynamic parameters for a single planet to be loaded in a UBO
-	struct PlanetDynamicUBO
+	/// Dynamic parameters for a single body to be loaded in a UBO
+	struct BodyUBO
 	{
-		/// Model matrix of the planet
+		/// Model matrix of the body
 		glm::mat4 modelMat;
 		/// Model matrix of the atmosphere
 		glm::mat4 atmoMat;
@@ -80,8 +79,8 @@ private:
 		glm::mat4 flareMat;
 		/// flare color
 		glm::vec4 flareColor;
-		/// Planet position in view space
-		glm::vec4 planetPos;
+		/// Entity position in view space
+		glm::vec4 bodyPos;
 		/// Light direction in view space
 		glm::vec4 lightDir;
 		/// Scattering constants
@@ -92,9 +91,9 @@ private:
 		glm::vec4 mask1ColorHardness;
 		/// Ring plane normal vector
 		glm::vec4 ringNormal;
-		/// Ring inner edge distance from center of planet
+		/// Ring inner edge distance from center of body
 		float ringInner;
-		/// Ring outer edge distance from center of planet
+		/// Ring outer edge distance from center of body
 		float ringOuter;
 		/// Brightness coefficient if body is a star
 		float starBrightness;
@@ -102,7 +101,7 @@ private:
 		float cloudDisp;
 		/// Intensity factor of night emission texture
 		float nightTexIntensity;
-		/// Radius of planet
+		/// Radius of body
 		float radius;
 		/// Atmospheric height
 		float atmoHeight;
@@ -124,31 +123,31 @@ private:
 	void createShaders();
 	/// Create Screenshot object
 	void createScreenshot();
-	/// Create atmo lookup textures for all planets with atmosphere
+	/// Create atmo lookup textures for all entities with atmosphere
 	void createAtmoLookups();
-	/// Create ring textures for all planets with rings
+	/// Create ring textures for all entities with rings
 	void createRingTextures();
 
-	/** Renders opaque parts of detailed planets to HDR rendertarget
-	 * @param closePlanets id of planets to render
+	/** Renders opaque parts of detailed entities to HDR rendertarget
+	 * @param closeEntities id of entities to render
 	 * @param buffer ranges to use for rendering
 	 */
 	void renderHdr(
-		const std::vector<uint32_t> &closePlanets, 
+		const std::vector<uint32_t> &closeEntities, 
 		const DynamicData &data);
 	/** Renders flares to HDR rendertarget
-	 * @param flares id of planets to render as flares
+	 * @param flares id of entities to render as flares
 	 * @param buffer ranges to use for rendering
 	 */
-	void renderPlanetFlares(
+	void renderEntityFlares(
 		const std::vector<uint32_t> &flares,
 		const DynamicData &data);
-	/** Renders translucent parts of detailed planets to HDR rendertarget
-	 * @param translucentPlanets id of planets to render
+	/** Renders translucent parts of detailed entities to HDR rendertarget
+	 * @param translucentEntities id of entities to render
 	 * @param buffer ranges to use for rendering
 	 */
 	void renderTranslucent(
-		const std::vector<uint32_t> &translucentPlanets,
+		const std::vector<uint32_t> &translucentEntities,
 		const DynamicData &data);
 	/** Generates highpass from HDR rendertarget
 	 * @param data buffer ranges to use for rendering
@@ -173,14 +172,14 @@ private:
 	void renderSunFlare(const DynamicData &data);
 	/** Renders Gui elements */
 	void renderGui();
-	/** Sets the textures of planets to be loaded asynchronouly
-	 * @param planets planets whose textures to load
+	/** Sets the textures of entities to be loaded asynchronouly
+	 * @param entities entities whose textures to load
 	 */
-	void loadTextures(const std::vector<uint32_t> &planets);
-	/** Sets the textures of planets to be unloaded asynchronouly
-	 * @param planets palanets whose textures to unload
+	void loadTextures(const std::vector<uint32_t> &entities);
+	/** Sets the textures of entities to be unloaded asynchronouly
+	 * @param entities palanets whose textures to unload
 	 */
-	void unloadTextures(const std::vector<uint32_t> &planets);
+	void unloadTextures(const std::vector<uint32_t> &entities);
 	/// Sets loaded textures to be uploaded to the GL
 	void uploadLoadedTextures();
 
@@ -202,8 +201,8 @@ private:
 	/// Screenshot object
 	Screenshot screenshot;
 
-	/// Number of planets in the scene
-	uint32_t planetCount = 0;
+	/// Number of entities in the scene
+	uint32_t entityCount = 0;
 	/// Samples per pixel of HDR rendertarget
 	int msaaSamples = 1;
 	/// Max texture width/height to be loaded and displayed (-1 means no limit)
@@ -218,15 +217,15 @@ private:
 	float logDepthC = 1.0;
 
 	// Constants for distance based loading
-	/// Max distance at which a planet is considered 'close' (detailed render)
-	float closePlanetMaxDistance;
-	/// Min distance at which a planet is considered 'far' (flare render)
+	/// Max distance at which a body is considered 'close' (detailed render)
+	float closeBodyMaxDistance;
+	/// Min distance at which a body is considered 'far' (flare render)
 	float flareMinDistance;
-	/// Optimal distance at which a planet is considered 'far' (no flare fade in)
+	/// Optimal distance at which a body is considered 'far' (no flare fade in)
 	float flareOptimalDistance;
-	/// Distance at which a planet's textures will be loaded
+	/// Distance at which a body's textures will be loaded
 	float texLoadDistance;
-	/// Distance at which a planet's textures will be unloaded
+	/// Distance at which a body's textures will be unloaded
 	float texUnloadDistance;
 
 	/// Buffer containing vertex data
@@ -241,7 +240,7 @@ private:
 	/// Data writing fences of each frame (multiple buffering)
 	std::vector<Fence> fences;
 
-	/// Vertex Array Object of planets, flares and deferred tris
+	/// Vertex Array Object of entities, flares and deferred tris
 	GLuint vertexArray;
 
 	// Rendertargets : 
@@ -273,13 +272,13 @@ private:
 	std::vector<GLuint> bloomFBOs;
 
 	// Pipelines
-	/// Planet without atmo
-	ShaderPipeline pipelinePlanetBare;
-	/// Planet with atmo
-	ShaderPipeline pipelinePlanetAtmo;
-	/// Planet with atmo and rings
-	ShaderPipeline pipelinePlanetAtmoRing;
-		/// Star map
+	/// Body without atmo
+	ShaderPipeline pipelineBodyBare;
+	/// Body with atmo
+	ShaderPipeline pipelineBodyAtmo;
+	/// Body with atmo and rings
+	ShaderPipeline pipelineBodyAtmoRing;
+	/// Star map
 	ShaderPipeline pipelineStarMap;
 	/// Atmosphere
 	ShaderPipeline pipelineAtmo;
@@ -312,14 +311,14 @@ private:
 	/// Number of frames to multi-buffer
 	uint32_t bufferFrames;
 
-	/// Planets' fixed parameters
-	std::vector<Planet> planetParams;
+	/// Entities' fixed parameters
+	std::vector<Entity> entityParams;
 
-	/// Planet data only for rendering
-	struct PlanetData
+	/// Entity data only for rendering
+	struct BodyData
 	{
-		/// Planet model
-		DrawCommand planetModel;
+		/// Entity model
+		DrawCommand bodyModel;
 		/// Ring model
 		DrawCommand ringModel;
 		/// Whether the textures have been loaded or onot
@@ -340,32 +339,32 @@ private:
 		GLuint ringTex1 = 0;
 		/// Ring texture 2
 		GLuint ringTex2 = 0;
-		PlanetData() = default;
+		BodyData() = default;
 	};
 
-	/** Fills DynamicPlanetUBO structure from planet parameters and state
+	/** Fills DynamicEntityUBO structure from entity parameters and state
 	 * @param viewPos World space eye position
 	 * @param viewMat View matrix (not accounting translation)
-	 * @param state Dynamic planet state
-	 * @param params Fixed planet parameters
-	 * @param data Planet data for rendering
+	 * @param state Dynamic entity state
+	 * @param params Fixed entity parameters
+	 * @param data Entity data for rendering
 	 * @returns UBO data
 	 */
-	PlanetDynamicUBO getPlanetUBO(
+	BodyUBO getBodyUBO(
 		float fovy,
 		float exp,
 		const glm::dvec3 &viewPos,
 		const glm::mat4 &projMat, 
 		const glm::mat4 &viewMat,
-		const PlanetState &state, 
-		const Planet &params, 
-		const PlanetData &data);
+		const EntityState &state, 
+		const Entity &params, 
+		const BodyData &data);
 
 	float getSunVisibility();
 
-	/// Rendering data for all planets
-	std::vector<PlanetData> planetData;
-	/// Index of sun in main planet collection
+	/// Rendering data for all bodies
+	std::vector<BodyData> bodyData;
+	/// Index of sun in main entity collection
 	size_t sunId = 0;
 
 	GLuint sunOcclusionQueries[2] = {0, 0};
@@ -388,8 +387,8 @@ private:
 	GLuint flareTex;
 
 	// Samplers
-	/// Sampler for planet textures
-	GLuint planetTexSampler;
+	/// Sampler for body textures
+	GLuint bodyTexSampler;
 	/// Sampler for atmospheric lookup table
 	GLuint atmoSampler;
 	/// Sampler for ring textures
@@ -399,7 +398,7 @@ private:
 	float textureAnisotropy;
 
 	// Models
-	/// Sphere model (for default planets and atmospheres)
+	/// Sphere model (for default entities and atmospheres)
 	DrawCommand sphere;
 	/// Flare model (Circle)
 	DrawCommand flareModel;

@@ -2,7 +2,7 @@
 
 #include "graphics_api.hpp"
 
-#include "planet.hpp"
+#include "entity.hpp"
 #include "renderer.hpp"
 #include <glm/glm.hpp>
 
@@ -40,8 +40,8 @@ private:
 	 */
 	bool isPressedOnce(int key);
 
-	/// Loads planet configuration files
-	void loadPlanetFiles();
+	/// Loads entity configuration files
+	void loadEntityFiles();
 	/// Loads settings file
 	void loadSettingsFile();
 
@@ -53,19 +53,19 @@ private:
 	void updateTrack(float dt);
 	void updateMove(float dt);
 
-	/// Returns the id of planet's parent (-1 if no parent)
-	int getParent(size_t planetId);
+	/// Returns the id of entity's parent (-1 if no parent)
+	int getParent(size_t entityId);
 	/// Returns all parents (recursive) until there is no parent
-	std::vector<size_t> getAllParents(size_t planetId);
-	/// Returns the level of planet inside the hierarchy
-	int getLevel(size_t planetId);
+	std::vector<size_t> getAllParents(size_t entityId);
+	/// Returns the level of entity inside the hierarchy
+	int getLevel(size_t entityId);
 	/// Returns direct children
-	std::vector<size_t> getChildren(size_t planetId);
+	std::vector<size_t> getChildren(size_t entityId);
 	/// Returns all children recursively
-	std::vector<size_t> getAllChildren(size_t planetId);
+	std::vector<size_t> getAllChildren(size_t entityId);
 
-	/// Returns planets in the vicinity of the given planet
-	std::vector<size_t> getFocusedPlanets(size_t focusedPlanetId);
+	/// Returns entities in the vicinity of the given entity
+	std::vector<size_t> getFocusedEntities(size_t focusedEntityId);
 
 	void displayProfiling(const std::vector<std::pair<std::string, uint64_t>> &a);
 	void updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &a);
@@ -94,19 +94,19 @@ private:
 	std::string starMapFilename = "";
 	float starMapIntensity = 1.0;
 	
-	// Main planet collection
-	/// Number of planets
-	uint32_t planetCount = 0;
-	/// Fixed planet parameters
-	std::vector<Planet> planetParams;
-	/// Dynamic planet state
-	std::vector<PlanetState> planetStates;
-	/// Index in the main collection of parent planet 
-	std::vector<int> planetParents;
+	// Main entity collection
+	/// Number of entities
+	uint32_t entityCount = 0;
+	/// Fixed entity parameters
+	std::vector<Entity> entityParams;
+	/// Dynamic entity state
+	std::vector<EntityState> entityStates;
+	/// Index in the main collection of parent entity 
+	std::vector<int> entityParents;
 
-	/// Index in the main collection of planet the view follows
-	size_t focusedPlanetId = 0; 
-	/// Seconds since January 1st 1950 00:00:00 UTC
+	/// Index in the main collection of entity the view follows
+	size_t focusedEntityId = 0; 
+	/// Seconds since January 1st 2017 00:00:00 UTC
 	double epoch = 0.0;
 	/// Index in the timeWarpValues collection which indicates the current timewarp factor
 	size_t timeWarpIndex = 0;
@@ -115,10 +115,10 @@ private:
 		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 
 			3600*24*10, 3600*24*28, 3600*24*365.2499, 3600*24*365.2499*8};
 
-	/// Planet name display
-	size_t planetNameId = focusedPlanetId;
-	/// Planet name display in/out
-	float planetNameFade = 1.f;
+	/// Entity name display
+	size_t entityNameId = focusedEntityId;
+	/// Entity name display in/out
+	float entityNameFade = 1.f;
 
 	// PROFILING
 	/// Total times
@@ -146,12 +146,12 @@ private:
 	glm::mat3 viewDir;
 
 	// SWITCHING PLANETS
-	/// Indicates if the view is switching from a planet to another
+	/// Indicates if the view is switching from a entity to another
 	SwitchPhase switchPhase = SwitchPhase::IDLE;
 	/// Time of switching
 	float switchTime = 0.0;
-	/// Index in main collection of planet switching from
-	int switchPreviousPlanet = -1; 
+	/// Index in main collection of entity switching from
+	int switchPreviousEntity = -1; 
 	/// View dir when switching started 
 	glm::mat3 switchPreviousViewDir;
 	/// When view is obstructed when switching, interpolate to this new position

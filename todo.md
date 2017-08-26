@@ -4,6 +4,7 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
+- [ ] Rename 'planet' with 'entity'
 - [ ] Fix planet orientations at epoch
 - [ ] Display some kind of planet description
 - [ ] Split up other textures
@@ -18,6 +19,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [ ] Add barycenters
 - [x] Ecliptic reference frame instead of equator
 - [x] Get more recent orbital parameters
 - [x] Body name displayed on top left, with mention of parent body and time

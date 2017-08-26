@@ -1,6 +1,6 @@
 #pragma once
 
-#include "planet.hpp"
+#include "entity.hpp"
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
@@ -17,8 +17,8 @@ public:
 
 	struct InitInfo
 	{
-		/// All of the planets fixed parameters
-		std::vector<Planet> planetParams;
+		/// All of the entities fixed parameters
+		std::vector<Entity> entityParams;
 		/// Star map texture filename
 		std::string starMapFilename;
 		/// Star map brightness
@@ -51,14 +51,14 @@ public:
 		bool wireframe;
 		/// Whether to activate bloom or not
 		bool bloom;
-		/// All of the planets dynamic state
-		std::vector<PlanetState> planetStates;
-		/// Ids of planets currently in focus
-		std::vector<size_t> focusedPlanetsId;
+		/// All of the entities dynamic state
+		std::vector<EntityState> entityStates;
+		/// Ids of entities currently in focus
+		std::vector<size_t> focusedEntitiesId;
 		/// Name of focused body
-		std::string focusedPlanetName;
+		std::string focusedEntityName;
 		/// Fade in/out of focused body name
-		float planetNameFade;
+		float entityNameFade;
 		/// Formatted time
 		std::string currentTime;
 	};

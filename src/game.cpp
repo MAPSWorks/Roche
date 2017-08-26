@@ -115,9 +115,10 @@ void Game::scrollFun(int offset)
 void Game::init()
 {
 	loadSettingsFile();
-	loadPlanetFiles();
+	loadEntityFiles();
 
-	viewPolar.z = planetParams[focusedPlanetId].getBody().getRadius()*4;
+	viewPolar.z = std::max(1000.f, 
+		entityParams[focusedEntityId].getSphere().getRadius()*4);
 
 	// Window & context creation
 	if (!glfwInit())
@@ -166,7 +167,7 @@ void Game::init()
 
 	// Renderer init
 	renderer->init({
-		planetParams, 
+		entityParams, 
 		starMapFilename, 
 		starMapIntensity, 
 		msaaSamples, 
@@ -224,18 +225,18 @@ vec3 axis(const float rightAscension, const float declination)
 		 sin(declination));
 }
 	
-void Game::loadPlanetFiles()
+void Game::loadEntityFiles()
 {
 	using namespace shaun;
 	try
 	{
 		parser p;
-		std::string fileContent = readFile("config/planets.sn");
+		std::string fileContent = readFile("config/entities.sn");
 		object obj = p.parse(fileContent.c_str());
 		sweeper swp(&obj);
 
 		ambientColor = (float)get<double>(swp("ambientColor"));
-		std::string startingPlanet = std::string(swp("startingPlanet").value<string>());
+		std::string startingEntity = std::string(swp("startingEntity").value<string>());
 
 		sweeper starMap(swp("starMap"));
 		starMapFilename = get<std::string>(starMap("diffuse"));
@@ -244,66 +245,69 @@ void Game::loadPlanetFiles()
 		const float axialTilt = radians(get<double>(swp("axialTilt")));
 		const mat3 axialMat = mat3(rotate(mat4(), axialTilt, vec3(0,-1,0)));
 
-		sweeper planetsSweeper(swp("planets"));
-		planetCount = planetsSweeper.value<list>().elements().size();
-		planetParams.resize(planetCount);
-		planetStates.resize(planetCount);
-		planetParents.resize(planetCount, -1);
+		sweeper entitiesSweeper(swp("entities"));
+		entityCount = entitiesSweeper.value<list>().elements().size();
+		entityParams.resize(entityCount);
+		entityStates.resize(entityCount);
+		entityParents.resize(entityCount, -1);
 
-		for (uint32_t i=0;i<planetCount;++i)
+		for (uint32_t i=0;i<entityCount;++i)
 		{
-			sweeper pl(planetsSweeper[i]);
+			sweeper pl(entitiesSweeper[i]);
 			std::string name = std::string(pl("name").value<string>());
-			// Set focus on starting planet
-			if (name == startingPlanet) focusedPlanetId = i;
-			// Create planet
-			Planet planet;
-			planet.setName(name);
-			planet.setParentName(get<std::string>(pl("parent")));
+			// Set focus on starting entity
+			if (name == startingEntity) focusedEntityId = i;
+			// Create entity
+			Entity entity;
+			entity.setName(name);
+			const std::string displayName = get<std::string>(pl("displayName"));
+			entity.setDisplayName(displayName==""?name:displayName);
+			entity.setParentName(get<std::string>(pl("parent")));
 
 			sweeper orbitsw(pl("orbit"));
 			if (!orbitsw.is_null())
 			{
-				const Planet::Orbit orbit(
+				const Orbit orbit(
 					get<double>(orbitsw("ecc")),
 					get<double>(orbitsw("sma")),
 					radians(get<double>(orbitsw("inc"))),
 					radians(get<double>(orbitsw("lan"))),
 					radians(get<double>(orbitsw("arg"))),
+					get<double>(orbitsw("pr")),
 					radians(get<double>(orbitsw("m0"))));
-				planet.setOrbit(orbit);
+				entity.setOrbit(orbit);
 			}
-			sweeper bodysw(pl("body"));
-			if (!bodysw.is_null())
+			sweeper spheresw(pl("sphere"));
+			if (!spheresw.is_null())
 			{
-				const Planet::Body body(
-					get<double>(bodysw("radius")),
-					get<double>(bodysw("GM")),
+				const Sphere sphere(
+					get<double>(spheresw("radius")),
+					get<double>(spheresw("GM")),
 					axialMat*
 					axis(
-						radians(get<double>(bodysw("rightAscension"))),
-						radians(get<double>(bodysw("declination")))),
-					get<double>(bodysw("rotPeriod")),
-					get<vec3>(bodysw("meanColor"))*
-					(float)get<double>(bodysw("albedo")),
-					get<std::string>(bodysw("diffuse")));
-				planet.setBody(body);
+						radians(get<double>(spheresw("rightAscension"))),
+						radians(get<double>(spheresw("declination")))),
+					get<double>(spheresw("rotPeriod")),
+					get<vec3>(spheresw("meanColor"))*
+					(float)get<double>(spheresw("albedo")),
+					get<std::string>(spheresw("diffuse")));
+				entity.setSphere(sphere);
 			}
 			sweeper atmosw(pl("atmo"));
 			if (!atmosw.is_null())
 			{
-				Planet::Atmo atmo(
+				Atmo atmo(
 					get<vec4>(atmosw("K")),
 					get<double>(atmosw("density")),
 					get<double>(atmosw("maxHeight")),
 					get<double>(atmosw("scaleHeight")));
-				planet.setAtmo(atmo);
+				entity.setAtmo(atmo);
 			}
 
 			sweeper ringsw(pl("ring"));
 			if (!ringsw.is_null())
 			{
-				Planet::Ring ring(
+				Ring ring(
 					get<double>(ringsw("inner")),
 					get<double>(ringsw("outer")),
 					axialMat*
@@ -315,38 +319,38 @@ void Game::loadPlanetFiles()
 					get<std::string>(ringsw("unlit")),
 					get<std::string>(ringsw("transparency")),
 					get<std::string>(ringsw("color")));
-				planet.setRing(ring);
+				entity.setRing(ring);
 			}
 
 			sweeper starsw(pl("star"));
 			if (!starsw.is_null())
 			{
-				Planet::Star star(
+				Star star(
 					get<double>(starsw("brightness")),
 					get<double>(starsw("flareFadeInStart")),
 					get<double>(starsw("flareFadeInEnd")),
 					get<double>(starsw("flareAttenuation")),
 					get<double>(starsw("flareMinSize")),
 					get<double>(starsw("flareMaxSize")));
-				planet.setStar(star);
+				entity.setStar(star);
 			}
 
 			sweeper cloudssw(pl("clouds"));
 			if (!cloudssw.is_null())
 			{
-				Planet::Clouds clouds(
+				Clouds clouds(
 					get<std::string>(cloudssw("filename")),
 					get<double>(cloudssw("period")));
-				planet.setClouds(clouds);
+				entity.setClouds(clouds);
 			}
 
 			sweeper nightsw(pl("night"));
 			if (!nightsw.is_null())
 			{
-				Planet::Night night(
+				Night night(
 					get<std::string>(nightsw("filename")),
 					get<double>(nightsw("intensity")));
-				planet.setNight(night);
+				entity.setNight(night);
 			}
 
 			sweeper specsw(pl("specular"));
@@ -354,29 +358,29 @@ void Game::loadPlanetFiles()
 			{
 				sweeper mask0(specsw("mask0"));
 				sweeper mask1(specsw("mask1"));
-				Planet::Specular spec(
+				Specular spec(
 					get<std::string>(specsw("filename")),
 					{get<vec3>(mask0("color")), 
 					 (float)get<double>(mask0("hardness"))},
 					{get<vec3>(mask1("color")),
 					 (float)get<double>(mask1("hardness"))});
-				planet.setSpecular(spec);
+				entity.setSpecular(spec);
 			}
 
-			planetParams[i] = planet;
+			entityParams[i] = entity;
 		}
-		// Assign planet parents
-		for (uint32_t i=0;i<planetCount;++i)
+		// Assign entity parents
+		for (uint32_t i=0;i<entityCount;++i)
 		{
-			const std::string parent = planetParams[i].getParentName();
+			const std::string parent = entityParams[i].getParentName();
 			if (parent != "")
 			{
-				for (uint32_t j=0;j<planetCount;++j)
+				for (uint32_t j=0;j<entityCount;++j)
 				{
 					if (i==j) continue;
-					if (planetParams[j].getName() == parent)
+					if (entityParams[j].getName() == parent)
 					{
-						planetParents[i] = j;
+						entityParents[i] = j;
 						break;
 					}
 				}
@@ -480,20 +484,19 @@ void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
 
-	std::vector<dvec3> relativePositions(planetCount);
-	// Planet state update
-	for (uint32_t i=0;i<planetCount;++i)
+	std::vector<dvec3> relativePositions(entityCount);
+	// Entity state update
+	for (uint32_t i=0;i<entityCount;++i)
 	{
 		// Relative position update
 		relativePositions[i] = 
-			(getParent(i) == -1 || !planetParams[i].hasOrbit())?
+			(getParent(i) == -1 || !entityParams[i].hasOrbit())?
 			dvec3(0.0):
-			planetParams[i].getOrbit().computePosition(
-				epoch, planetParams[getParent(i)].getBody().getGM());
+			entityParams[i].getOrbit().computePosition(epoch);
 	}
 
-	// Planet absolute position update
-	for (uint32_t i=0;i<planetCount;++i)
+	// Entity absolute position update
+	for (uint32_t i=0;i<entityCount;++i)
 	{
 		dvec3 absPosition = relativePositions[i];
 		int parent = getParent(i);
@@ -503,20 +506,20 @@ void Game::update(const double dt)
 			parent = getParent(parent);
 		}
 
-		// Planet Angle
+		// Entity Angle
 		const float rotationAngle = 
 			(2.0*pi<float>())*
-			fmod(epoch/planetParams[i].getBody().getRotationPeriod(),1.f)
+			fmod(epoch/entityParams[i].getSphere().getRotationPeriod(),1.f)
 			+ pi<float>();
 
 		// Cloud Displacement
 		const float cloudDisp = [&]{
-			if (planetParams[i].hasClouds()) return 0.0;
-			const float period = planetParams[i].getClouds().getPeriod();
+			if (entityParams[i].hasClouds()) return 0.0;
+			const float period = entityParams[i].getClouds().getPeriod();
 			return (period)?fmod(-epoch/period, 1.f):0.f;
 		}();
 
-		planetStates[i] = PlanetState(absPosition, rotationAngle, cloudDisp);
+		entityStates[i] = EntityState(absPosition, rotationAngle, cloudDisp);
 	}
 	
 	// Wireframe on/off
@@ -558,8 +561,8 @@ void Game::update(const double dt)
 		renderer->takeScreenshot(generateScreenshotName());
 	}
 
-	// Focused planets
-	const std::vector<size_t> visiblePlanetsId = getFocusedPlanets(focusedPlanetId);
+	// Focused entities
+	const std::vector<size_t> visibleEntitiesId = getFocusedEntities(focusedEntityId);
 
 	// Time formatting
 	const long epochInSeconds = floor(epoch);
@@ -569,8 +572,9 @@ void Game::update(const double dt)
 	renderer->render({
 		viewPos, viewFovy, viewDir,
 		exposure, ambientColor, wireframe, bloom, 
-		planetStates, visiblePlanetsId, planetParams[planetNameId].getName(),
-		planetNameFade, formattedTime});
+		entityStates, visibleEntitiesId, 
+		entityParams[entityNameId].getDisplayName(),
+		entityNameFade, formattedTime});
 
 	auto a = renderer->getProfilerTimes();
 
@@ -632,11 +636,11 @@ void Game::updateIdle(float dt, double posX, double posY)
 		}
 	}
 
-	const float radius = planetParams[focusedPlanetId].getBody().getRadius();
+	const float radius = entityParams[focusedEntityId].getSphere().getRadius();
 
 	viewPolar.x += viewSpeed.x;
 	viewPolar.y += viewSpeed.y;
-	viewPolar.z += viewSpeed.z*(viewPolar.z-radius);
+	viewPolar.z += viewSpeed.z*std::max(0.01f, viewPolar.z-radius);
 
 	viewSpeed *= viewSmoothness;
 
@@ -668,7 +672,7 @@ void Game::updateIdle(float dt, double posX, double posY)
 		viewPolar.z;
 
 	viewPos = dvec3(relViewPos) + 
-		planetStates[focusedPlanetId].getPosition();
+		entityStates[focusedEntityId].getPosition();
 
 	const vec3 direction = -polarToCartesian(vec2(viewPolar)+panPolar);
 
@@ -684,44 +688,44 @@ void Game::updateIdle(float dt, double posX, double posY)
 		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
 	}
 
-	// Planet name display
-	planetNameId = focusedPlanetId;
-	planetNameFade = 1.f;
+	// Entity name display
+	entityNameId = focusedEntityId;
+	entityNameFade = 1.f;
 
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
 		switchPhase = SwitchPhase::TRACK;
-		// Save previous planet
-		switchPreviousPlanet = focusedPlanetId;
-		// Choose next planet
-		const int nextPlanet = focusedPlanetId+
+		// Save previous entity
+		switchPreviousEntity = focusedEntityId;
+		// Choose next entity
+		const int nextEntity = focusedEntityId+
 		(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
-		focusedPlanetId = (nextPlanet>=(int)planetCount)?0:
-			((nextPlanet<0?(planetCount-1):nextPlanet));
+		focusedEntityId = (nextEntity>=(int)entityCount)?0:
+			((nextEntity<0?(entityCount-1):nextEntity));
 		// Kill timewarp
 		timeWarpIndex = 0;
 		// Save previous orientation
 		switchPreviousViewDir = viewDir;
 		// Ray test
 		switchNewViewPolar = viewPolar;
-		// Get direction from view to target body
-		const dvec3 target = planetStates[focusedPlanetId].getPosition() - 
-				planetStates[switchPreviousPlanet].getPosition();
+		// Get direction from view to target entity
+		const dvec3 target = entityStates[focusedEntityId].getPosition() - 
+				entityStates[switchPreviousEntity].getPosition();
 		const vec3 targetDir = normalize(target-dvec3(relViewPos));
-		// Get t as origin+dir*t = closest point to body
+		// Get t as origin+dir*t = closest point to entity
 		const float b = dot(relViewPos, targetDir);
 		// Dont care if behind view
 		if (b < 0)
 		{
 			// Get closest point coordinates
 			const vec3 closestPoint = relViewPos-b*targetDir;
-			// Get compare closest distance with radius of body
+			// Get compare closest distance with radius of entity
 			const float closestDist = length(closestPoint);
 			const float closestMinDist = radius*1.1;
 			if (closestDist < closestMinDist)
 			{
-				// Vector to shift view to not have obstructed target body
+				// Vector to shift view to not have obstructed target entity
 				const vec3 tangent = normalize(closestPoint);
 				// Thales to get amount to shift
 				const double totalDist = length(target-dvec3(relViewPos));
@@ -757,9 +761,9 @@ void Game::updateTrack(float dt)
 	const float t = min(1.f, switchTime/totalTime);
 	const float f = ease(t);
 
-	// Planet name display
-	planetNameId = switchPreviousPlanet;
-	planetNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
+	// Entity name display
+	entityNameId = switchPreviousEntity;
+	entityNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
 
 	// Interpolate positions
 	float posDeltaTheta = switchNewViewPolar.x-viewPolar.x;
@@ -769,12 +773,12 @@ void Game::updateTrack(float dt)
 	const vec3 interpPolar = (1-f)*viewPolar+f*
 		vec3(viewPolar.x+posDeltaTheta, switchNewViewPolar.y, switchNewViewPolar.z);
 
-	viewPos = planetStates[switchPreviousPlanet].getPosition()+
+	viewPos = entityStates[switchPreviousEntity].getPosition()+
 		dvec3(polarToCartesian(vec2(interpPolar))*interpPolar.z);
 
-	// Aim at next body
+	// Aim at next entity
 	const vec3 targetDir = 
-		normalize(planetStates[focusedPlanetId].getPosition() - viewPos);
+		normalize(entityStates[focusedEntityId].getPosition() - viewPos);
 	// Find the angles
 	const float targetPhi = asin(targetDir.z);
 	const float targetTheta = atan2(targetDir.y, targetDir.x);
@@ -812,21 +816,22 @@ void Game::updateMove(float dt)
 	const float t = min(1.f, switchTime/totalTime);
 	const double f = ease2(t, 4);
 
-	// Planet name fade
-	planetNameId = focusedPlanetId;
-	planetNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
+	// Entity name fade
+	entityNameId = focusedEntityId;
+	entityNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
 
 	// Old position to move from
-	const dvec3 sourcePos = planetStates[switchPreviousPlanet].getPosition()+
+	const dvec3 sourcePos = entityStates[switchPreviousEntity].getPosition()+
 		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
 
-	// Distance from planet at arrival
-	const float targetDist = 4*planetParams[focusedPlanetId].getBody().getRadius();
-	// Direction from old position to new planet
+	// Distance from entity at arrival
+	const float targetDist = std::max(
+		4*entityParams[focusedEntityId].getSphere().getRadius(), 1000.f);
+	// Direction from old position to new entity
 	const vec3 direction = 
-		normalize(planetStates[focusedPlanetId].getPosition()-sourcePos);
-	// New position (subtract direction to not be inside planet)
-	const dvec3 targetPos = planetStates[focusedPlanetId].getPosition()-
+		normalize(entityStates[focusedEntityId].getPosition()-sourcePos);
+	// New position (subtract direction to not be inside entity)
+	const dvec3 targetPos = entityStates[focusedEntityId].getPosition()-
 		dvec3(direction*targetDist);
 
 	// Interpolate positions
@@ -846,15 +851,15 @@ void Game::updateMove(float dt)
 	}
 }
 
-int Game::getParent(size_t planetId)
+int Game::getParent(size_t entityId)
 {
-	return planetParents[planetId];
+	return entityParents[entityId];
 }
 
-std::vector<size_t> Game::getAllParents(size_t planetId)
+std::vector<size_t> Game::getAllParents(size_t entityId)
 {
 	std::vector<size_t> parents = {};
-	int temp = planetId;
+	int temp = entityId;
 	int tempParent = -1;
 	while ((tempParent = getParent(temp)) != -1)
 	{
@@ -864,10 +869,10 @@ std::vector<size_t> Game::getAllParents(size_t planetId)
 	return parents;
 }
 
-int Game::getLevel(size_t planetId)
+int Game::getLevel(size_t entityId)
 {
 	int level = 0;
-	int temp = planetId;
+	int temp = entityId;
 	int tempParent = -1;
 	while ((tempParent = getParent(temp)) != -1)
 	{
@@ -877,19 +882,19 @@ int Game::getLevel(size_t planetId)
 	return level;
 }
 
-std::vector<size_t> Game::getChildren(size_t planetId)
+std::vector<size_t> Game::getChildren(size_t entityId)
 {
 	std::vector<size_t> children;
-	for (size_t i=0;i<planetParents.size();++i)
+	for (size_t i=0;i<entityParents.size();++i)
 	{
-		if (getParent(i) == (int)planetId) children.push_back(i);
+		if (getParent(i) == (int)entityId) children.push_back(i);
 	}
 	return children;
 }
 
-std::vector<size_t> Game::getAllChildren(size_t planetId)
+std::vector<size_t> Game::getAllChildren(size_t entityId)
 {
-	auto c = getChildren(planetId);
+	auto c = getChildren(entityId);
 	std::vector<size_t> accum = {};
 	for (auto i : c)
 	{
@@ -900,24 +905,24 @@ std::vector<size_t> Game::getAllChildren(size_t planetId)
 	return c;
 }
 
-std::vector<size_t> Game::getFocusedPlanets(size_t focusedPlanetId)
+std::vector<size_t> Game::getFocusedEntities(size_t focusedEntityId)
 {
-	int level = getLevel(focusedPlanetId);
+	int level = getLevel(focusedEntityId);
 
 	// Itself visible
-	std::vector<size_t> v = {focusedPlanetId};
+	std::vector<size_t> v = {focusedEntityId};
 	// All children visible
-	auto children = getAllChildren(focusedPlanetId);
+	auto children = getAllChildren(focusedEntityId);
 	v.insert(v.end(), children.begin(), children.end());
 
 	// All parents visible
-	auto parents = getAllParents(focusedPlanetId);
+	auto parents = getAllParents(focusedEntityId);
 	v.insert(v.end(), parents.begin(), parents.end());
 
 	// If it is a moon, siblings are visible
 	if (level >= 2)
 	{
-		auto siblings = getAllChildren(getParent(focusedPlanetId));
+		auto siblings = getAllChildren(getParent(focusedEntityId));
 		v.insert(v.end(), siblings.begin(), siblings.end());
 	}
 	return v;

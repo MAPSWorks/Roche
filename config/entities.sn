@@ -1,0 +1,965 @@
+ambientColor:0.0002
+startingEntity:"Earth"
+starMap:{
+	diffuse:"tex/starmap"
+	intensity:0.05
+}
+axialTilt:2.343899501947467E+01
+entities:[
+{
+	name:"SSB"
+	displayName:"Solar System Barycenter"
+}
+{
+	name:"Sun"
+	displayName:"The Sun"
+	parent:"SSB"
+	orbit:{
+		ecc:7.223679992904547E-01
+		sma:4.791149834758607E+05
+		inc:2.217622246627185E+00
+		lan:1.002422425142114E+02
+		arg:1.415659793765009E+02
+		pr:1.165239689701036E+08
+		m0:1.283721199501000E+02
+	}
+	sphere:{
+		rightAscension:286.13
+		declination:63.87
+		rotPeriod:2192831.6
+		radius:696000
+		GM:132712440018
+		diffuse:"tex/sun"
+		meanColor:[1.0,1.0,1.0]
+		albedo:1.0
+	}
+	star:{
+		brightness:2.0
+		flareFadeInStart:2.0
+		flareFadeInEnd:10.0
+		flareAttenuation:0.000008
+		flareMinSize:0.1
+		flareMaxSize:1.0
+	}
+}
+{
+	name:"Mercury"
+	parent:"SSB"
+	orbit:{
+		ecc:2.032437244458283E-01
+		sma:5.867636173180770E+07
+		inc:6.977274841991888E+00
+		lan:4.841353874352001E+01
+		arg:3.343602419522905E+01
+		pr:7.746896322647904E+06
+		m0:2.265749813265085E+01
+	}
+	sphere:{
+		radius:2439.7
+		rightAscension:281.01
+		declination:61.45
+		rotPeriod:5067000
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.142
+		GM:22032.9
+		diffuse:"tex/mercury/"
+	}
+}
+{
+	name:"Venus"
+	parent:"SSB"
+	orbit:{
+		ecc:9.928308769704441E-03
+		sma:1.096978383167375E+08
+		inc:3.394449437167350E+00
+		lan:7.665503154991849E+01
+		arg:1.461779354833069E+01
+		pr:1.980302641119052E+07
+		m0:3.191236774709908E+02
+	}
+	sphere:{
+		radius:6051.8
+		rightAscension:272.76
+		declination:67.16
+		rotPeriod:-20997360
+		meanColor:[1.0,0.8,0.4]
+		albedo:0.67
+		GM:324859.9
+		diffuse:"tex/venus/"
+	}
+	atmo:{
+		maxHeight:250
+		scaleHeight:15.9
+		K:[2,1.5,1.0,0.0]
+		density:5
+	}
+}
+{
+	name:"EMB"
+	displayName:"Earth-Moon Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:1.936404631355074E-02
+		sma:1.504265275973429E+08
+		inc:1.116190435656998E-02
+		lan:1.862134279499492E+02
+		arg:2.873822265631837E+02
+		pr:3.179958802936189E+07
+		m0:3.471964973643252E+02
+	}
+}
+{
+	name:"Earth"
+	displayName:"The Earth"
+	parent:"EMB"
+	orbit:{
+		ecc:4.151912181763105E-02
+		sma:4.681748553811522E+03
+		inc:5.107151746896363E+00
+		lan:1.543164577863016E+02
+		arg:9.137839243489144E+01
+		pr:2.365771210133944E+06
+		m0:2.502170811805973E+02
+	}
+	sphere:{
+		radius:6371.01
+		rightAscension:0
+		declination:90
+		rotPeriod:86164.091
+		meanColor:[0.6,0.8,1.0]
+		albedo:0.367
+		GM:398600.440
+		diffuse:"tex/earth/albedo"
+	}
+	atmo:{
+		maxHeight:130
+		scaleHeight:8.5
+		K:[0.1,0.4,1.0,0.01]
+		density:1
+	}
+	clouds:{
+		filename:"tex/earth/clouds"
+		period:0
+	}
+	night:{
+		filename:"tex/earth/nightlights"
+		intensity:0.04
+	}
+	specular:{
+		filename:"tex/earth/specularmask"
+		mask0:{
+			color:[0.2,0.25,0.3]
+			hardness:60
+		}
+		mask1:{
+			color:[0,0,0]
+			hardness:0
+		}
+	}
+}
+{
+	name:"Moon"
+	displayName:"The Moon"
+	parent:"EMB"
+	orbit:{
+		ecc:4.151912181761209E-02
+		sma:3.806288216871648E+05
+		inc:5.107151746896368E+00
+		lan:1.543164577863016E+02
+		arg:2.713783924348262E+02
+		pr:2.365771210134184E+06
+		m0:2.502170811806626E+02
+	}
+	sphere:{
+		radius:1737.53
+		rightAscension:270
+		declination:67.16
+		rotPeriod:2360586
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.12
+		GM:4902.768
+		diffuse:"tex/moon"
+	}
+}
+{
+	name:"MB"
+	displayName:"Mars Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:9.698172602671137E-02
+		sma:2.293660306075990E+08
+		inc:1.851687976262193E+00
+		lan:4.967353474062943E+01
+		arg:2.866027625602253E+02
+		pr:5.987240836930058E+07
+		m0:3.303868321644009E+01
+	}
+}
+{
+	name:"Mars"
+	parent:"MB"
+	orbit:{
+		ecc:9.071000391036276E-01
+		sma:8.694607716721140E-05
+		inc:2.731249621803816E+01
+		lan:7.956180777295614E+01
+		arg:1.595254213028320E+02
+		pr:3.430360313927889E+03
+		m0:1.922763394852632E+02
+	}
+	sphere:{
+		radius:3389.5
+		rightAscension:317.68143
+		declination:52.88650
+		rotPeriod:88642
+		meanColor:[1.0,0.4,0.2]
+		albedo:0.170
+		GM:42828.9
+		diffuse:"tex/mars"
+	}
+	atmo:{
+		maxHeight:170
+		scaleHeight:11.1
+		K:[0.3,0.12,0.05,0.00001]
+		density:0.009
+	}
+}
+{
+	name:"Vesta"
+	parent:"SSB"
+	orbit:{
+		ecc:9.032126552852322E-02
+		sma:3.533697423477140E+08
+		inc:7.142170139519576E+00
+		lan:1.037755867579982E+02
+		arg:1.508085296330379E+02
+		pr:1.144924660311228E+08
+		m0:2.261070837923667E+02
+	}
+	sphere:{
+		radius:262.7
+		rightAscension:294.18
+		declination:66.764
+		rotPeriod:19231.2
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.423
+		GM:17.8
+		diffuse:"tex/vesta"
+	}
+}
+{
+	name:"Ceres"
+	parent:"SSB"
+	orbit:{
+		ecc:7.467667552609816E-02
+		sma:4.155393262491297E+08
+		inc:1.058550879992051E+01
+		lan:8.029193521341929E+01
+		arg:7.173690011699800E+01
+		pr:1.459993985900643E+08
+		m0:2.581019349525831E+02
+	}
+	sphere:{
+		radius:473
+		rightAscension:294.18
+		declination:66.764
+		rotPeriod:32667.012
+		meanColor:[1.0,1.0,1.0]
+		Ceres:0.090
+		GM:63.2
+		diffuse:"tex/ceres"
+	}
+}
+{
+	name:"JB"
+	displayName:"Jupiter System Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:4.911973250758208E-02
+		sma:7.774678672474000E+08
+		inc:1.303056633913318E+00
+		lan:1.005218075537592E+02
+		arg:2.732494652578694E+02
+		pr:3.741777826190836E+08
+		m0:1.765774109100122E+02
+	}
+}
+{
+	name:"Jupiter"
+	parent:"JB"
+	orbit:{
+		ecc:9.883291850785360E-01
+		sma:6.653473939462141E+01
+		inc:2.221668524840759E+00
+		lan:3.358067616431784E+02
+		arg:1.544404044761726E+02
+		pr:1.017134489855682E+05
+		m0:1.662532119616407E+02
+	}
+	sphere:{
+		radius:69911
+		rightAscension:268.057
+		declination:64.496
+		rotPeriod:35730
+		meanColor:[1.0,0.8,0.6]
+		albedo:0.52
+		GM:126686534
+		diffuse:"tex/jupiter/albedo"
+	}
+	atmo:{
+		maxHeight:400
+		scaleHeight:27
+		K:[1.0,1.0,1.0,0.0]
+		density:1000
+	}
+}
+{
+	name:"Io"
+	parent:"JB"
+	orbit:{
+		ecc:3.416882333124332E-03
+		sma:4.222393611822934E+05
+		inc:2.189794730186266E+00
+		lan:3.379087599431522E+02
+		arg:1.486701967702108E+02
+		pr:1.531575462193703E+05
+		m0:2.163019101196024E+02
+	}
+	sphere:{
+		radius:3660.0
+		rightAscension:268.057
+		declination:64.496
+		rotPeriod:1.530389098146819E+05
+		meanColor:[1.0,0.96,0.90]
+		albedo:0.63
+		GM:0
+		diffuse:"tex/io"
+	}
+}
+{
+	name:"Europa"
+	parent:"JB"
+	orbit:{
+		ecc:9.567213384923784E-03
+		sma:6.711071449626116E+05
+		inc:2.688769707295532E+00
+		lan:3.385342825908808E+02
+		arg:3.391058621827173E+02
+		pr:3.068837867614810E+05
+		m0:9.995458157682359E+01
+	}
+	sphere:{
+		radius:1560.8
+		rightAscension:268.057
+		declination:64.496
+		rotPeriod:3.069941568596450E+05
+		meanColor:[1.0,0.99,0.96]
+		albedo:0.67
+		GM:0
+		diffuse:"tex/europa"
+	}
+}
+{
+	name:"Ganymede"
+	parent:"JB"
+	orbit:{
+		ecc:1.340006495348744E-03
+		sma:1.070327959098243E+06
+		inc:2.292786913752083E+00
+		lan:3.407731464762111E+02
+		arg:3.478331552188865E+02
+		pr:6.181527793854525E+05
+		m0:2.195477127886655E+02
+	}
+	sphere:{
+		radius:2634.1
+		rightAscension:268.057
+		declination:64.496
+		rotPeriod:6.185164679655199E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.43
+		GM:0
+		diffuse:"tex/ganymede"
+	}
+}
+{
+	name:"Callisto"
+	parent:"JB"
+	orbit:{
+		ecc:7.244893644041741E-03
+		sma:1.882761159332192E+06
+		inc:1.972719732549757E+00
+		lan:3.371714953521344E+02
+		arg:2.758646371870005E+01
+		pr:1.442113495000405E+06
+		m0:1.000194639236621E+02
+	}
+	sphere:{
+		radius:2410.3
+		rightAscension:268.057
+		declination:64.496
+		rotPeriod:1.443187314612591E+06
+		meanColor:[1.0,0.97,0.96]
+		albedo:0.22
+		GM:0
+		diffuse:"tex/callisto"
+	}
+}
+{
+	name:"SB"
+	displayName:"Saturn Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:5.393642900588957E-02
+		sma:1.427799049684059E+09
+		inc:2.486890367519602E+00
+		lan:1.135990258913877E+02
+		arg:3.390331994893422E+02
+		pr:9.302924954617430E+08
+		m0:1.651506083951050E+02
+	}
+}
+{
+	name:"Saturn"
+	parent:"SB"
+	orbit:{
+		ecc:6.216880418586314E-02
+		sma:2.776458337024201E+02
+		inc:2.723489141630708E+01
+		lan:1.686225081408732E+02
+		arg:9.998336642122270E+01
+		pr:1.214388705482736E+06
+		m0:2.012456233648876E+02
+	}
+	sphere:{
+		radius:58232
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:37980
+		meanColor:[1.0,0.9,0.5]
+		albedo:0.47
+		GM:37931187
+		diffuse:"tex/saturn/albedo"
+	}
+	atmo:{
+		maxHeight:800
+		scaleHeight:59.5
+		K:[1.0,1.0,1.0,0.0]
+		density:1000
+	}
+	ring:{
+		inner:66900
+		outer:139826
+		rightAscension:40.589
+		declination:83.537
+		backscat:"tex/saturn/rings_backscat.txt"
+		forwardscat:"tex/saturn/rings_forwardscat.txt"
+		unlit:"tex/saturn/rings_unlit.txt"
+		transparency:"tex/saturn/rings_transparency.txt"
+		color:"tex/saturn/rings_color.txt"
+	}
+}
+{
+	name:"Mimas"
+	parent:"SB"
+	orbit:{
+		ecc:1.846640820161236E-02
+		sma:1.858140401442707E+05
+		inc:2.914796957989772E+01
+		lan:1.718781492718155E+02
+		arg:1.917707151631314E+02
+		pr:8.170444572794715E+04
+		m0:2.092807249230585E+02
+	}
+	sphere:{
+		radius:198.2
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:8.184044290751277E+04
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.962
+		GM:0
+		diffuse:"tex/mimas"
+	}
+}
+{
+	name:"Enceladus"
+	parent:"SB"
+	orbit:{
+		ecc:5.683948346938440E-03
+		sma:2.380560541168750E+05
+		inc:2.804833672948257E+01
+		lan:1.695173439737098E+02
+		arg:7.735922830216188E+01
+		pr:1.184804856322292E+05
+		m0:3.386377243066024E+02
+	}
+	sphere:{
+		radius:252.3
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:1.187620763017552E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:1.04
+		GM:0
+		diffuse:"tex/enceladus"
+	}
+}
+{
+	name:"Tethys"
+	parent:"SB"
+	orbit:{
+		ecc:1.650140326188725E-03
+		sma:2.953314913187114E+05
+		inc:2.841517103948053E+01
+		lan:1.717009171967551E+02
+		arg:2.236268416125689E+02
+		pr:1.637167825073942E+05
+		m0:2.308661996827253E+01
+	}
+	sphere:{
+		radius:536.3
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:1.634393455060252E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.80
+		GM:0
+		diffuse:"tex/tethys"
+	}
+}
+{
+	name:"Dione"
+	parent:"SB"
+	orbit:{
+		ecc:1.499149206544597E-03
+		sma:3.771593418093561E+05
+		inc:2.804375304554831E+01
+		lan:1.695765612718963E+02
+		arg:3.320022872701480E+02
+		pr:2.362742617706654E+05
+		m0:9.108675142246655E+01
+	}
+	sphere:{
+		radius:562.5
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:2.367627575044749E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.6
+		GM:0
+		diffuse:"tex/dione"
+	}
+}
+{
+	name:"Rhea"
+	parent:"SB"
+	orbit:{
+		ecc:1.017120256994136E-03
+		sma:5.270787197190437E+05
+		inc:2.776435000070865E+01
+		lan:1.699554320715897E+02
+		arg:1.527246957756240E+02
+		pr:3.903405974265215E+05
+		m0:5.443151783479784E+01
+	}
+	sphere:{
+		radius:764.5
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:3.905354920207487E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.6
+		GM:0
+		diffuse:"tex/rhea/"
+	}
+}
+{
+	name:"Titan"
+	parent:"SB"
+	orbit:{
+		ecc:2.865273489020206E-02
+		sma:1.221626654436562E+06
+		inc:2.769489495001675E+01
+		lan:1.691068857962307E+02
+		arg:1.730854201872415E+02
+		pr:1.377811416432242E+06
+		m0:3.066126022289936E+02
+	}
+	sphere:{
+		radius:2575.5
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:1.377905939181029E+06
+		meanColor:[1.0,0.97,0.94]
+		albedo:0.2
+		GM:0
+		diffuse:"tex/titan"
+	}
+	atmo:{
+		maxHeight:500
+		scaleHeight:40
+		K:[1.0,0.85,0.55,0.0]
+		density:1.45
+	}
+}
+{
+	name:"Iapetus"
+	parent:"SB"
+	orbit:{
+		ecc:2.803146320291419E-02
+		sma:3.560748413403306E+06
+		inc:1.707472505219301E+01
+		lan:1.389128661789546E+02
+		arg:2.317513084829645E+02
+		pr:6.853964632624398E+06
+		m0:3.050697163955879E+02
+	}
+	sphere:{
+		radius:734.5
+		rightAscension:40.589
+		declination:83.537
+		rotPeriod:6.853311665503774E+06
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.6
+		GM:120.51
+		diffuse:"tex/iapetus"
+	}
+}
+{
+	name:"UB"
+	displayName:"Uranus Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:4.737804074736301E-02
+		sma:2.870310870326335E+09
+		inc:7.721529812145274E-01
+		lan:7.400136653107919E+01
+		arg:9.710653280980426E+01
+		pr:2.650663998697134E+09
+		m0:2.149726650159968E+02
+	}
+}
+{
+	name:"Uranus"
+	parent:"UB"
+	orbit:{
+		ecc:3.293889750785834E-01
+		sma:2.885482827799365E+01
+		inc:9.779844184696863E+01
+		lan:1.676138978198239E+02
+		arg:4.036106265037489E+01
+		pr:3.866007978502878E+05
+		m0:1.819091896868349E+02
+	}
+	sphere:{
+		radius:25362
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:62064
+		meanColor:[0.93,0.97,1.0]
+		albedo:0.51
+		GM:5793939
+		diffuse:"tex/uranus/albedo"
+	}
+	atmo:{
+		maxHeight:500
+		scaleHeight:27.7
+		K:[0.2,0.7,1.0,0.0]
+		density:1000
+	}
+}
+{
+	name:"Miranda"
+	parent:"UB"
+	orbit:{
+		ecc:1.101224873101901E-03
+		sma:1.298081542076437E+05
+		inc:9.609435806920715E+01
+		lan:1.717732626281943E+02
+		arg:2.245431440855841E+02
+		pr:1.220740943358544E+05
+		m0:1.226958732179177E+02
+	}
+	sphere:{
+		radius:234.2
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:1.221785307098922E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.27
+		GM:0.0
+		diffuse:"tex/miranda/"
+	}
+}
+{
+	name:"Ariel"
+	parent:"UB"
+	orbit:{
+		ecc:6.302530990363897E-04
+		sma:1.908730397099504E+05
+		inc:9.770842114034183E+01
+		lan:1.676420781969959E+02
+		arg:1.539650607049257E+02
+		pr:2.176688744349402E+05
+		m0:3.019228330367515E+02
+	}
+	sphere:{
+		radius:577.9
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:2.177948929193003E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.34
+		GM:0.0
+		diffuse:"tex/ariel/"
+	}
+}
+{
+	name:"Umbriel"
+	parent:"UB"
+	orbit:{
+		ecc:4.151460619928582E-03
+		sma:2.659051287835310E+05
+		inc:9.769752018216431E+01
+		lan:1.676858470963917E+02
+		arg:2.888286557418462E+01
+		pr:3.579065951173867E+05
+		m0:3.496386268151237E+02
+	}
+	sphere:{
+		radius:584.7
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:3.580955244932137E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.18
+		GM:0.0
+		diffuse:"tex/umbriel"
+	}
+}
+{
+	name:"Titania"
+	parent:"UB"
+	orbit:{
+		ecc:2.630723745995594E-03
+		sma:4.361814007739114E+05
+		inc:9.778621724672497E+01
+		lan:1.676221243813267E+02
+		arg:2.294942858378941E+02
+		pr:7.519626886594996E+05
+		m0:1.386860783830583E+02
+	}
+	sphere:{
+		radius:788.9
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:7.522359193044165E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.27
+		GM:0.0
+		diffuse:"tex/titania"
+	}
+}
+{
+	name:"Oberon"
+	parent:"UB"
+	orbit:{
+		ecc:5.449434789380019E-04
+		sma:5.834958761299838E+05
+		inc:9.790882674868629E+01
+		lan:1.677279760696012E+02
+		arg:1.492327721022784E+02
+		pr:1.163455651476950E+06
+		m0:2.770601267235023E+02
+	}
+	sphere:{
+		radius:761.4
+		rightAscension:257.311
+		declination:-15.175
+		rotPeriod:7.522359193044165E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.24
+		GM:0.0
+		diffuse:"tex/oberon"
+	}
+}
+{
+	name:"NB"
+	displayName:"Neptune Barycenter"
+	parent:"SSB"
+	orbit:{
+		ecc:8.754154442592218E-03
+		sma:4.499053467251481E+09
+		inc:1.770230280329569E+00
+		lan:2.725046425719144E+02
+		arg:2.725046425719144E+02
+		pr:5.201733708277207E+09
+		m0:2.977406474366738E+02
+	}
+}
+{
+	name:"Neptune"
+	parent:"NB"
+	orbit:{
+		ecc:1.192746589001871E-05
+		sma:7.408172539787434E+01
+		inc:1.294366069658219E+02
+		lan:2.202720296202912E+02
+		arg:1.229126917069132E+02
+		pr:5.077770647821483E+05
+		m0:3.522483282470720E+02
+	}
+	sphere:{
+		radius:24622
+		rightAscension:299.3
+		declination:42.950
+		rotPeriod:57996
+		meanColor:[0.94,0.97,1.0]
+		albedo:0.41
+		GM:6836529
+		diffuse:"tex/neptune/albedo"
+	}
+	atmo:{
+		maxHeight:400
+		scaleHeight:19.7
+		K:[0.2,0.7,1.0,0.0]
+		density:1000
+	}
+}
+{
+	name:"Proteus"
+	parent:"NB"
+	orbit:{
+		ecc:4.032071642153327E-04 
+		sma:1.176156591192108E+05
+		inc:2.901116324269758E+01
+		lan:4.875212954436495E+01
+		arg:2.154895919497377E+02
+		pr:9.693035840388924E+04
+		m0:3.086734157766128E+02
+	}
+	sphere:{
+		radius:761.4
+		rightAscension:299.3
+		declination:42.950
+		rotPeriod:9.701179388941791E+04
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.06
+		GM:0.0
+		diffuse:"tex/proteus"
+	}
+}
+{
+	name:"Triton"
+	parent:"NB"
+	orbit:{
+		ecc:1.192668627496889E-05
+		sma:3.546908261951870E+05
+		inc:1.294366069658219E+02
+		lan:2.202720296202912E+02
+		arg:3.029132015401293E+02
+		pr:5.077770639830987E+05
+		m0:3.522478184138560E+02
+	}
+	sphere:{
+		radius:1352.6
+		rightAscension:299.3
+		declination:42.950
+		rotPeriod:-5.077817809625707E+05
+		meanColor:[1.0,1.0,0.99]
+		albedo:0.7
+		GM:0.0
+		diffuse:"tex/triton/"
+	}
+}
+{
+	name:"Nereid"
+	parent:"NB"
+	orbit:{
+		ecc:7.451079257832213E-01
+		sma:5.514217710768887E+06
+		inc:5.054752788127587E+00
+		lan:3.194668725939889E+02
+		arg:2.968363208511593E+02
+		pr:3.111630083958182E+07
+		m0:3.036595546834685E+02
+	}
+	sphere:{
+		radius:170
+		rightAscension:299.3
+		declination:42.950
+		rotPeriod:5.077817809625707E+05
+		meanColor:[1.0,1.0,1.0]
+		albedo:0.2
+		GM:0.0
+		diffuse:"tex/nereid"
+	}
+}
+{
+	name:"PB"
+	displayName:"Pluto Barycenter"
+	parent: "SSB"
+	orbit:{
+		ecc:2.490251164566945E-01
+		sma:5.907480503482660E+09
+		inc:1.714071082940643E+01
+		lan:1.103010238198909E+02
+		arg:1.137729428313685E+02
+		pr:7.825936508720883E+09
+		m0:3.900309639441793E+01
+	}
+}
+{
+	name:"Pluto"
+	parent:"PB"
+	orbit:{
+		ecc:3.599854046041547E-02
+		sma:2.060620692192996E+03
+		inc:1.128961387305522E+02
+		lan:2.274018522221956E+02
+		arg:2.446064253732535E+01
+		pr:5.140251577496760E+05
+		m0:1.799156116863976E+02
+	}
+	sphere:{
+		radius:1187
+		rightAscension:132.993
+		declination:-6.163
+		rotPeriod:551856
+		meanColor:[1.0,0.99,0.95]
+		albedo:0.57
+		GM:871
+		diffuse:"tex/pluto"
+	}
+	atmo:{
+		maxHeight:10
+		scaleHeight:2
+		K:[0.02,0.02,0.02,0.0]
+		density:3E-6
+	}
+}
+{
+	name:"Charon"
+	parent:"PB"
+	orbit:{
+		ecc:2.131968912140733E-03
+		sma:1.742771176866422E+04
+		inc:1.128961286011208E+02
+		lan:2.274018620916954E+02
+		arg:2.030540002607698E+02
+		pr:5.496616710819446E+05
+		m0:1.813267051297685E+02
+	}
+	sphere:{
+		radius:606
+		rightAscension:132.993
+		declination:-6.163
+		rotPeriod:584020
+		meanColor:[1.0,0.99,0.97]
+		albedo:0.2
+		GM:106
+		diffuse:"tex/charon"
+	}
+}
+]

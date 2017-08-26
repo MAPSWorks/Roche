@@ -94,16 +94,16 @@ void RendererGL::createModels()
 	modelInfos[flareModelId] = generateFlareModel(detail);
 
 	// Sphere
-	const int planetMeridians = 32;
-	const int planetRings = 32;
-	modelInfos[sphereModelId] = generateSphere(planetMeridians, planetRings);
+	const int entityMeridians = 32;
+	const int entityRings = 32;
+	modelInfos[sphereModelId] = generateSphere(entityMeridians, entityRings);
 
 	// Load custom models
-	vector<int> planetModelId(planetCount, sphereModelId);
-	vector<int> ringModelId(planetCount, -1);
-	for (uint32_t i=0;i<planetCount;++i)
+	vector<int> bodyModelId(entityCount, sphereModelId);
+	vector<int> ringModelId(entityCount, -1);
+	for (uint32_t i=0;i<entityCount;++i)
 	{
-		const Planet param = planetParams[i];
+		const Entity param = entityParams[i];
 		// Rings
 		if (param.hasRing())
 		{
@@ -125,10 +125,10 @@ void RendererGL::createModels()
 	flareModel    = commands[flareModelId];
 	sphere        = commands[sphereModelId];
 
-	for (uint32_t i=0;i<planetCount;++i)
+	for (uint32_t i=0;i<entityCount;++i)
 	{
-		auto &data = planetData[i];
-		data.planetModel = commands[planetModelId[i]];
+		auto &data = bodyData[i];
+		data.bodyModel = commands[bodyModelId[i]];
 		int ringId = ringModelId[i];
 		if (ringId != -1)
 			data.ringModel   = commands[ringId];
@@ -146,12 +146,12 @@ void RendererGL::createUBO()
 	for (auto &data : dynamicData)
 	{
 		// Scene UBO
-		data.sceneUBO = uboBuffer.assignUBO(sizeof(SceneDynamicUBO));
-		// Planet UBOs
-		data.planetUBOs.resize(planetCount);
-		for (uint32_t j=0;j<planetCount;++j)
+		data.sceneUBO = uboBuffer.assignUBO(sizeof(SceneUBO));
+		// Entity UBOs
+		data.bodyUBOs.resize(entityCount);
+		for (uint32_t j=0;j<entityCount;++j)
 		{
-			data.planetUBOs[j] = uboBuffer.assignUBO(sizeof(PlanetDynamicUBO));
+			data.bodyUBOs[j] = uboBuffer.assignUBO(sizeof(BodyUBO));
 		}
 	}
 
@@ -160,22 +160,22 @@ void RendererGL::createUBO()
 
 void RendererGL::init(const InitInfo &info)
 {
-	this->planetParams = info.planetParams;
-	this->planetCount = info.planetParams.size();
+	this->entityParams = info.entityParams;
+	this->entityCount = info.entityParams.size();
 	this->msaaSamples = info.msaa;
 	this->maxTexSize = info.maxTexSize;
 	this->windowWidth = info.windowWidth;
 	this->windowHeight = info.windowHeight;
 
 	// Find the sun
-	for (size_t i=0;i<planetParams.size();++i)
+	for (size_t i=0;i<entityParams.size();++i)
 	{
-		if (planetParams[i].isStar()) sunId = i; 
+		if (entityParams[i].isStar()) sunId = i; 
 	}
 
 	this->bufferFrames = 3; // triple-buffering
 
-	this->planetData.resize(planetCount);
+	this->bodyData.resize(entityCount);
 	this->fences.resize(bufferFrames);
 
 	createVertexArray();
@@ -258,12 +258,12 @@ void RendererGL::createTextures()
 	specularTexDefault = create1PixTex({0,0,0,0});
 
 	// Samplers
-	glCreateSamplers(1, &planetTexSampler);
-	glSamplerParameterf(planetTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
-	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(planetTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glSamplerParameteri(planetTexSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glCreateSamplers(1, &bodyTexSampler);
+	glSamplerParameterf(bodyTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
+	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
 	glCreateSamplers(1, &atmoSampler);
 	glSamplerParameteri(atmoSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -403,20 +403,20 @@ void RendererGL::createShaders()
 	typedef pair<GLenum,string> shader;
 
 	// Vert shaders
-	const shader planetVert = {GL_VERTEX_SHADER, "planet.vert"};
+	const shader bodyVert = {GL_VERTEX_SHADER, "body.vert"};
 	const shader starMapVert = {GL_VERTEX_SHADER, "starmap.vert"};
 	const shader flareVert = {GL_VERTEX_SHADER, "flare.vert"};
 	const shader deferred = {GL_VERTEX_SHADER, "deferred.vert"};
 
 	// Tesc shaders
-	const shader planetTesc = {GL_TESS_CONTROL_SHADER, "planet.tesc"};
+	const shader bodyTesc = {GL_TESS_CONTROL_SHADER, "body.tesc"};
 
 	// Tese shaders
-	const shader planetTese = {GL_TESS_EVALUATION_SHADER, "planet.tese"};
+	const shader bodyTese = {GL_TESS_EVALUATION_SHADER, "body.tese"};
 	const shader starMapTese = {GL_TESS_EVALUATION_SHADER, "starmap.tese"};
 	
 	// Frag shaders
-	const shader planetFrag = {GL_FRAGMENT_SHADER, "planet.frag"};
+	const shader bodyFrag = {GL_FRAGMENT_SHADER, "body.frag"};
 	const shader starMapFrag = {GL_FRAGMENT_SHADER, "starmap.frag"};
 	const shader atmo = {GL_FRAGMENT_SHADER, "atmo.frag"};
 	const shader ringFrag = {GL_FRAGMENT_SHADER, "ring.frag"};
@@ -440,34 +440,34 @@ void RendererGL::createShaders()
 
 	const string bloom = "USE_BLOOM";
 
-	const vector<shader> planetFilenames = {
-		planetVert, planetTesc, planetTese, planetFrag
+	const vector<shader> entityFilenames = {
+		bodyVert, bodyTesc, bodyTese, bodyFrag
 	};
 
-	pipelinePlanetBare = factory.createPipeline(
-		planetFilenames);
+	pipelineBodyBare = factory.createPipeline(
+		entityFilenames);
 
-	pipelinePlanetAtmo = factory.createPipeline(
-		planetFilenames,
+	pipelineBodyAtmo = factory.createPipeline(
+		entityFilenames,
 		{hasAtmo});
 
-	pipelinePlanetAtmoRing = factory.createPipeline(
-		planetFilenames,
+	pipelineBodyAtmoRing = factory.createPipeline(
+		entityFilenames,
 		{hasAtmo, hasRing});
 
 	pipelineStarMap = factory.createPipeline(
 		{starMapVert, starMapTese, starMapFrag});
 
 	pipelineAtmo = factory.createPipeline(
-		{planetVert, planetTesc, planetTese, atmo},
+		{bodyVert, bodyTesc, bodyTese, atmo},
 		{isAtmo});
 
 	pipelineSun = factory.createPipeline(
-		planetFilenames,
+		entityFilenames,
 		{isStar});
 
 	const vector<shader> ringFilenames = {
-		planetVert, planetTesc, planetTese, ringFrag
+		bodyVert, bodyTesc, bodyTese, ringFrag
 	};
 
 	pipelineRingFar = factory.createPipeline(
@@ -521,17 +521,17 @@ void RendererGL::createScreenshot()
 
 void RendererGL::createAtmoLookups()
 {
-	for (uint32_t i=0;i<planetParams.size();++i)
+	for (uint32_t i=0;i<entityParams.size();++i)
 	{
-		const Planet param = planetParams[i];
-		auto &data = planetData[i];
+		const Entity param = entityParams[i];
+		auto &data = bodyData[i];
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
 		{
 			const int size = 128;
 			vector<float> table = 
-				planetParams[i].getAtmo().generateLookupTable(size, param.getBody().getRadius());
+				entityParams[i].getAtmo().generateLookupTable(size, param.getSphere().getRadius());
 
 			GLuint &tex = data.atmoLookupTable;
 
@@ -545,16 +545,16 @@ void RendererGL::createAtmoLookups()
 
 void RendererGL::createRingTextures()
 {
-	for (uint32_t i=0;i<planetParams.size();++i)
+	for (uint32_t i=0;i<entityParams.size();++i)
 	{
-		const Planet param = planetParams[i];
-		auto &data = planetData[i];
+		const Entity param = entityParams[i];
+		auto &data = bodyData[i];
 
 		// Load ring textures
 		if (param.hasRing())
 		{
 			// Load files
-			const Planet::Ring &ring = param.getRing();
+			const Ring &ring = param.getRing();
 			vector<float> backscat = ring.loadFile(ring.getBackscatFilename());
 			vector<float> forwardscat = ring.loadFile(ring.getForwardscatFilename());
 			vector<float> unlit = ring.loadFile(ring.getUnlitFilename());
@@ -621,18 +621,18 @@ bool testSpherePlane(const vec3 &sphereCenter, float radius, const vec4 &plane)
 void RendererGL::render(const RenderInfo &info)
 {
 	// GUI
-	const uint8_t textFade = clamp(info.planetNameFade,0.f,1.f)*255;
-	gui.setText(mainFontBig, 5, 25, info.focusedPlanetName, 
+	const uint8_t textFade = clamp(info.entityNameFade,0.f,1.f)*255;
+	gui.setText(mainFontBig, 5, 25, info.focusedEntityName, 
 		textFade, textFade, textFade, textFade);
 	gui.setText(mainFontMedium, 2, windowHeight-8, info.currentTime, 
 		255, 255, 255, 255);
 
-	const float closePlanetMinSizePixels = 1;
-	this->closePlanetMaxDistance =windowHeight/(closePlanetMinSizePixels*tan(info.fovy/2));
-	this->flareMinDistance = closePlanetMaxDistance*0.35;
-	this->flareOptimalDistance = closePlanetMaxDistance*1.0;
-	this->texLoadDistance = closePlanetMaxDistance*1.4;
-	this->texUnloadDistance = closePlanetMaxDistance*1.6;
+	const float closeBodyMinSizePixels = 1;
+	this->closeBodyMaxDistance =windowHeight/(closeBodyMinSizePixels*tan(info.fovy/2));
+	this->flareMinDistance = closeBodyMaxDistance*0.35;
+	this->flareOptimalDistance = closeBodyMaxDistance*1.0;
+	this->texLoadDistance = closeBodyMaxDistance*1.4;
+	this->texUnloadDistance = closeBodyMaxDistance*1.6;
 
 	profiler.begin("Full frame");
 
@@ -655,36 +655,36 @@ void RendererGL::render(const RenderInfo &info)
 		vec4(normalize(vec3(0, -1, f)), 0)
 	};
 
-	// Planet classification
-	vector<uint32_t> closePlanets;
-	vector<uint32_t> translucentPlanets;
+	// Entity classification
+	vector<uint32_t> closeEntities;
+	vector<uint32_t> translucentEntities;
 	vector<uint32_t> flares;
 
-	vector<uint32_t> texLoadPlanets;
-	vector<uint32_t> texUnloadPlanets;
+	vector<uint32_t> texLoadEntities;
+	vector<uint32_t> texUnloadEntities;
 
-	for (uint32_t i=0;i<info.planetStates.size();++i)
+	for (uint32_t i=0;i<info.entityStates.size();++i)
 	{
-		auto &data = planetData[i];
-		const auto &param = planetParams[i];
-		const auto &state = info.planetStates[i];
-		const float radius = param.getBody().getRadius();
+		auto &data = bodyData[i];
+		const auto &param = entityParams[i];
+		const auto &state = info.entityStates[i];
+		const float radius = param.getSphere().getRadius();
 		const float maxRadius = radius+(param.hasRing()?
 			param.getRing().getOuterDistance():0);
 		const dvec3 pos = state.getPosition();
 		const double dist = distance(info.viewPos, pos)/radius;
 		bool focused = count(
-			info.focusedPlanetsId.begin(), 
-			info.focusedPlanetsId.end(), i)>0;
+			info.focusedEntitiesId.begin(), 
+			info.focusedEntitiesId.end(), i)>0;
 
 		if ((focused || dist < texLoadDistance) && !data.texLoaded)
 		{
-			texLoadPlanets.push_back(i);
+			texLoadEntities.push_back(i);
 		}
 		else if (!focused && data.texLoaded && dist > texUnloadDistance)
 		{
 			// Textures need to be unloaded
-			texUnloadPlanets.push_back(i);
+			texUnloadEntities.push_back(i);
 		}
 
 		// Frustum test
@@ -695,17 +695,17 @@ void RendererGL::render(const RenderInfo &info)
 			visible = visible && testSpherePlane(viewSpacePos, maxRadius, plane);
 		}
 
-		// Render planets inside the frustum
+		// Render entities inside the frustum
 		if (visible)
 		{
 			// Render if is range, always render sun
-			if (dist < closePlanetMaxDistance || param.isStar())
+			if (dist < closeBodyMaxDistance || param.isStar())
 			{
-				closePlanets.push_back(i);
-				// Planet atmospheres
+				closeEntities.push_back(i);
+				// Entity atmospheres
 				if (param.hasAtmo() || param.hasRing())
 				{
-					translucentPlanets.push_back(i);
+					translucentEntities.push_back(i);
 				}
 			}
 		}
@@ -718,8 +718,8 @@ void RendererGL::render(const RenderInfo &info)
 
 	// Manage stream textures
 	profiler.begin("Texture creation/deletion");
-	loadTextures(texLoadPlanets);
-	unloadTextures(texUnloadPlanets);
+	loadTextures(texLoadEntities);
+	unloadTextures(texUnloadEntities);
 	profiler.end();
 	profiler.begin("Texture updating");
 	uploadLoadedTextures();
@@ -728,7 +728,7 @@ void RendererGL::render(const RenderInfo &info)
 	const float exp = pow(2, info.exposure);
 
 	// Scene uniform update
-	SceneDynamicUBO sceneUBO{};
+	SceneUBO sceneUBO{};
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.starMapMat = viewMat*scale(mat4(), vec3(-1));
@@ -739,12 +739,12 @@ void RendererGL::render(const RenderInfo &info)
 	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));
 	sceneUBO.logDepthC = logDepthC;
 
-	// Planet uniform update
-	vector<PlanetDynamicUBO> planetUBOs(planetCount);
-	for (uint32_t i=0;i<planetCount;++i)
+	// Entity uniform update
+	vector<BodyUBO> bodyUBOs(entityCount);
+	for (uint32_t i=0;i<entityCount;++i)
 	{
-		planetUBOs[i] = getPlanetUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
-			info.planetStates[i], planetParams[i], planetData[i]);
+		bodyUBOs[i] = getBodyUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
+			info.entityStates[i], entityParams[i], bodyData[i]);
 	}
 
 	// Dynamic data upload
@@ -753,36 +753,36 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.end();
 
 	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
-	for (uint32_t i=0;i<planetUBOs.size();++i)
+	for (uint32_t i=0;i<bodyUBOs.size();++i)
 	{
-		uboBuffer.write(currentData.planetUBOs[i], &planetUBOs[i]);
+		uboBuffer.write(currentData.bodyUBOs[i], &bodyUBOs[i]);
 	}
 
-	// Planet sorting from front to back
-	sort(closePlanets.begin(), closePlanets.end(), [&](int i, int j)
+	// Entity sorting from front to back
+	sort(closeEntities.begin(), closeEntities.end(), [&](int i, int j)
 	{
-		const float distI = distance(info.planetStates[i].getPosition(), info.viewPos);
-		const float distJ = distance(info.planetStates[j].getPosition(), info.viewPos);
+		const float distI = distance(info.entityStates[i].getPosition(), info.viewPos);
+		const float distJ = distance(info.entityStates[j].getPosition(), info.viewPos);
 		return distI < distJ;
 	});
 
 	// Atmosphere sorting from back to front
-	sort(translucentPlanets.begin(), translucentPlanets.end(), [&](int i, int j)
+	sort(translucentEntities.begin(), translucentEntities.end(), [&](int i, int j)
 	{
-		const float distI = distance(info.planetStates[i].getPosition(), info.viewPos);
-		const float distJ = distance(info.planetStates[j].getPosition(), info.viewPos);
+		const float distI = distance(info.entityStates[i].getPosition(), info.viewPos);
+		const float distJ = distance(info.entityStates[j].getPosition(), info.viewPos);
 		return distI > distJ;
 	});
 
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	profiler.begin("Planets");
-	renderHdr(closePlanets, currentData);
+	profiler.begin("Entities");
+	renderHdr(closeEntities, currentData);
 	profiler.end();
 	profiler.begin("Flares");
-	renderPlanetFlares(flares, currentData);
+	renderEntityFlares(flares, currentData);
 	profiler.end();
 	profiler.begin("Translucent objects");
-	renderTranslucent(translucentPlanets, currentData);
+	renderTranslucent(translucentEntities, currentData);
 	profiler.end();
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	if (info.bloom)
@@ -847,7 +847,7 @@ void RendererGL::saveScreenshot()
 }
 
 void RendererGL::renderHdr(
-	const vector<uint32_t> &closePlanets,
+	const vector<uint32_t> &closeEntities,
 	const DynamicData &ddata)
 {
 	// Viewport
@@ -874,37 +874,37 @@ void RendererGL::renderHdr(
 	// Bind FBO for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
-	// Planet rendering
-	for (uint32_t i : closePlanets)
+	// Entity rendering
+	for (uint32_t i : closeEntities)
 	{
-		auto &data = planetData[i];
-		const bool star = planetParams[i].isStar();
-		const bool hasAtmo = planetParams[i].hasAtmo();
-		const bool hasRing = planetParams[i].hasRing();
+		auto &data = bodyData[i];
+		const bool star = entityParams[i].isStar();
+		const bool hasAtmo = entityParams[i].hasAtmo();
+		const bool hasRing = entityParams[i].hasRing();
 		if (star) pipelineSun.bind();
 		else if (hasAtmo)
 		{
-			if (hasRing) pipelinePlanetAtmoRing.bind();
-			else pipelinePlanetAtmo.bind();
+			if (hasRing) pipelineBodyAtmoRing.bind();
+			else pipelineBodyAtmo.bind();
 		}
-		else pipelinePlanetBare.bind();
+		else pipelineBodyBare.bind();
 
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			ddata.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
+			sizeof(SceneUBO));
 
-		// Bind planet UBO
+		// Bind entity UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			ddata.planetUBOs[i].getOffset(),
-			sizeof(PlanetDynamicUBO));
+			ddata.bodyUBOs[i].getOffset(),
+			sizeof(BodyUBO));
 
 		// Bind samplers
 		const vector<GLuint> samplers = {
-			planetTexSampler,
-			planetTexSampler,
-			planetTexSampler,
-			planetTexSampler,
+			bodyTexSampler,
+			bodyTexSampler,
+			bodyTexSampler,
+			bodyTexSampler,
 			atmoSampler,
 			ringSampler
 		};
@@ -922,7 +922,7 @@ void RendererGL::renderHdr(
 		glBindTextures(2, texs.size(), texs.data());
 
 		if (star) glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[0]);
-		data.planetModel.draw(true);
+		data.bodyModel.draw(true);
 		if (star)
 		{
 			glEndQuery(GL_SAMPLES_PASSED);
@@ -930,7 +930,7 @@ void RendererGL::renderHdr(
 			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 			glDepthMask(GL_FALSE);
 			glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[1]);
-			data.planetModel.draw(true);
+			data.bodyModel.draw(true);
 			glEndQuery(GL_SAMPLES_PASSED);
 			glDepthFunc(GL_LESS);
 			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -948,14 +948,14 @@ void RendererGL::renderHdr(
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			ddata.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
-		glBindSampler(1, planetTexSampler);
+			sizeof(SceneUBO));
+		glBindSampler(1, bodyTexSampler);
 		glBindTextureUnit(1, starMapTex.getCompleteTextureId());
 		sphere.draw(true);
 	}
 }
 
-void RendererGL::renderPlanetFlares(
+void RendererGL::renderEntityFlares(
 	const vector<uint32_t> &flares,
 	const DynamicData &data)
 {
@@ -977,15 +977,15 @@ void RendererGL::renderPlanetFlares(
 	for (uint32_t i : flares)
 	{
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-			data.planetUBOs[i].getOffset(),
-			sizeof(PlanetDynamicUBO));
+			data.bodyUBOs[i].getOffset(),
+			sizeof(BodyUBO));
 
 		flareModel.draw();
 	}
 }
 
 void RendererGL::renderTranslucent(
-	const vector<uint32_t> &translucentPlanets,
+	const vector<uint32_t> &translucentEntities,
 	const DynamicData &data)
 {
 	// Viewport
@@ -999,21 +999,21 @@ void RendererGL::renderTranslucent(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
-	for (uint32_t i : translucentPlanets)
+	for (uint32_t i : translucentEntities)
 	{
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
-		// Bind Planet UBO
+			sizeof(SceneUBO));
+		// Bind Entity UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			data.planetUBOs[i].getOffset(),
-			sizeof(PlanetDynamicUBO));
+			data.bodyUBOs[i].getOffset(),
+			sizeof(BodyUBO));
 
-		bool hasRing = planetParams[i].hasRing();
-		bool hasAtmo = planetParams[i].hasAtmo();
+		bool hasRing = entityParams[i].hasRing();
+		bool hasAtmo = entityParams[i].hasAtmo();
 
-		auto &data = planetData[i];
+		auto &data = bodyData[i];
 		DrawCommand ringModel = data.ringModel;
 
 		const vector<GLuint> samplers = {
@@ -1042,7 +1042,7 @@ void RendererGL::renderTranslucent(
 		if (hasAtmo)
 		{
 			pipelineAtmo.bind();
-			data.planetModel.draw(true);
+			data.bodyModel.draw(true);
 		}
 
 		// Near rings
@@ -1082,7 +1082,7 @@ void RendererGL::renderHighpass(const DynamicData &data)
 	// Bind scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
+			sizeof(SceneUBO));
 
 	fullscreenTri.draw();
 }
@@ -1175,7 +1175,7 @@ void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
-			sizeof(SceneDynamicUBO));
+			sizeof(SceneUBO));
 
 	// Bind image after bloom is done
 	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
@@ -1205,8 +1205,8 @@ void RendererGL::renderSunFlare(
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-		data.planetUBOs[sunId].getOffset(),
-		sizeof(PlanetDynamicUBO));
+		data.bodyUBOs[sunId].getOffset(),
+		sizeof(BodyUBO));
 
 	// Bind textures
 	glBindSampler(1, 0);
@@ -1221,15 +1221,15 @@ void RendererGL::renderGui()
 	gui.display(windowWidth, windowHeight);
 }
 
-void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
+void RendererGL::loadTextures(const vector<uint32_t> &texLoadEntities)
 {
 	// Texture loading
-	for (uint32_t i : texLoadPlanets)
+	for (uint32_t i : texLoadEntities)
 	{
-		const Planet param = planetParams[i];
-		auto &data = planetData[i];
+		const Entity param = entityParams[i];
+		auto &data = bodyData[i];
 		// Textures & samplers
-		data.diffuse = streamer.createTex(param.getBody().getDiffuseFilename());
+		data.diffuse = streamer.createTex(param.getSphere().getDiffuseFilename());
 		if (param.hasClouds())
 			data.cloud = streamer.createTex(param.getClouds().getFilename());
 		if (param.hasNight())
@@ -1241,12 +1241,12 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadPlanets)
 	}
 }
 
-void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadPlanets)
+void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadEntities)
 {
 	// Texture unloading
-	for (uint32_t i : texUnloadPlanets)
+	for (uint32_t i : texUnloadEntities)
 	{
-		auto &data = planetData[i];
+		auto &data = bodyData[i];
 
 		// Reset variables
 		data.texLoaded = false;
@@ -1267,17 +1267,17 @@ void RendererGL::uploadLoadedTextures()
 	streamer.update();
 }
 
-RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
+RendererGL::BodyUBO RendererGL::getBodyUBO(
 	const float fovy, const float exp,
 	const dvec3 &viewPos, const mat4 &projMat, const mat4 &viewMat,
-	const PlanetState &state, const Planet &params,
-	const PlanetData &data)
+	const EntityState &state, const Entity &params,
+	const BodyData &data)
 {
-	const vec3 planetPos = state.getPosition() - viewPos;
+	const vec3 bodyPos = state.getPosition() - viewPos;
 
-	// Planet rotation
+	// Entity rotation
 	const vec3 north = vec3(0,0,1);
-	const vec3 rotAxis = params.getBody().getRotationAxis();
+	const vec3 rotAxis = params.getSphere().getRotationAxis();
 	const quat q = rotate(quat(), 
 		(float)acos(dot(north, rotAxis)), 
 		cross(north, rotAxis))*
@@ -1285,22 +1285,22 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 
 	// Model matrix
 	const mat4 modelMat = 
-		translate(mat4(), planetPos)*
+		translate(mat4(), bodyPos)*
 		mat4_cast(q)*
-		scale(mat4(), vec3(params.getBody().getRadius()));
+		scale(mat4(), vec3(params.getSphere().getRadius()));
 
 	// Atmosphere matrix
 	const mat4 atmoMat = (params.hasAtmo())?
-		translate(mat4(), planetPos)*
+		translate(mat4(), bodyPos)*
 		mat4_cast(q)*
-		scale(mat4(), -vec3(params.getBody().getRadius()+params.getAtmo().getMaxHeight())):
+		scale(mat4(), -vec3(params.getSphere().getRadius()+params.getAtmo().getMaxHeight())):
 		mat4(0.0);
 
 	// Ring matrices
 	pair<mat4, mat4> ringMatrices = [&]{
 		if (!params.hasRing()) return make_pair(mat4(0),mat4(0));
 
-		const vec3 towards = normalize(planetPos);
+		const vec3 towards = normalize(bodyPos);
 		const vec3 up = params.getRing().getNormal();
 		const float sideflip = (dot(towards, up)<0)?1.f:-1.f;
 		const vec3 right = normalize(cross(towards, up));
@@ -1310,18 +1310,18 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		const mat4 lookAtNear = mat4(mat3(-sideflip*right, newTowards, up));
 
 		const mat4 ringFarMat = 
-			translate(mat4(), planetPos)*
+			translate(mat4(), bodyPos)*
 			lookAtFar;
 
 		const mat4 ringNearMat =
-			translate(mat4(), planetPos)*
+			translate(mat4(), bodyPos)*
 			lookAtNear;
 
 		return make_pair(ringFarMat, ringNearMat);
 	}();
 
 	// Flare
-	const vec4 clip = projMat*viewMat*vec4(planetPos,1.0);
+	const vec4 clip = projMat*viewMat*vec4(bodyPos,1.0);
 	const vec3 screen = vec3(vec2((clip)/clip.w),0.999);
 	const bool visible = clip.w > 0;
 
@@ -1330,8 +1330,8 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 
 	if (visible)
 	{
-		const float dist = length(planetPos);
-		const float radius = params.getBody().getRadius();
+		const float dist = length(bodyPos);
+		const float radius = params.getSphere().getRadius();
 		float flareSize = 0.0;
 		if (params.isStar())
 		{
@@ -1349,7 +1349,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		}
 		else
 		{
-			// Smooth transition to detailed planet to flare
+			// Smooth transition to detailed entity to flare
 			const float fadeIn = clamp((dist/radius-flareMinDistance)/
 				(flareOptimalDistance-flareMinDistance),0.f,1.f);
 			flareSize = fadeIn*(4.f/(float)windowHeight);
@@ -1357,7 +1357,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 			// Angle between view and light 
 			const float phaseAngle = acos(dot(
 				(vec3)normalize(state.getPosition()), 
-				normalize(planetPos)));
+				normalize(bodyPos)));
 			// Illumination compared to fully lit disk
 			const float phase = 
 				(1-phaseAngle/pi<float>())*cos(phaseAngle)+
@@ -1367,7 +1367,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 			
 			flareColor = vec4(
 				clamp(20.f*radius*radius*phase/(cutDist*cutDist),0.f,10.f)*
-				params.getBody().getMeanColor()
+				params.getSphere().getMeanColor()
 				,1.0);
 		}
 		flareMat = translate(mat4(), screen)*
@@ -1380,14 +1380,14 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 	// Light direction
 	const vec3 lightDir = vec3(normalize(-state.getPosition()));
 
-	PlanetDynamicUBO ubo{};
+	BodyUBO ubo{};
 	ubo.modelMat = modelMat;
 	ubo.atmoMat = atmoMat;
 	ubo.ringFarMat = ringMatrices.first;
 	ubo.ringNearMat = ringMatrices.second;
 	ubo.flareMat = flareMat;
 	ubo.flareColor = flareColor;
-	ubo.planetPos = viewMat*vec4(planetPos, 1.0);
+	ubo.bodyPos = viewMat*vec4(bodyPos, 1.0);
 	ubo.lightDir = viewMat*vec4(lightDir,0.0);
 	ubo.K = params.hasAtmo()
 		?params.getAtmo().getScatteringConstant()
@@ -1413,7 +1413,7 @@ RendererGL::PlanetDynamicUBO RendererGL::getPlanetUBO(
 		?params.getNight().getIntensity():0.0;
 	ubo.starBrightness = params.isStar()
 		?params.getStar().getBrightness():0.0;
-	ubo.radius = params.getBody().getRadius();
+	ubo.radius = params.getSphere().getRadius();
 	ubo.atmoHeight = params.hasAtmo()?params.getAtmo().getMaxHeight():0.0;
 
 	return ubo;

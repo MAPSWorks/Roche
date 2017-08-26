@@ -1,4 +1,4 @@
-#include "planet.hpp"
+#include "entity.hpp"
 
 #include <fstream>
 #include <string>
@@ -14,18 +14,20 @@
 #include "thirdparty/shaun/sweeper.hpp"
 #include <glm/ext.hpp>
 
-Planet::Orbit::Orbit(
+Orbit::Orbit(
 	const double ecc,
 	const double sma,
 	const double inc,
 	const double lan,
 	const double arg,
+	const double pr,
 	const double m0) :
 	_ecc{ecc},
 	_sma{sma},
 	_inc{inc},
 	_lan{lan},
 	_arg{arg},
+	_pr{pr},
 	_m0{m0}
 {
 
@@ -41,14 +43,11 @@ static double meanToEccentric(const double mean, const double ecc)
 	return En;
 }
 
-glm::dvec3 Planet::Orbit::computePosition(
-	const double epoch, 
-	const double parentGM) const
+glm::dvec3 Orbit::computePosition(
+	const double epoch) const
 {
 	// Mean Anomaly compute
-	const double orbitalPeriod = 2*glm::pi<float>()*sqrt(
-		(_sma*_sma*_sma)/parentGM);
-	const double meanMotion = 2*glm::pi<float>()/orbitalPeriod;
+	const double meanMotion = 2*glm::pi<float>()/_pr;
 	const double meanAnomaly = fmod(epoch*meanMotion + _m0, 2*glm::pi<float>());
 	// Mean anomaly to Eccentric
 	const double En = meanToEccentric(meanAnomaly, _ecc);
@@ -68,7 +67,7 @@ glm::dvec3 Planet::Orbit::computePosition(
 	return q*posInPlane;
 }
 
-Planet::Atmo::Atmo(
+Atmo::Atmo(
 	const glm::vec4 K,
 	const float density,
 	const float maxHeight,
@@ -121,7 +120,7 @@ static glm::vec2 intersectsSphere(
 	return glm::vec2(-b-e,-b+e);
 }
 
-std::vector<float> Planet::Atmo::generateLookupTable(
+std::vector<float> Atmo::generateLookupTable(
 	const size_t size,
 	const float radius) const
 {
@@ -154,27 +153,27 @@ std::vector<float> Planet::Atmo::generateLookupTable(
 	return table;
 }
 
-glm::vec4 Planet::Atmo::getScatteringConstant() const
+glm::vec4 Atmo::getScatteringConstant() const
 {
 	return _K;
 }
 
-float Planet::Atmo::getDensity() const
+float Atmo::getDensity() const
 {
 	return _density;
 }
 
-float Planet::Atmo::getMaxHeight() const
+float Atmo::getMaxHeight() const
 {
 	return _maxHeight;
 }
 
-float Planet::Atmo::getScaleHeight() const
+float Atmo::getScaleHeight() const
 {
 	return _scaleHeight;
 }
 
-Planet::Ring::Ring(
+Ring::Ring(
 	const float innerDistance,
 	const float outerDistance,
 	const glm::vec3 normal,
@@ -195,7 +194,7 @@ Planet::Ring::Ring(
 
 }
 
-std::vector<float> Planet::Ring::loadFile(
+std::vector<float> Ring::loadFile(
 	const std::string &filename) const
 {
 	std::ifstream in(filename);
@@ -231,47 +230,47 @@ std::vector<float> Planet::Ring::loadFile(
 	return pixelData;
 }
 
-float Planet::Ring::getInnerDistance() const
+float Ring::getInnerDistance() const
 {
 	return _innerDistance;
 }
 
-float Planet::Ring::getOuterDistance() const
+float Ring::getOuterDistance() const
 {
 	return _outerDistance;
 }
 
-glm::vec3 Planet::Ring::getNormal() const
+glm::vec3 Ring::getNormal() const
 {
 	return _normal;
 }
 
-std::string Planet::Ring::getBackscatFilename() const
+std::string Ring::getBackscatFilename() const
 {
 	return _backscatFilename;
 }
 
-std::string Planet::Ring::getForwardscatFilename() const
+std::string Ring::getForwardscatFilename() const
 {
 	return _forwardscatFilename;
 }
 
-std::string Planet::Ring::getUnlitFilename() const
+std::string Ring::getUnlitFilename() const
 {
 	return _unlitFilename;
 }
 
-std::string Planet::Ring::getTransparencyFilename() const
+std::string Ring::getTransparencyFilename() const
 {
 	return _transparencyFilename;
 }
 
-std::string Planet::Ring::getColorFilename() const
+std::string Ring::getColorFilename() const
 {
 	return _colorFilename;
 }
 
-Planet::Body::Body(
+Sphere::Sphere(
 	const float radius,
 	const double GM,
 	const glm::vec3 rotAxis,
@@ -288,37 +287,37 @@ Planet::Body::Body(
 
 }
 
-glm::vec3 Planet::Body::getRotationAxis() const
+glm::vec3 Sphere::getRotationAxis() const
 {
 	return _rotAxis;
 }
 
-float Planet::Body::getRotationPeriod() const
+float Sphere::getRotationPeriod() const
 {
 	return _rotPeriod;
 }
 
-glm::vec3 Planet::Body::getMeanColor() const
+glm::vec3 Sphere::getMeanColor() const
 {
 	return _meanColor;
 }
 
-float Planet::Body::getRadius() const
+float Sphere::getRadius() const
 {
 	return _radius;
 }
 
-double Planet::Body::getGM() const
+double Sphere::getGM() const
 {
 	return _GM;
 }
 
-std::string Planet::Body::getDiffuseFilename() const
+std::string Sphere::getDiffuseFilename() const
 {
 	return _diffuseFilename;
 }
 
-Planet::Star::Star(const float brightness,
+Star::Star(const float brightness,
 	const float flareFadeInStart, const float flareFadeInEnd,
 	const float flareAttenuation, const float flareMinSize,
 	const float flareMaxSize) : 
@@ -332,54 +331,54 @@ Planet::Star::Star(const float brightness,
 
 }
 
-float Planet::Star::getBrightness() const
+float Star::getBrightness() const
 {
 	return _brightness;
 }
 
-float Planet::Star::getFlareFadeInStart() const
+float Star::getFlareFadeInStart() const
 {
 	return _flareFadeInStart;
 }
 
-float Planet::Star::getFlareFadeInEnd() const
+float Star::getFlareFadeInEnd() const
 {
 	return _flareFadeInEnd;
 }
 
-float Planet::Star::getFlareAttenuation() const
+float Star::getFlareAttenuation() const
 {
 	return _flareAttenuation;
 }
 
-float Planet::Star::getFlareMinSize() const
+float Star::getFlareMinSize() const
 {
 	return _flareMinSize;
 }
 
-float Planet::Star::getFlareMaxSize() const
+float Star::getFlareMaxSize() const
 {
 	return _flareMaxSize;
 }
 
-Planet::Clouds::Clouds(const std::string &filename, const float period) :
+Clouds::Clouds(const std::string &filename, const float period) :
 	_filename{filename},
 	_period{period}
 {
 
 }
 
-std::string Planet::Clouds::getFilename() const
+std::string Clouds::getFilename() const
 {
 	return _filename;
 }
 
-float Planet::Clouds::getPeriod() const
+float Clouds::getPeriod() const
 {
 	return _period;
 }
 
-Planet::Night::Night(const std::string &filename,
+Night::Night(const std::string &filename,
 	const float intensity) :
 	_filename{filename},
 	_intensity{intensity}
@@ -387,17 +386,17 @@ Planet::Night::Night(const std::string &filename,
 
 }
 
-std::string Planet::Night::getFilename() const
+std::string Night::getFilename() const
 {
 	return _filename;
 }
 
-float Planet::Night::getIntensity() const
+float Night::getIntensity() const
 {
 	return _intensity;
 }
 
-Planet::Specular::Specular(const std::string &filename,
+Specular::Specular(const std::string &filename,
 	const Mask mask0, const Mask mask1) :
 	_filename{filename},
 	_mask0{mask0},
@@ -406,157 +405,172 @@ Planet::Specular::Specular(const std::string &filename,
 
 }
 
-Planet::Specular::Mask Planet::Specular::getMask0() const
+Specular::Mask Specular::getMask0() const
 {
 	return _mask0;
 }
 
-Planet::Specular::Mask Planet::Specular::getMask1() const
+Specular::Mask Specular::getMask1() const
 {
 	return _mask1;
 }
 
-std::string Planet::Specular::getFilename() const
+std::string Specular::getFilename() const
 {
 	return _filename;
 }
 
-void Planet::setName(const std::string &name)
+void Entity::setName(const std::string &name)
 {
 	_name = name;
 }
 
-void Planet::setParentName(const std::string &name)
+void Entity::setDisplayName(const std::string &name)
+{
+	_displayName = name;
+}
+
+void Entity::setParentName(const std::string &name)
 {
 	_parentName = name;
 }
 
-void Planet::setBody(const Body &body)
+void Entity::setSphere(const Sphere &sphere)
 {
-	_body = body;
+	_sphere = std::make_pair(true, sphere);
 }
 
-void Planet::setOrbit(const Orbit &orbit)
+void Entity::setOrbit(const Orbit &orbit)
 {
 	_orbit = std::make_pair(true, orbit);
 }
 
-void Planet::setAtmo(const Atmo &atmo)
+void Entity::setAtmo(const Atmo &atmo)
 {
 	_atmo = std::make_pair(true, atmo);
 }
 
-void Planet::setRing(const Ring &ring)
+void Entity::setRing(const Ring &ring)
 {
 	_ring = std::make_pair(true, ring);
 }
 
-void Planet::setStar(const Star &star)
+void Entity::setStar(const Star &star)
 {
 	_star = std::make_pair(true, star);
 }
 
-void Planet::setClouds(const Clouds &clouds)
+void Entity::setClouds(const Clouds &clouds)
 {
 	_clouds = std::make_pair(true, clouds);
 }
 
-void Planet::setNight(const Night &night)
+void Entity::setNight(const Night &night)
 {
 	_night = std::make_pair(true, night);
 }
 
-void Planet::setSpecular(const Specular &specular)
+void Entity::setSpecular(const Specular &specular)
 {
 	_specular = std::make_pair(true, specular);
 }
 
-bool Planet::hasOrbit() const
+bool Entity::isSphere() const
+{
+	return _sphere.first;
+}
+
+bool Entity::hasOrbit() const
 {
 	return _orbit.first;
 }
 
-bool Planet::hasAtmo() const
+bool Entity::hasAtmo() const
 {
 	return _atmo.first;
 }
 
-bool Planet::hasRing() const
+bool Entity::hasRing() const
 {
 	return _ring.first;
 }
 
-bool Planet::isStar() const
+bool Entity::isStar() const
 {
 	return _star.first;
 }
 
-bool Planet::hasClouds() const
+bool Entity::hasClouds() const
 {
 	return _clouds.first;
 }
 
-bool Planet::hasNight() const
+bool Entity::hasNight() const
 {
 	return _night.first;
 }
 
-bool Planet::hasSpecular() const
+bool Entity::hasSpecular() const
 {
 	return _specular.first;
 }
 
-std::string Planet::getName() const
+std::string Entity::getName() const
 {
 	return _name;
 }
 
-std::string Planet::getParentName() const
+std::string Entity::getDisplayName() const
+{
+	return _displayName;
+}
+
+std::string Entity::getParentName() const
 {
 	return _parentName;
 }
 
-const Planet::Body &Planet::getBody() const
+const Sphere &Entity::getSphere() const
 {
-	return _body;
+	return _sphere.second;
 }
 
-const Planet::Orbit &Planet::getOrbit() const
+const Orbit &Entity::getOrbit() const
 {
 	return _orbit.second;
 }
 
-const Planet::Atmo &Planet::getAtmo() const
+const Atmo &Entity::getAtmo() const
 {
 	return _atmo.second;
 }
 
-const Planet::Ring &Planet::getRing() const
+const Ring &Entity::getRing() const
 {
 	return _ring.second;
 }
 
-const Planet::Star &Planet::getStar() const
+const Star &Entity::getStar() const
 {
 	return _star.second;
 }
 
-const Planet::Clouds &Planet::getClouds() const
+const Clouds &Entity::getClouds() const
 {
 	return _clouds.second;
 }
 
-const Planet::Night &Planet::getNight() const
+const Night &Entity::getNight() const
 {
 	return _night.second;
 }
 
-const Planet::Specular &Planet::getSpecular() const
+const Specular &Entity::getSpecular() const
 {
 	return _specular.second;
 }
 
-PlanetState::PlanetState(
+EntityState::EntityState(
 	const glm::dvec3 &pos, float rotationAngle, float cloudDisp) :
 	_position{pos},
 	_rotationAngle{rotationAngle},
@@ -565,17 +579,17 @@ PlanetState::PlanetState(
 
 }
 
-glm::dvec3 PlanetState::getPosition() const
+glm::dvec3 EntityState::getPosition() const
 {
 	return _position;
 }
 
-float PlanetState::getRotationAngle() const
+float EntityState::getRotationAngle() const
 {
 	return _rotationAngle;
 }
 
-float PlanetState::getCloudDisp() const
+float EntityState::getCloudDisp() const
 {
 	return _cloudDisp;
 }
