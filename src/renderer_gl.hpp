@@ -11,13 +11,9 @@
 #include "shader_pipeline.hpp"
 #include "gui_gl.hpp"
 
-#include <condition_variable>
-#include <thread>
-#include <mutex>
-#include <memory>
-#include <queue>
+#include <vector>
 #include <map>
-#include <stack>
+#include <memory>
 #include <utility>
 
 /**
@@ -40,7 +36,7 @@ private:
 	struct DynamicData
 	{
 		BufferRange sceneUBO;
-		std::vector<BufferRange> bodyUBOs;
+		std::map<EntityHandle, BufferRange> bodyUBOs;
 	};
 
 	/// Dynamic parameters for the scene to be loaded in a UBO
@@ -108,7 +104,7 @@ private:
 	};
 
 	/// Generates the vertex and index data and fill the static VBOs
-	void createModels();
+	void createMeshes();
 	/// Creates the UBO buffers and assigns buffer ranges for UBO structures
 	void createUBO();
 	/// Creates default textures, flare textures and samplers
@@ -133,21 +129,21 @@ private:
 	 * @param buffer ranges to use for rendering
 	 */
 	void renderHdr(
-		const std::vector<uint32_t> &closeEntities, 
+		const std::vector<EntityHandle> &closeEntities, 
 		const DynamicData &data);
 	/** Renders flares to HDR rendertarget
 	 * @param flares id of entities to render as flares
 	 * @param buffer ranges to use for rendering
 	 */
 	void renderEntityFlares(
-		const std::vector<uint32_t> &flares,
+		const std::vector<EntityHandle> &flares,
 		const DynamicData &data);
 	/** Renders translucent parts of detailed entities to HDR rendertarget
 	 * @param translucentEntities id of entities to render
 	 * @param buffer ranges to use for rendering
 	 */
 	void renderTranslucent(
-		const std::vector<uint32_t> &translucentEntities,
+		const std::vector<EntityHandle> &translucentEntities,
 		const DynamicData &data);
 	/** Generates highpass from HDR rendertarget
 	 * @param data buffer ranges to use for rendering
@@ -175,11 +171,11 @@ private:
 	/** Sets the textures of entities to be loaded asynchronouly
 	 * @param entities entities whose textures to load
 	 */
-	void loadTextures(const std::vector<uint32_t> &entities);
+	void loadTextures(const std::vector<EntityHandle> &entities);
 	/** Sets the textures of entities to be unloaded asynchronouly
 	 * @param entities palanets whose textures to unload
 	 */
-	void unloadTextures(const std::vector<uint32_t> &entities);
+	void unloadTextures(const std::vector<EntityHandle> &entities);
 	/// Sets loaded textures to be uploaded to the GL
 	void uploadLoadedTextures();
 
@@ -201,8 +197,6 @@ private:
 	/// Screenshot object
 	Screenshot screenshot;
 
-	/// Number of entities in the scene
-	uint32_t entityCount = 0;
 	/// Samples per pixel of HDR rendertarget
 	int msaaSamples = 1;
 	/// Max texture width/height to be loaded and displayed (-1 means no limit)
@@ -311,16 +305,15 @@ private:
 	/// Number of frames to multi-buffer
 	uint32_t bufferFrames;
 
-	/// Entities' fixed parameters
-	std::vector<Entity> entityParams;
+	const EntityCollection* entityCollection;
 
 	/// Entity data only for rendering
 	struct BodyData
 	{
-		/// Entity model
-		DrawCommand bodyModel;
-		/// Ring model
-		DrawCommand ringModel;
+		/// Body draw command
+		DrawCommand bodyDraw;
+		/// Ring draw command
+		DrawCommand ringDraw;
 		/// Whether the textures have been loaded or onot
 		bool texLoaded = false;
 
@@ -357,15 +350,15 @@ private:
 		const glm::mat4 &projMat, 
 		const glm::mat4 &viewMat,
 		const EntityState &state, 
-		const Entity &params, 
+		const EntityParam &params, 
 		const BodyData &data);
 
 	float getSunVisibility();
 
 	/// Rendering data for all bodies
-	std::vector<BodyData> bodyData;
+	std::map<EntityHandle, BodyData> bodyData;
 	/// Index of sun in main entity collection
-	size_t sunId = 0;
+	EntityHandle sun;
 
 	GLuint sunOcclusionQueries[2] = {0, 0};
 	int occlusionQueryResults[2] = {0, 1};
@@ -397,11 +390,11 @@ private:
 	/// Max anisotropy for texture sampling
 	float textureAnisotropy;
 
-	// Models
-	/// Sphere model (for default entities and atmospheres)
+	// Meshes
+	/// Sphere draw command (for celestial bodies and atmospheres)
 	DrawCommand sphere;
-	/// Flare model (Circle)
-	DrawCommand flareModel;
+	/// Flare mesh (Circle)
+	DrawCommand flareDraw;
 	/// Fullscreen triangle for covering the whole screen
 	DrawCommand fullscreenTri;
 

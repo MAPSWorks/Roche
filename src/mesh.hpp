@@ -12,11 +12,11 @@ struct Vertex
 
 typedef uint32_t Index;
 
-class Model
+class Mesh
 {
 public:
-	Model() = default;
-	Model(const std::vector<Vertex> &vertices, const std::vector<Index> &indices);
+	Mesh() = default;
+	Mesh(const std::vector<Vertex> &vertices, const std::vector<Index> &indices);
 	const std::vector<Vertex> &getVertices() const;
 	const std::vector<Index> &getIndices() const;
 private:
@@ -24,10 +24,10 @@ private:
 	std::vector<Index> _indices;
 };
 
-Model generateSphere(int meridians, int rings);
+Mesh generateSphere(int meridians, int rings);
 
-Model generateFullscreenTri();
+Mesh generateFullscreenTri();
 
-Model generateFlareModel(int detail);
+Mesh generateFlareMesh(int detail);
 
-Model generateRingModel(int meridians, float near, float far);
+Mesh generateRingMesh(int meridians, float near, float far);

@@ -27,6 +27,12 @@ public:
         column_ = column+1;
         error_ = error;
     }
+    std::string what() const
+    {
+        return std::string("parse error at line: ") + std::to_string(line_)
+            + " column: " + std::to_string(column_)
+            + " (" + error_ + ")";
+    }
 
 private:
     size_t line_;
@@ -36,12 +42,9 @@ private:
     friend std::ostream& operator<<(std::ostream& out, parse_error& err);
 };
 
-
 inline std::ostream& operator<<(std::ostream& out, parse_error& err)
 {
-    out << "parse error at line: " << err.line_
-        << " column: " << err.column_
-        << " (" << err.error_ << ")";
+    out << err.what();
 
     return out;
 }

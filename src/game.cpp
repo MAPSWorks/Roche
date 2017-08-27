@@ -117,8 +117,7 @@ void Game::init()
 	loadSettingsFile();
 	loadEntityFiles();
 
-	viewPolar.z = std::max(1000.f, 
-		entityParams[focusedEntityId].getSphere().getRadius()*4);
+	viewPolar.z = getFocusedBody().getParam().getModel().getRadius()*4;
 
 	// Window & context creation
 	if (!glfwInit())
@@ -167,7 +166,7 @@ void Game::init()
 
 	// Renderer init
 	renderer->init({
-		entityParams, 
+		&entityCollection, 
 		starMapFilename, 
 		starMapIntensity, 
 		msaaSamples, 
@@ -224,7 +223,96 @@ vec3 axis(const float rightAscension, const float declination)
 		 cos(rightAscension)*cos(declination),
 		 sin(declination));
 }
-	
+
+Orbit parseOrbit(shaun::sweeper &swp)
+{
+	return Orbit(
+		get<double>(swp("ecc")),
+		get<double>(swp("sma")),
+		radians(get<double>(swp("inc"))),
+		radians(get<double>(swp("lan"))),
+		radians(get<double>(swp("arg"))),
+		get<double>(swp("pr")),
+		radians(get<double>(swp("m0"))));
+}
+
+Model parseModel(shaun::sweeper &modelsw, const mat3 &axialMat)
+{
+	return Model(
+		get<double>(modelsw("radius")),
+		get<double>(modelsw("GM")),
+		axialMat*
+		axis(
+			radians(get<double>(modelsw("rightAscension"))),
+			radians(get<double>(modelsw("declination")))),
+		get<double>(modelsw("rotPeriod")),
+		get<vec3>(modelsw("meanColor"))*
+		(float)get<double>(modelsw("albedo")),
+		get<std::string>(modelsw("diffuse")));
+}
+
+Atmo parseAtmo(shaun::sweeper &atmosw)
+{
+	return Atmo(
+		get<vec4>(atmosw("K")),
+		get<double>(atmosw("density")),
+		get<double>(atmosw("maxHeight")),
+		get<double>(atmosw("scaleHeight")));
+}
+
+Ring parseRing(shaun::sweeper &ringsw, const mat3 &axialMat)
+{
+	return Ring(
+		get<double>(ringsw("inner")),
+		get<double>(ringsw("outer")),
+		axialMat*
+		axis(
+			radians(get<double>(ringsw("rightAscension"))),
+			radians(get<double>(ringsw("declination")))),
+		get<std::string>(ringsw("backscat")),
+		get<std::string>(ringsw("forwardscat")),
+		get<std::string>(ringsw("unlit")),
+		get<std::string>(ringsw("transparency")),
+		get<std::string>(ringsw("color")));
+}
+
+Star parseStar(shaun::sweeper &starsw)
+{
+	return Star(
+		get<double>(starsw("brightness")),
+		get<double>(starsw("flareFadeInStart")),
+		get<double>(starsw("flareFadeInEnd")),
+		get<double>(starsw("flareAttenuation")),
+		get<double>(starsw("flareMinSize")),
+		get<double>(starsw("flareMaxSize")));
+}
+
+Clouds parseClouds(shaun::sweeper &cloudssw)
+{
+	return Clouds(
+		get<std::string>(cloudssw("filename")),
+		get<double>(cloudssw("period")));
+}
+
+Night parseNight(shaun::sweeper &nightsw)
+{
+	return Night(
+		get<std::string>(nightsw("filename")),
+		get<double>(nightsw("intensity")));
+}
+
+Specular parseSpecular(shaun::sweeper &specsw)
+{
+	shaun::sweeper mask0(specsw("mask0"));
+	shaun::sweeper mask1(specsw("mask1"));
+	return Specular(
+		get<std::string>(specsw("filename")),
+		{get<vec3>(mask0("color")), 
+		 (float)get<double>(mask0("hardness"))},
+		{get<vec3>(mask1("color")),
+		 (float)get<double>(mask1("hardness"))});
+}
+
 void Game::loadEntityFiles()
 {
 	using namespace shaun;
@@ -236,7 +324,7 @@ void Game::loadEntityFiles()
 		sweeper swp(&obj);
 
 		ambientColor = (float)get<double>(swp("ambientColor"));
-		std::string startingEntity = std::string(swp("startingEntity").value<string>());
+		std::string startingBody = std::string(swp("startingBody").value<string>());
 
 		sweeper starMap(swp("starMap"));
 		starMapFilename = get<std::string>(starMap("diffuse"));
@@ -245,151 +333,99 @@ void Game::loadEntityFiles()
 		const float axialTilt = radians(get<double>(swp("axialTilt")));
 		const mat3 axialMat = mat3(rotate(mat4(), axialTilt, vec3(0,-1,0)));
 
-		sweeper entitiesSweeper(swp("entities"));
-		entityCount = entitiesSweeper.value<list>().elements().size();
-		entityParams.resize(entityCount);
-		entityStates.resize(entityCount);
-		entityParents.resize(entityCount, -1);
+		std::vector<EntityParam> entities;
 
-		for (uint32_t i=0;i<entityCount;++i)
+		sweeper barycenterSw(swp("barycenters"));
+		for (int i=0;i<(int)barycenterSw.size();++i)
 		{
-			sweeper pl(entitiesSweeper[i]);
-			std::string name = std::string(pl("name").value<string>());
-			// Set focus on starting entity
-			if (name == startingEntity) focusedEntityId = i;
-			// Create entity
-			Entity entity;
-			entity.setName(name);
-			const std::string displayName = get<std::string>(pl("displayName"));
-			entity.setDisplayName(displayName==""?name:displayName);
-			entity.setParentName(get<std::string>(pl("parent")));
+			sweeper bc(barycenterSw[i]);
+			EntityParam entity;
+			entity.setName(std::string(bc("name").value<string>()));
+			entity.setParentName(get<std::string>(bc("parent")));
 
-			sweeper orbitsw(pl("orbit"));
+			sweeper orbitsw(bc("orbit"));
 			if (!orbitsw.is_null())
 			{
-				const Orbit orbit(
-					get<double>(orbitsw("ecc")),
-					get<double>(orbitsw("sma")),
-					radians(get<double>(orbitsw("inc"))),
-					radians(get<double>(orbitsw("lan"))),
-					radians(get<double>(orbitsw("arg"))),
-					get<double>(orbitsw("pr")),
-					radians(get<double>(orbitsw("m0"))));
-				entity.setOrbit(orbit);
+				entity.setOrbit(parseOrbit(orbitsw));
 			}
-			sweeper spheresw(pl("sphere"));
-			if (!spheresw.is_null())
+			entities.push_back(entity);
+		}
+
+		sweeper bodySweeper(swp("bodies"));
+
+		for (int i=0;i<(int)bodySweeper.size();++i)
+		{
+			sweeper bd(bodySweeper[i]);
+			std::string name = std::string(bd("name").value<string>());
+			// Create entity
+			EntityParam entity;
+			entity.setName(name);
+			const std::string displayName = get<std::string>(bd("displayName"));
+			entity.setDisplayName(displayName==""?name:displayName);
+			entity.setParentName(get<std::string>(bd("parent")));
+
+			sweeper orbitsw(bd("orbit"));
+			if (!orbitsw.is_null())
 			{
-				const Sphere sphere(
-					get<double>(spheresw("radius")),
-					get<double>(spheresw("GM")),
-					axialMat*
-					axis(
-						radians(get<double>(spheresw("rightAscension"))),
-						radians(get<double>(spheresw("declination")))),
-					get<double>(spheresw("rotPeriod")),
-					get<vec3>(spheresw("meanColor"))*
-					(float)get<double>(spheresw("albedo")),
-					get<std::string>(spheresw("diffuse")));
-				entity.setSphere(sphere);
+				entity.setOrbit(parseOrbit(orbitsw));
 			}
-			sweeper atmosw(pl("atmo"));
+			sweeper modelsw(bd("model"));
+			if (!modelsw.is_null())
+			{
+				entity.setModel(parseModel(modelsw, axialMat));
+			}
+			sweeper atmosw(bd("atmo"));
 			if (!atmosw.is_null())
 			{
-				Atmo atmo(
-					get<vec4>(atmosw("K")),
-					get<double>(atmosw("density")),
-					get<double>(atmosw("maxHeight")),
-					get<double>(atmosw("scaleHeight")));
-				entity.setAtmo(atmo);
+				entity.setAtmo(parseAtmo(atmosw));
 			}
 
-			sweeper ringsw(pl("ring"));
+			sweeper ringsw(bd("ring"));
 			if (!ringsw.is_null())
 			{
-				Ring ring(
-					get<double>(ringsw("inner")),
-					get<double>(ringsw("outer")),
-					axialMat*
-					axis(
-						radians(get<double>(ringsw("rightAscension"))),
-						radians(get<double>(ringsw("declination")))),
-					get<std::string>(ringsw("backscat")),
-					get<std::string>(ringsw("forwardscat")),
-					get<std::string>(ringsw("unlit")),
-					get<std::string>(ringsw("transparency")),
-					get<std::string>(ringsw("color")));
-				entity.setRing(ring);
+				entity.setRing(parseRing(ringsw, axialMat));
 			}
 
-			sweeper starsw(pl("star"));
+			sweeper starsw(bd("star"));
 			if (!starsw.is_null())
 			{
-				Star star(
-					get<double>(starsw("brightness")),
-					get<double>(starsw("flareFadeInStart")),
-					get<double>(starsw("flareFadeInEnd")),
-					get<double>(starsw("flareAttenuation")),
-					get<double>(starsw("flareMinSize")),
-					get<double>(starsw("flareMaxSize")));
-				entity.setStar(star);
+				entity.setStar(parseStar(starsw));
 			}
 
-			sweeper cloudssw(pl("clouds"));
+			sweeper cloudssw(bd("clouds"));
 			if (!cloudssw.is_null())
 			{
-				Clouds clouds(
-					get<std::string>(cloudssw("filename")),
-					get<double>(cloudssw("period")));
-				entity.setClouds(clouds);
+				entity.setClouds(parseClouds(cloudssw));
 			}
 
-			sweeper nightsw(pl("night"));
+			sweeper nightsw(bd("night"));
 			if (!nightsw.is_null())
 			{
-				Night night(
-					get<std::string>(nightsw("filename")),
-					get<double>(nightsw("intensity")));
-				entity.setNight(night);
+				entity.setNight(parseNight(nightsw));
 			}
 
-			sweeper specsw(pl("specular"));
+			sweeper specsw(bd("specular"));
 			if (!specsw.is_null())
 			{
-				sweeper mask0(specsw("mask0"));
-				sweeper mask1(specsw("mask1"));
-				Specular spec(
-					get<std::string>(specsw("filename")),
-					{get<vec3>(mask0("color")), 
-					 (float)get<double>(mask0("hardness"))},
-					{get<vec3>(mask1("color")),
-					 (float)get<double>(mask1("hardness"))});
-				entity.setSpecular(spec);
+				entity.setSpecular(parseSpecular(specsw));
 			}
+			entities.push_back(entity);
+		}
+		entityCollection.init(entities);
 
-			entityParams[i] = entity;
-		}
-		// Assign entity parents
-		for (uint32_t i=0;i<entityCount;++i)
+		// Set focused body
+		for (int i=0;i<(int)entityCollection.getBodies().size();++i)
 		{
-			const std::string parent = entityParams[i].getParentName();
-			if (parent != "")
+			if (entityCollection.getBodies()[i].getParam().getName() == startingBody)
 			{
-				for (uint32_t j=0;j<entityCount;++j)
-				{
-					if (i==j) continue;
-					if (entityParams[j].getName() == parent)
-					{
-						entityParents[i] = j;
-						break;
-					}
-				}
+				focusedBodyId = i;
+				break;
 			}
 		}
-	} 
+	}
 	catch (parse_error &e)
 	{
-		std::cout << e << std::endl;
+		throw std::runtime_error(std::string("Parse Error : ") + e.what());
 	}
 }
 
@@ -484,43 +520,44 @@ void Game::update(const double dt)
 {
 	epoch += timeWarpValues[timeWarpIndex]*dt;
 
-	std::vector<dvec3> relativePositions(entityCount);
+	std::map<EntityHandle, dvec3> relativePositions;
 	// Entity state update
-	for (uint32_t i=0;i<entityCount;++i)
+	for (const auto &h : entityCollection.getAll())
 	{
-		// Relative position update
-		relativePositions[i] = 
-			(getParent(i) == -1 || !entityParams[i].hasOrbit())?
+		relativePositions[h] = (!h.getParent().exists() || !h.getParam().hasOrbit())?
 			dvec3(0.0):
-			entityParams[i].getOrbit().computePosition(epoch);
+			h.getParam().getOrbit().computePosition(epoch);
 	}
 
+	std::map<EntityHandle, EntityState> state;
+
 	// Entity absolute position update
-	for (uint32_t i=0;i<entityCount;++i)
+	for (auto h : entityCollection.getAll())
 	{
-		dvec3 absPosition = relativePositions[i];
-		int parent = getParent(i);
-		while (parent != -1)
+		dvec3 absPosition = relativePositions[h];
+		auto parent = h.getParent();
+		while (parent.exists())
 		{
 			absPosition += relativePositions[parent];
-			parent = getParent(parent);
+			parent = parent.getParent();
 		}
 
 		// Entity Angle
 		const float rotationAngle = 
 			(2.0*pi<float>())*
-			fmod(epoch/entityParams[i].getSphere().getRotationPeriod(),1.f)
-			+ pi<float>();
+			fmod(epoch/h.getParam().getModel().getRotationPeriod(),1.f);
 
 		// Cloud Displacement
 		const float cloudDisp = [&]{
-			if (entityParams[i].hasClouds()) return 0.0;
-			const float period = entityParams[i].getClouds().getPeriod();
+			if (h.getParam().hasClouds()) return 0.0;
+			const float period = h.getParam().getClouds().getPeriod();
 			return (period)?fmod(-epoch/period, 1.f):0.f;
 		}();
 
-		entityStates[i] = EntityState(absPosition, rotationAngle, cloudDisp);
+		state[h] = EntityState(absPosition, rotationAngle, cloudDisp);
 	}
+
+	entityCollection.setState(state);
 	
 	// Wireframe on/off
 	if (isPressedOnce(GLFW_KEY_W))
@@ -562,7 +599,8 @@ void Game::update(const double dt)
 	}
 
 	// Focused entities
-	const std::vector<size_t> visibleEntitiesId = getFocusedEntities(focusedEntityId);
+	const std::vector<EntityHandle> texLoadBodies = 
+		getTexLoadBodies(getFocusedBody());
 
 	// Time formatting
 	const long epochInSeconds = floor(epoch);
@@ -571,10 +609,9 @@ void Game::update(const double dt)
 	// Scene rendering
 	renderer->render({
 		viewPos, viewFovy, viewDir,
-		exposure, ambientColor, wireframe, bloom, 
-		entityStates, visibleEntitiesId, 
-		entityParams[entityNameId].getDisplayName(),
-		entityNameFade, formattedTime});
+		exposure, ambientColor, wireframe, bloom, texLoadBodies, 
+		getDisplayedBody().getParam().getDisplayName(),
+		bodyNameFade, formattedTime});
 
 	auto a = renderer->getProfilerTimes();
 
@@ -599,6 +636,30 @@ void Game::update(const double dt)
 bool Game::isRunning()
 {
 	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
+}
+
+EntityHandle Game::getFocusedBody()
+{
+	return entityCollection.getBodies()[focusedBodyId];
+}
+
+EntityHandle Game::getDisplayedBody()
+{
+	return entityCollection.getBodies()[bodyNameId];
+}
+
+EntityHandle Game::getPreviousBody()
+{
+	return entityCollection.getBodies()[switchPreviousBodyId];
+}
+
+int Game::chooseNextBody(bool direction)
+{
+	int id = focusedBodyId+(direction?1:-1);
+	int size = entityCollection.getBodies().size();
+	if (id < 0) id += size;
+	else if (id >= size) id -= size;
+	return id;
 }
 
 void Game::updateIdle(float dt, double posX, double posY)
@@ -636,7 +697,7 @@ void Game::updateIdle(float dt, double posX, double posY)
 		}
 	}
 
-	const float radius = entityParams[focusedEntityId].getSphere().getRadius();
+	const float radius = getFocusedBody().getParam().getModel().getRadius();
 
 	viewPolar.x += viewSpeed.x;
 	viewPolar.y += viewSpeed.y;
@@ -671,8 +732,7 @@ void Game::updateIdle(float dt, double posX, double posY)
 	const vec3 relViewPos = polarToCartesian(vec2(viewPolar))*
 		viewPolar.z;
 
-	viewPos = dvec3(relViewPos) + 
-		entityStates[focusedEntityId].getPosition();
+	viewPos = dvec3(relViewPos) + getFocusedBody().getState().getPosition();
 
 	const vec3 direction = -polarToCartesian(vec2(viewPolar)+panPolar);
 
@@ -685,24 +745,22 @@ void Game::updateIdle(float dt, double posX, double posY)
 	}
 	if (isPressedOnce(GLFW_KEY_L))
 	{
-		if (timeWarpIndex < timeWarpValues.size()-1) timeWarpIndex++;
+		if (timeWarpIndex < (int)timeWarpValues.size()-1) timeWarpIndex++;
 	}
 
 	// Entity name display
-	entityNameId = focusedEntityId;
-	entityNameFade = 1.f;
+	bodyNameId = focusedBodyId;
+	bodyNameFade = 1.f;
 
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
 		switchPhase = SwitchPhase::TRACK;
 		// Save previous entity
-		switchPreviousEntity = focusedEntityId;
+		switchPreviousBodyId = focusedBodyId;
 		// Choose next entity
-		const int nextEntity = focusedEntityId+
-		(glfwGetKey(win, GLFW_KEY_LEFT_SHIFT)?-1:1);
-		focusedEntityId = (nextEntity>=(int)entityCount)?0:
-			((nextEntity<0?(entityCount-1):nextEntity));
+		const int direction = !glfwGetKey(win, GLFW_KEY_LEFT_SHIFT);
+		focusedBodyId = chooseNextBody(direction);
 		// Kill timewarp
 		timeWarpIndex = 0;
 		// Save previous orientation
@@ -710,8 +768,8 @@ void Game::updateIdle(float dt, double posX, double posY)
 		// Ray test
 		switchNewViewPolar = viewPolar;
 		// Get direction from view to target entity
-		const dvec3 target = entityStates[focusedEntityId].getPosition() - 
-				entityStates[switchPreviousEntity].getPosition();
+		const dvec3 target = getFocusedBody().getState().getPosition() - 
+				getPreviousBody().getState().getPosition();
 		const vec3 targetDir = normalize(target-dvec3(relViewPos));
 		// Get t as origin+dir*t = closest point to entity
 		const float b = dot(relViewPos, targetDir);
@@ -762,8 +820,8 @@ void Game::updateTrack(float dt)
 	const float f = ease(t);
 
 	// Entity name display
-	entityNameId = switchPreviousEntity;
-	entityNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
+	bodyNameId = switchPreviousBodyId;
+	bodyNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
 
 	// Interpolate positions
 	float posDeltaTheta = switchNewViewPolar.x-viewPolar.x;
@@ -773,12 +831,12 @@ void Game::updateTrack(float dt)
 	const vec3 interpPolar = (1-f)*viewPolar+f*
 		vec3(viewPolar.x+posDeltaTheta, switchNewViewPolar.y, switchNewViewPolar.z);
 
-	viewPos = entityStates[switchPreviousEntity].getPosition()+
+	viewPos = getPreviousBody().getState().getPosition()+
 		dvec3(polarToCartesian(vec2(interpPolar))*interpPolar.z);
 
 	// Aim at next entity
 	const vec3 targetDir = 
-		normalize(entityStates[focusedEntityId].getPosition() - viewPos);
+		normalize(getFocusedBody().getState().getPosition() - viewPos);
 	// Find the angles
 	const float targetPhi = asin(targetDir.z);
 	const float targetTheta = atan2(targetDir.y, targetDir.x);
@@ -817,21 +875,21 @@ void Game::updateMove(float dt)
 	const double f = ease2(t, 4);
 
 	// Entity name fade
-	entityNameId = focusedEntityId;
-	entityNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
+	bodyNameId = focusedBodyId;
+	bodyNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
 
 	// Old position to move from
-	const dvec3 sourcePos = entityStates[switchPreviousEntity].getPosition()+
+	const dvec3 sourcePos = getPreviousBody().getState().getPosition()+
 		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
 
 	// Distance from entity at arrival
 	const float targetDist = std::max(
-		4*entityParams[focusedEntityId].getSphere().getRadius(), 1000.f);
+		4*getFocusedBody().getParam().getModel().getRadius(), 1000.f);
 	// Direction from old position to new entity
 	const vec3 direction = 
-		normalize(entityStates[focusedEntityId].getPosition()-sourcePos);
+		normalize(getFocusedBody().getState().getPosition()-sourcePos);
 	// New position (subtract direction to not be inside entity)
-	const dvec3 targetPos = entityStates[focusedEntityId].getPosition()-
+	const dvec3 targetPos = getFocusedBody().getState().getPosition()-
 		dvec3(direction*targetDist);
 
 	// Interpolate positions
@@ -851,6 +909,7 @@ void Game::updateMove(float dt)
 	}
 }
 
+/*
 int Game::getParent(size_t entityId)
 {
 	return entityParents[entityId];
@@ -904,27 +963,26 @@ std::vector<size_t> Game::getAllChildren(size_t entityId)
 	c.insert(c.end(), accum.begin(), accum.end());
 	return c;
 }
+*/
 
-std::vector<size_t> Game::getFocusedEntities(size_t focusedEntityId)
+std::vector<EntityHandle> Game::getTexLoadBodies(const EntityHandle &focusedEntity)
 {
-	int level = getLevel(focusedEntityId);
-
 	// Itself visible
-	std::vector<size_t> v = {focusedEntityId};
-	// All children visible
-	auto children = getAllChildren(focusedEntityId);
-	v.insert(v.end(), children.begin(), children.end());
+	std::vector<EntityHandle> v = {focusedEntity};
 
 	// All parents visible
-	auto parents = getAllParents(focusedEntityId);
+	auto parents = focusedEntity.getAllParents();
 	v.insert(v.end(), parents.begin(), parents.end());
 
-	// If it is a moon, siblings are visible
-	if (level >= 2)
-	{
-		auto siblings = getAllChildren(getParent(focusedEntityId));
-		v.insert(v.end(), siblings.begin(), siblings.end());
-	}
+	// All siblings visible
+	auto siblings = focusedEntity.getParent().getAllChildren();
+	v.insert(v.end(), siblings.begin(), siblings.end());
+
+	// Only select bodies
+	v.erase(std::remove_if(v.begin(), v.end(), [](const EntityHandle &h){
+		return !h.getParam().isBody();
+	}), v.end());
+
 	return v;
 }
 

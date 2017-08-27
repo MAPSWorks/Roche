@@ -4,6 +4,7 @@
 #include <vector>
 #include <limits>
 #include <utility>
+#include <map>
 
 #include <glm/glm.hpp>
 
@@ -128,10 +129,10 @@ private:
 	std::string _colorFilename;
 };
 
-class Sphere
+class Model
 {
 public:
-	Sphere() = default;
+	Model() = default;
 	/**
 	 * @param radius radius of sphere (km)
 	 * @param GM gravitational parameter
@@ -140,7 +141,7 @@ public:
 	 * @param meanColor flare color
 	 * @param diffuseFilename diffuse texture filename
 	 */
-	Sphere(
+	Model(
 		float radius,
 		double GM,
 		glm::vec3 rotAxis,
@@ -244,10 +245,10 @@ private:
 /**
  * Fixed state of an entity, unlikely to change
  */
-class Entity
+class EntityParam
 {
 public:
-	Entity() = default;
+	EntityParam() = default;
 	/**
 	 * Sets the name of the entity
 	 * @param name unique name for the entity
@@ -265,9 +266,9 @@ public:
 	void setParentName(const std::string &name);
 	/**
 	 * Sets the sphere properties
-	 * @param sphere Sphere properties
+	 * @param sphere Model properties
 	 */
-	void setSphere(const Sphere &sphere);
+	void setModel(const Model &model);
 	/**
 	 * Sets the orbit parameters of the entity
 	 * @param orbit Orbit parameters
@@ -304,10 +305,10 @@ public:
 	 */
 	void setSpecular(const Specular &specular);
 
-	/// Indicates whether the entity has a sphere model
-	bool isSphere() const;
 	/// Indicates whether the entity is fixed in place or orbits some other entity
 	bool hasOrbit() const;
+	/// Indicates if the entity is a celestial body
+	bool isBody() const;
 	/// Indicates whether the entity has an atmosphere
 	bool hasAtmo() const;
 	/// Indicates whether the entity has a set of rings
@@ -328,7 +329,7 @@ public:
 	/// Returns the name of the parent entity
 	std::string getParentName() const;
 	/// Returns the sphere properties
-	const Sphere &getSphere() const;
+	const Model &getModel() const;
 	/// Returns the orbital parameters
 	const Orbit &getOrbit() const;
 	/// Returns the atmosphere properties
@@ -348,7 +349,7 @@ private:
 	std::string _name = "Undefined";
 	std::string _displayName = "Undefined";
 	std::string _parentName = "";
-	std::pair<bool, Sphere> _sphere = std::make_pair(false, Sphere());
+	std::pair<bool, Model> _model = std::make_pair(false, Model());
 	std::pair<bool, Orbit> _orbit = std::make_pair(false, Orbit());
 	std::pair<bool, Atmo> _atmo = std::make_pair(false, Atmo());
 	std::pair<bool, Ring> _ring = std::make_pair(false, Ring());
@@ -370,7 +371,7 @@ public:
 	 * @param rotationAngle rotation angle around Body::getRotationAxis()
 	 * @param cloudDisp amount of displacement of the cloud layer
 	 */
-	EntityState(const glm::dvec3 &pos, float rotationAngle, float cloudDisp);
+	explicit EntityState(const glm::dvec3 &pos, float rotationAngle=0.0, float cloudDisp=0.0);
 	/// Returns the world space position of center of entity
 	glm::dvec3 getPosition() const;
 	/// Returns the rotation angle around Body::getRotationAxis()
@@ -381,4 +382,48 @@ private:
 	glm::dvec3 _position = glm::dvec3(0.0);
 	float _rotationAngle = 0.0;
 	float _cloudDisp = 0.0;
+};
+
+class EntityCollection;
+
+class EntityHandle
+{
+	int _id = -1;
+	const EntityCollection * _collec = nullptr;
+	EntityHandle(const EntityCollection* collec, int id);
+public:
+	EntityHandle() = default;
+	bool exists() const;
+	const EntityParam &getParam() const;
+	const EntityState &getState() const;
+	EntityHandle getParent() const;
+	std::vector<EntityHandle> getAllParents() const;
+	std::vector<EntityHandle> getChildren() const;
+	std::vector<EntityHandle> getAllChildren() const;
+	bool operator<(const EntityHandle &h) const;
+	bool operator==(const EntityHandle &h) const;
+	friend class EntityCollection;
+};
+
+class EntityCollection
+{
+public:
+	EntityCollection() = default;
+	void init(const std::vector<EntityParam> &param);
+	void setState(const std::map<EntityHandle, EntityState> &state);
+	const std::vector<EntityHandle> &getAll() const;
+	const std::vector<EntityHandle> &getBodies() const;
+	friend class EntityHandle;
+private:
+	EntityHandle createHandle(int id) const;
+	const EntityParam &getParam(const EntityHandle &handle) const;
+	const EntityState &getState(const EntityHandle &handle) const;
+
+	std::vector<EntityParam> _param;
+	std::vector<EntityState> _state;
+
+	std::vector<EntityHandle> _all;
+	std::vector<EntityHandle> _bodies;
+
+	std::vector<int> _parents;
 };

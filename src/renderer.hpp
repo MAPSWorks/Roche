@@ -2,7 +2,6 @@
 
 #include "entity.hpp"
 #include <glm/glm.hpp>
-#include <map>
 #include <string>
 
 /**
@@ -18,7 +17,7 @@ public:
 	struct InitInfo
 	{
 		/// All of the entities fixed parameters
-		std::vector<Entity> entityParams;
+		const EntityCollection * collection;
 		/// Star map texture filename
 		std::string starMapFilename;
 		/// Star map brightness
@@ -51,10 +50,8 @@ public:
 		bool wireframe;
 		/// Whether to activate bloom or not
 		bool bloom;
-		/// All of the entities dynamic state
-		std::vector<EntityState> entityStates;
 		/// Ids of entities currently in focus
-		std::vector<size_t> focusedEntitiesId;
+		std::vector<EntityHandle> focusedEntitiesId;
 		/// Name of focused body
 		std::string focusedEntityName;
 		/// Fade in/out of focused body name

@@ -4,7 +4,7 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
-- [ ] Separate barycenters from bodies
+- [ ] Enforce the _member notation
 - [ ] Fix planet orientations at epoch
 - [ ] Display some kind of planet description
 - [ ] Split up other textures
@@ -19,6 +19,8 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Separate barycenters from bodies
+- [x] Huge refactor for entities
 - [x] Rename 'planet' with 'entity' or 'body'
 - [x] Add barycenters
 - [x] Ecliptic reference frame instead of equator

@@ -1,15 +1,107 @@
 ambientColor:0.0002
-startingEntity:"Earth"
+startingBody:"Earth"
 starMap:{
 	diffuse:"tex/starmap"
 	intensity:0.05
 }
 axialTilt:2.343899501947467E+01
-entities:[
+barycenters:[
 {
 	name:"SSB"
-	displayName:"Solar System Barycenter"
 }
+{
+	name:"EMB"
+	parent:"SSB"
+	orbit:{
+		ecc:1.936404631355074E-02
+		sma:1.504265275973429E+08
+		inc:1.116190435656998E-02
+		lan:1.862134279499492E+02
+		arg:2.873822265631837E+02
+		pr:3.179958802936189E+07
+		m0:3.471964973643252E+02
+	}
+}
+{
+	name:"MB"
+	parent:"SSB"
+	orbit:{
+		ecc:9.698172602671137E-02
+		sma:2.293660306075990E+08
+		inc:1.851687976262193E+00
+		lan:4.967353474062943E+01
+		arg:2.866027625602253E+02
+		pr:5.987240836930058E+07
+		m0:3.303868321644009E+01
+	}
+}
+{
+	name:"JB"
+	parent:"SSB"
+	orbit:{
+		ecc:4.911973250758208E-02
+		sma:7.774678672474000E+08
+		inc:1.303056633913318E+00
+		lan:1.005218075537592E+02
+		arg:2.732494652578694E+02
+		pr:3.741777826190836E+08
+		m0:1.765774109100122E+02
+	}
+}
+{
+	name:"SB"
+	parent:"SSB"
+	orbit:{
+		ecc:5.393642900588957E-02
+		sma:1.427799049684059E+09
+		inc:2.486890367519602E+00
+		lan:1.135990258913877E+02
+		arg:3.390331994893422E+02
+		pr:9.302924954617430E+08
+		m0:1.651506083951050E+02
+	}
+}
+{
+	name:"UB"
+	parent:"SSB"
+	orbit:{
+		ecc:4.737804074736301E-02
+		sma:2.870310870326335E+09
+		inc:7.721529812145274E-01
+		lan:7.400136653107919E+01
+		arg:9.710653280980426E+01
+		pr:2.650663998697134E+09
+		m0:2.149726650159968E+02
+	}
+}
+{
+	name:"NB"
+	parent:"SSB"
+	orbit:{
+		ecc:8.754154442592218E-03
+		sma:4.499053467251481E+09
+		inc:1.770230280329569E+00
+		lan:2.725046425719144E+02
+		arg:2.725046425719144E+02
+		pr:5.201733708277207E+09
+		m0:2.977406474366738E+02
+	}
+}
+{
+	name:"PB"
+	parent: "SSB"
+	orbit:{
+		ecc:2.490251164566945E-01
+		sma:5.907480503482660E+09
+		inc:1.714071082940643E+01
+		lan:1.103010238198909E+02
+		arg:1.137729428313685E+02
+		pr:7.825936508720883E+09
+		m0:3.900309639441793E+01
+	}
+}]
+
+bodies:[
 {
 	name:"Sun"
 	displayName:"The Sun"
@@ -23,7 +115,7 @@ entities:[
 		pr:1.165239689701036E+08
 		m0:1.283721199501000E+02
 	}
-	sphere:{
+	model:{
 		rightAscension:286.13
 		declination:63.87
 		rotPeriod:2192831.6
@@ -54,7 +146,7 @@ entities:[
 		pr:7.746896322647904E+06
 		m0:2.265749813265085E+01
 	}
-	sphere:{
+	model:{
 		radius:2439.7
 		rightAscension:281.01
 		declination:61.45
@@ -77,7 +169,7 @@ entities:[
 		pr:1.980302641119052E+07
 		m0:3.191236774709908E+02
 	}
-	sphere:{
+	model:{
 		radius:6051.8
 		rightAscension:272.76
 		declination:67.16
@@ -94,20 +186,7 @@ entities:[
 		density:5
 	}
 }
-{
-	name:"EMB"
-	displayName:"Earth-Moon Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:1.936404631355074E-02
-		sma:1.504265275973429E+08
-		inc:1.116190435656998E-02
-		lan:1.862134279499492E+02
-		arg:2.873822265631837E+02
-		pr:3.179958802936189E+07
-		m0:3.471964973643252E+02
-	}
-}
+
 {
 	name:"Earth"
 	displayName:"The Earth"
@@ -121,7 +200,7 @@ entities:[
 		pr:2.365771210133944E+06
 		m0:2.502170811805973E+02
 	}
-	sphere:{
+	model:{
 		radius:6371.01
 		rightAscension:0
 		declination:90
@@ -170,7 +249,7 @@ entities:[
 		pr:2.365771210134184E+06
 		m0:2.502170811806626E+02
 	}
-	sphere:{
+	model:{
 		radius:1737.53
 		rightAscension:270
 		declination:67.16
@@ -181,20 +260,7 @@ entities:[
 		diffuse:"tex/moon"
 	}
 }
-{
-	name:"MB"
-	displayName:"Mars Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:9.698172602671137E-02
-		sma:2.293660306075990E+08
-		inc:1.851687976262193E+00
-		lan:4.967353474062943E+01
-		arg:2.866027625602253E+02
-		pr:5.987240836930058E+07
-		m0:3.303868321644009E+01
-	}
-}
+
 {
 	name:"Mars"
 	parent:"MB"
@@ -207,7 +273,7 @@ entities:[
 		pr:3.430360313927889E+03
 		m0:1.922763394852632E+02
 	}
-	sphere:{
+	model:{
 		radius:3389.5
 		rightAscension:317.68143
 		declination:52.88650
@@ -236,7 +302,7 @@ entities:[
 		pr:1.144924660311228E+08
 		m0:2.261070837923667E+02
 	}
-	sphere:{
+	model:{
 		radius:262.7
 		rightAscension:294.18
 		declination:66.764
@@ -259,7 +325,7 @@ entities:[
 		pr:1.459993985900643E+08
 		m0:2.581019349525831E+02
 	}
-	sphere:{
+	model:{
 		radius:473
 		rightAscension:294.18
 		declination:66.764
@@ -270,20 +336,7 @@ entities:[
 		diffuse:"tex/ceres"
 	}
 }
-{
-	name:"JB"
-	displayName:"Jupiter System Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:4.911973250758208E-02
-		sma:7.774678672474000E+08
-		inc:1.303056633913318E+00
-		lan:1.005218075537592E+02
-		arg:2.732494652578694E+02
-		pr:3.741777826190836E+08
-		m0:1.765774109100122E+02
-	}
-}
+
 {
 	name:"Jupiter"
 	parent:"JB"
@@ -296,7 +349,7 @@ entities:[
 		pr:1.017134489855682E+05
 		m0:1.662532119616407E+02
 	}
-	sphere:{
+	model:{
 		radius:69911
 		rightAscension:268.057
 		declination:64.496
@@ -325,7 +378,7 @@ entities:[
 		pr:1.531575462193703E+05
 		m0:2.163019101196024E+02
 	}
-	sphere:{
+	model:{
 		radius:3660.0
 		rightAscension:268.057
 		declination:64.496
@@ -348,7 +401,7 @@ entities:[
 		pr:3.068837867614810E+05
 		m0:9.995458157682359E+01
 	}
-	sphere:{
+	model:{
 		radius:1560.8
 		rightAscension:268.057
 		declination:64.496
@@ -371,7 +424,7 @@ entities:[
 		pr:6.181527793854525E+05
 		m0:2.195477127886655E+02
 	}
-	sphere:{
+	model:{
 		radius:2634.1
 		rightAscension:268.057
 		declination:64.496
@@ -394,7 +447,7 @@ entities:[
 		pr:1.442113495000405E+06
 		m0:1.000194639236621E+02
 	}
-	sphere:{
+	model:{
 		radius:2410.3
 		rightAscension:268.057
 		declination:64.496
@@ -403,20 +456,6 @@ entities:[
 		albedo:0.22
 		GM:0
 		diffuse:"tex/callisto"
-	}
-}
-{
-	name:"SB"
-	displayName:"Saturn Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:5.393642900588957E-02
-		sma:1.427799049684059E+09
-		inc:2.486890367519602E+00
-		lan:1.135990258913877E+02
-		arg:3.390331994893422E+02
-		pr:9.302924954617430E+08
-		m0:1.651506083951050E+02
 	}
 }
 {
@@ -431,7 +470,7 @@ entities:[
 		pr:1.214388705482736E+06
 		m0:2.012456233648876E+02
 	}
-	sphere:{
+	model:{
 		radius:58232
 		rightAscension:40.589
 		declination:83.537
@@ -471,7 +510,7 @@ entities:[
 		pr:8.170444572794715E+04
 		m0:2.092807249230585E+02
 	}
-	sphere:{
+	model:{
 		radius:198.2
 		rightAscension:40.589
 		declination:83.537
@@ -494,7 +533,7 @@ entities:[
 		pr:1.184804856322292E+05
 		m0:3.386377243066024E+02
 	}
-	sphere:{
+	model:{
 		radius:252.3
 		rightAscension:40.589
 		declination:83.537
@@ -517,7 +556,7 @@ entities:[
 		pr:1.637167825073942E+05
 		m0:2.308661996827253E+01
 	}
-	sphere:{
+	model:{
 		radius:536.3
 		rightAscension:40.589
 		declination:83.537
@@ -540,7 +579,7 @@ entities:[
 		pr:2.362742617706654E+05
 		m0:9.108675142246655E+01
 	}
-	sphere:{
+	model:{
 		radius:562.5
 		rightAscension:40.589
 		declination:83.537
@@ -563,7 +602,7 @@ entities:[
 		pr:3.903405974265215E+05
 		m0:5.443151783479784E+01
 	}
-	sphere:{
+	model:{
 		radius:764.5
 		rightAscension:40.589
 		declination:83.537
@@ -586,7 +625,7 @@ entities:[
 		pr:1.377811416432242E+06
 		m0:3.066126022289936E+02
 	}
-	sphere:{
+	model:{
 		radius:2575.5
 		rightAscension:40.589
 		declination:83.537
@@ -615,7 +654,7 @@ entities:[
 		pr:6.853964632624398E+06
 		m0:3.050697163955879E+02
 	}
-	sphere:{
+	model:{
 		radius:734.5
 		rightAscension:40.589
 		declination:83.537
@@ -624,20 +663,6 @@ entities:[
 		albedo:0.6
 		GM:120.51
 		diffuse:"tex/iapetus"
-	}
-}
-{
-	name:"UB"
-	displayName:"Uranus Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:4.737804074736301E-02
-		sma:2.870310870326335E+09
-		inc:7.721529812145274E-01
-		lan:7.400136653107919E+01
-		arg:9.710653280980426E+01
-		pr:2.650663998697134E+09
-		m0:2.149726650159968E+02
 	}
 }
 {
@@ -652,7 +677,7 @@ entities:[
 		pr:3.866007978502878E+05
 		m0:1.819091896868349E+02
 	}
-	sphere:{
+	model:{
 		radius:25362
 		rightAscension:257.311
 		declination:-15.175
@@ -681,7 +706,7 @@ entities:[
 		pr:1.220740943358544E+05
 		m0:1.226958732179177E+02
 	}
-	sphere:{
+	model:{
 		radius:234.2
 		rightAscension:257.311
 		declination:-15.175
@@ -704,7 +729,7 @@ entities:[
 		pr:2.176688744349402E+05
 		m0:3.019228330367515E+02
 	}
-	sphere:{
+	model:{
 		radius:577.9
 		rightAscension:257.311
 		declination:-15.175
@@ -727,7 +752,7 @@ entities:[
 		pr:3.579065951173867E+05
 		m0:3.496386268151237E+02
 	}
-	sphere:{
+	model:{
 		radius:584.7
 		rightAscension:257.311
 		declination:-15.175
@@ -750,7 +775,7 @@ entities:[
 		pr:7.519626886594996E+05
 		m0:1.386860783830583E+02
 	}
-	sphere:{
+	model:{
 		radius:788.9
 		rightAscension:257.311
 		declination:-15.175
@@ -773,7 +798,7 @@ entities:[
 		pr:1.163455651476950E+06
 		m0:2.770601267235023E+02
 	}
-	sphere:{
+	model:{
 		radius:761.4
 		rightAscension:257.311
 		declination:-15.175
@@ -782,20 +807,6 @@ entities:[
 		albedo:0.24
 		GM:0.0
 		diffuse:"tex/oberon"
-	}
-}
-{
-	name:"NB"
-	displayName:"Neptune Barycenter"
-	parent:"SSB"
-	orbit:{
-		ecc:8.754154442592218E-03
-		sma:4.499053467251481E+09
-		inc:1.770230280329569E+00
-		lan:2.725046425719144E+02
-		arg:2.725046425719144E+02
-		pr:5.201733708277207E+09
-		m0:2.977406474366738E+02
 	}
 }
 {
@@ -810,7 +821,7 @@ entities:[
 		pr:5.077770647821483E+05
 		m0:3.522483282470720E+02
 	}
-	sphere:{
+	model:{
 		radius:24622
 		rightAscension:299.3
 		declination:42.950
@@ -839,7 +850,7 @@ entities:[
 		pr:9.693035840388924E+04
 		m0:3.086734157766128E+02
 	}
-	sphere:{
+	model:{
 		radius:761.4
 		rightAscension:299.3
 		declination:42.950
@@ -862,7 +873,7 @@ entities:[
 		pr:5.077770639830987E+05
 		m0:3.522478184138560E+02
 	}
-	sphere:{
+	model:{
 		radius:1352.6
 		rightAscension:299.3
 		declination:42.950
@@ -885,7 +896,7 @@ entities:[
 		pr:3.111630083958182E+07
 		m0:3.036595546834685E+02
 	}
-	sphere:{
+	model:{
 		radius:170
 		rightAscension:299.3
 		declination:42.950
@@ -894,20 +905,6 @@ entities:[
 		albedo:0.2
 		GM:0.0
 		diffuse:"tex/nereid"
-	}
-}
-{
-	name:"PB"
-	displayName:"Pluto Barycenter"
-	parent: "SSB"
-	orbit:{
-		ecc:2.490251164566945E-01
-		sma:5.907480503482660E+09
-		inc:1.714071082940643E+01
-		lan:1.103010238198909E+02
-		arg:1.137729428313685E+02
-		pr:7.825936508720883E+09
-		m0:3.900309639441793E+01
 	}
 }
 {
@@ -922,7 +919,7 @@ entities:[
 		pr:5.140251577496760E+05
 		m0:1.799156116863976E+02
 	}
-	sphere:{
+	model:{
 		radius:1187
 		rightAscension:132.993
 		declination:-6.163
@@ -951,7 +948,7 @@ entities:[
 		pr:5.496616710819446E+05
 		m0:1.813267051297685E+02
 	}
-	sphere:{
+	model:{
 		radius:606
 		rightAscension:132.993
 		declination:-6.163

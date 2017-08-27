@@ -38,7 +38,7 @@ vector<DrawCommand> getCommands(
 	GLenum indexType,
 	Buffer &vertexBuffer,
 	Buffer &indexBuffer,
-	const vector<Model> &infos)
+	const vector<Mesh> &infos)
 {
 	vector<DrawCommand> commands(infos.size());
 	vector<pair<BufferRange, BufferRange>> ranges(infos.size());
@@ -68,7 +68,7 @@ vector<DrawCommand> getCommands(
 	return commands;
 }
 
-void RendererGL::createModels()
+void RendererGL::createMeshes()
 {
 	vertexBuffer = Buffer(
 		Buffer::Usage::STATIC,
@@ -79,39 +79,40 @@ void RendererGL::createModels()
 		Buffer::Access::WRITE_ONLY);
 
 	const int modelCount = 3;
-	const int fsTriModelId  = 0;
-	const int flareModelId  = 1;
-	const int sphereModelId = 2;
+	const int fsTriMeshId  = 0;
+	const int flareMeshId  = 1;
+	const int sphereMeshId = 2;
 
 	// Static vertex & index data
-	vector<Model> modelInfos(modelCount);
+	vector<Mesh> modelInfos(modelCount);
 
 	// Fullscreen tri
-	modelInfos[fsTriModelId] = generateFullscreenTri();
+	modelInfos[fsTriMeshId] = generateFullscreenTri();
 
 	// Flare
 	const int detail = 8;
-	modelInfos[flareModelId] = generateFlareModel(detail);
+	modelInfos[flareMeshId] = generateFlareMesh(detail);
 
 	// Sphere
 	const int entityMeridians = 32;
 	const int entityRings = 32;
-	modelInfos[sphereModelId] = generateSphere(entityMeridians, entityRings);
+	modelInfos[sphereMeshId] = generateSphere(entityMeridians, entityRings);
 
 	// Load custom models
-	vector<int> bodyModelId(entityCount, sphereModelId);
-	vector<int> ringModelId(entityCount, -1);
-	for (uint32_t i=0;i<entityCount;++i)
+	map<EntityHandle, int> bodyMeshId;
+	map<EntityHandle, int> ringMeshId;
+	for (const auto &h: entityCollection->getBodies())
 	{
-		const Entity param = entityParams[i];
+		const EntityParam param = h.getParam();
+		bodyMeshId[h] = sphereMeshId;
 		// Rings
 		if (param.hasRing())
 		{
-			ringModelId[i] = modelInfos.size();
+			ringMeshId[h] = modelInfos.size();
 			const float near = param.getRing().getInnerDistance();
 			const float far = param.getRing().getOuterDistance();
 			const int ringMeridians = 32;
-			modelInfos.push_back(generateRingModel(ringMeridians, near, far));
+			modelInfos.push_back(generateRingMesh(ringMeridians, near, far));
 		}
 	}
 
@@ -121,17 +122,17 @@ void RendererGL::createModels()
 		indexBuffer,
 		modelInfos);
 
-	fullscreenTri = commands[fsTriModelId];
-	flareModel    = commands[flareModelId];
-	sphere        = commands[sphereModelId];
+	fullscreenTri = commands[fsTriMeshId];
+	flareDraw     = commands[flareMeshId];
+	sphere        = commands[sphereMeshId];
 
-	for (uint32_t i=0;i<entityCount;++i)
+	for (const auto &h: entityCollection->getBodies())
 	{
-		auto &data = bodyData[i];
-		data.bodyModel = commands[bodyModelId[i]];
-		int ringId = ringModelId[i];
+		auto &data = bodyData[h];
+		data.bodyDraw = commands[bodyMeshId[h]];
+		const int ringId = ringMeshId[h];
 		if (ringId != -1)
-			data.ringModel   = commands[ringId];
+			data.ringDraw   = commands[ringId];
 	}
 }
 
@@ -148,10 +149,9 @@ void RendererGL::createUBO()
 		// Scene UBO
 		data.sceneUBO = uboBuffer.assignUBO(sizeof(SceneUBO));
 		// Entity UBOs
-		data.bodyUBOs.resize(entityCount);
-		for (uint32_t j=0;j<entityCount;++j)
+		for (const auto &h: entityCollection->getBodies())
 		{
-			data.bodyUBOs[j] = uboBuffer.assignUBO(sizeof(BodyUBO));
+			data.bodyUBOs[h] = uboBuffer.assignUBO(sizeof(BodyUBO));
 		}
 	}
 
@@ -160,26 +160,27 @@ void RendererGL::createUBO()
 
 void RendererGL::init(const InitInfo &info)
 {
-	this->entityParams = info.entityParams;
-	this->entityCount = info.entityParams.size();
+	this->entityCollection = info.collection;
 	this->msaaSamples = info.msaa;
 	this->maxTexSize = info.maxTexSize;
 	this->windowWidth = info.windowWidth;
 	this->windowHeight = info.windowHeight;
 
 	// Find the sun
-	for (size_t i=0;i<entityParams.size();++i)
+	for (const auto &h : entityCollection->getBodies())
 	{
-		if (entityParams[i].isStar()) sunId = i; 
+		if (h.getParam().isStar()) sun = h;
 	}
 
 	this->bufferFrames = 3; // triple-buffering
 
-	this->bodyData.resize(entityCount);
+	for (const auto &h : entityCollection->getBodies())
+		this->bodyData[h] = BodyData();
+
 	this->fences.resize(bufferFrames);
 
 	createVertexArray();
-	createModels();
+	createMeshes();
 	createUBO();
 	createShaders();
 	createRendertargets();
@@ -521,17 +522,17 @@ void RendererGL::createScreenshot()
 
 void RendererGL::createAtmoLookups()
 {
-	for (uint32_t i=0;i<entityParams.size();++i)
+	for (const auto &h : entityCollection->getBodies())
 	{
-		const Entity param = entityParams[i];
-		auto &data = bodyData[i];
+		const EntityParam &param = h.getParam();
+		auto &data = bodyData[h];
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
 		{
 			const int size = 128;
-			vector<float> table = 
-				entityParams[i].getAtmo().generateLookupTable(size, param.getSphere().getRadius());
+			vector<float> table = param.getAtmo().
+				generateLookupTable(size, param.getModel().getRadius());
 
 			GLuint &tex = data.atmoLookupTable;
 
@@ -545,10 +546,10 @@ void RendererGL::createAtmoLookups()
 
 void RendererGL::createRingTextures()
 {
-	for (uint32_t i=0;i<entityParams.size();++i)
+	for (const auto &h : entityCollection->getBodies())
 	{
-		const Entity param = entityParams[i];
-		auto &data = bodyData[i];
+		const EntityParam &param = h.getParam();
+		auto &data = bodyData[h];
 
 		// Load ring textures
 		if (param.hasRing())
@@ -656,35 +657,35 @@ void RendererGL::render(const RenderInfo &info)
 	};
 
 	// Entity classification
-	vector<uint32_t> closeEntities;
-	vector<uint32_t> translucentEntities;
-	vector<uint32_t> flares;
+	vector<EntityHandle> closeEntities;
+	vector<EntityHandle> translucentEntities;
+	vector<EntityHandle> flares;
 
-	vector<uint32_t> texLoadEntities;
-	vector<uint32_t> texUnloadEntities;
+	vector<EntityHandle> texLoadEntities;
+	vector<EntityHandle> texUnloadEntities;
 
-	for (uint32_t i=0;i<info.entityStates.size();++i)
+	for (const auto &h : entityCollection->getBodies())
 	{
-		auto &data = bodyData[i];
-		const auto &param = entityParams[i];
-		const auto &state = info.entityStates[i];
-		const float radius = param.getSphere().getRadius();
+		auto &data = bodyData[h];
+		const auto &param = h.getParam();
+		const auto &state = h.getState();
+		const float radius = param.getModel().getRadius();
 		const float maxRadius = radius+(param.hasRing()?
 			param.getRing().getOuterDistance():0);
 		const dvec3 pos = state.getPosition();
 		const double dist = distance(info.viewPos, pos)/radius;
 		bool focused = count(
 			info.focusedEntitiesId.begin(), 
-			info.focusedEntitiesId.end(), i)>0;
+			info.focusedEntitiesId.end(), h)>0;
 
 		if ((focused || dist < texLoadDistance) && !data.texLoaded)
 		{
-			texLoadEntities.push_back(i);
+			texLoadEntities.push_back(h);
 		}
 		else if (!focused && data.texLoaded && dist > texUnloadDistance)
 		{
 			// Textures need to be unloaded
-			texUnloadEntities.push_back(i);
+			texUnloadEntities.push_back(h);
 		}
 
 		// Frustum test
@@ -701,18 +702,18 @@ void RendererGL::render(const RenderInfo &info)
 			// Render if is range, always render sun
 			if (dist < closeBodyMaxDistance || param.isStar())
 			{
-				closeEntities.push_back(i);
+				closeEntities.push_back(h);
 				// Entity atmospheres
 				if (param.hasAtmo() || param.hasRing())
 				{
-					translucentEntities.push_back(i);
+					translucentEntities.push_back(h);
 				}
 			}
 		}
 
 		if (dist > flareMinDistance && !param.isStar())
 		{
-			flares.push_back(i); 
+			flares.push_back(h); 
 		}
 	}
 
@@ -740,11 +741,11 @@ void RendererGL::render(const RenderInfo &info)
 	sceneUBO.logDepthC = logDepthC;
 
 	// Entity uniform update
-	vector<BodyUBO> bodyUBOs(entityCount);
-	for (uint32_t i=0;i<entityCount;++i)
+	map<EntityHandle, BodyUBO> bodyUBOs;
+	for (const auto &h : entityCollection->getBodies())
 	{
-		bodyUBOs[i] = getBodyUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
-			info.entityStates[i], entityParams[i], bodyData[i]);
+		bodyUBOs[h] = getBodyUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
+			h.getState(), h.getParam(), bodyData[h]);
 	}
 
 	// Dynamic data upload
@@ -753,26 +754,28 @@ void RendererGL::render(const RenderInfo &info)
 	profiler.end();
 
 	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
-	for (uint32_t i=0;i<bodyUBOs.size();++i)
+	for (const auto &h : entityCollection->getBodies())
 	{
-		uboBuffer.write(currentData.bodyUBOs[i], &bodyUBOs[i]);
+		uboBuffer.write(currentData.bodyUBOs[h], &bodyUBOs[h]);
 	}
 
-	// Entity sorting from front to back
-	sort(closeEntities.begin(), closeEntities.end(), [&](int i, int j)
+	auto closerFun = [&](const EntityHandle &i, const EntityHandle &j)
 	{
-		const float distI = distance(info.entityStates[i].getPosition(), info.viewPos);
-		const float distJ = distance(info.entityStates[j].getPosition(), info.viewPos);
+		const float distI = distance(i.getState().getPosition(), info.viewPos);
+		const float distJ = distance(j.getState().getPosition(), info.viewPos);
 		return distI < distJ;
-	});
+	};
+
+	auto fartherFun = [&](const EntityHandle &i, const EntityHandle &j)
+	{
+		return !closerFun(i,j);
+	};
+
+	// Entity sorting from front to back
+	sort(closeEntities.begin(), closeEntities.end(), closerFun);
 
 	// Atmosphere sorting from back to front
-	sort(translucentEntities.begin(), translucentEntities.end(), [&](int i, int j)
-	{
-		const float distI = distance(info.entityStates[i].getPosition(), info.viewPos);
-		const float distJ = distance(info.entityStates[j].getPosition(), info.viewPos);
-		return distI > distJ;
-	});
+	sort(translucentEntities.begin(), translucentEntities.end(), fartherFun);
 
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	profiler.begin("Entities");
@@ -847,7 +850,7 @@ void RendererGL::saveScreenshot()
 }
 
 void RendererGL::renderHdr(
-	const vector<uint32_t> &closeEntities,
+	const vector<EntityHandle> &closeEntities,
 	const DynamicData &ddata)
 {
 	// Viewport
@@ -875,12 +878,13 @@ void RendererGL::renderHdr(
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
 	// Entity rendering
-	for (uint32_t i : closeEntities)
+	for (const auto &h : closeEntities)
 	{
-		auto &data = bodyData[i];
-		const bool star = entityParams[i].isStar();
-		const bool hasAtmo = entityParams[i].hasAtmo();
-		const bool hasRing = entityParams[i].hasRing();
+		auto &data = bodyData[h];
+		const EntityParam &param = h.getParam();
+		const bool star = param.isStar();
+		const bool hasAtmo = param.hasAtmo();
+		const bool hasRing = param.hasRing();
 		if (star) pipelineSun.bind();
 		else if (hasAtmo)
 		{
@@ -896,7 +900,7 @@ void RendererGL::renderHdr(
 
 		// Bind entity UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			ddata.bodyUBOs[i].getOffset(),
+			ddata.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
 		// Bind samplers
@@ -922,7 +926,7 @@ void RendererGL::renderHdr(
 		glBindTextures(2, texs.size(), texs.data());
 
 		if (star) glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[0]);
-		data.bodyModel.draw(true);
+		data.bodyDraw.draw(true);
 		if (star)
 		{
 			glEndQuery(GL_SAMPLES_PASSED);
@@ -930,7 +934,7 @@ void RendererGL::renderHdr(
 			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 			glDepthMask(GL_FALSE);
 			glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[1]);
-			data.bodyModel.draw(true);
+			data.bodyDraw.draw(true);
 			glEndQuery(GL_SAMPLES_PASSED);
 			glDepthFunc(GL_LESS);
 			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -956,7 +960,7 @@ void RendererGL::renderHdr(
 }
 
 void RendererGL::renderEntityFlares(
-	const vector<uint32_t> &flares,
+	const vector<EntityHandle> &flares,
 	const DynamicData &data)
 {
 	glViewport(0,0, windowWidth, windowHeight);
@@ -974,18 +978,18 @@ void RendererGL::renderEntityFlares(
 	glBindSampler(1, 0);
 	glBindTextureUnit(1, flareTex);
 
-	for (uint32_t i : flares)
+	for (const auto &h : flares)
 	{
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-			data.bodyUBOs[i].getOffset(),
+			data.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
-		flareModel.draw();
+		flareDraw.draw();
 	}
 }
 
 void RendererGL::renderTranslucent(
-	const vector<uint32_t> &translucentEntities,
+	const vector<EntityHandle> &translucentEntities,
 	const DynamicData &data)
 {
 	// Viewport
@@ -999,7 +1003,7 @@ void RendererGL::renderTranslucent(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 
-	for (uint32_t i : translucentEntities)
+	for (const auto &h : translucentEntities)
 	{
 		// Bind Scene UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
@@ -1007,14 +1011,13 @@ void RendererGL::renderTranslucent(
 			sizeof(SceneUBO));
 		// Bind Entity UBO
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
-			data.bodyUBOs[i].getOffset(),
+			data.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
-		bool hasRing = entityParams[i].hasRing();
-		bool hasAtmo = entityParams[i].hasAtmo();
+		const bool hasRing = h.getParam().hasRing();
+		const bool hasAtmo = h.getParam().hasAtmo();
 
-		auto &data = bodyData[i];
-		DrawCommand ringModel = data.ringModel;
+		const auto &data = bodyData[h];
 
 		const vector<GLuint> samplers = {
 			atmoSampler,
@@ -1035,21 +1038,21 @@ void RendererGL::renderTranslucent(
 		if (hasRing)
 		{
 			pipelineRingFar.bind();
-			ringModel.draw(true);
+			data.ringDraw.draw(true);
 		}
 
 		// Atmosphere
 		if (hasAtmo)
 		{
 			pipelineAtmo.bind();
-			data.bodyModel.draw(true);
+			data.bodyDraw.draw(true);
 		}
 
 		// Near rings
 		if (hasRing)
 		{
 			pipelineRingNear.bind();
-			ringModel.draw(true);
+			data.ringDraw.draw(true);
 		}
 	}
 }
@@ -1205,14 +1208,14 @@ void RendererGL::renderSunFlare(
 
 	// Bind Scene UBO
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-		data.bodyUBOs[sunId].getOffset(),
+		data.bodyUBOs.at(sun).getOffset(),
 		sizeof(BodyUBO));
 
 	// Bind textures
 	glBindSampler(1, 0);
 	glBindTextureUnit(1, flareTex);
 
-	flareModel.draw();
+	flareDraw.draw();
 }
 
 void RendererGL::renderGui()
@@ -1221,15 +1224,15 @@ void RendererGL::renderGui()
 	gui.display(windowWidth, windowHeight);
 }
 
-void RendererGL::loadTextures(const vector<uint32_t> &texLoadEntities)
+void RendererGL::loadTextures(const vector<EntityHandle> &texLoadEntities)
 {
 	// Texture loading
-	for (uint32_t i : texLoadEntities)
+	for (const auto &h : texLoadEntities)
 	{
-		const Entity param = entityParams[i];
-		auto &data = bodyData[i];
+		const EntityParam param = h.getParam();
+		auto &data = bodyData[h];
 		// Textures & samplers
-		data.diffuse = streamer.createTex(param.getSphere().getDiffuseFilename());
+		data.diffuse = streamer.createTex(param.getModel().getDiffuseFilename());
 		if (param.hasClouds())
 			data.cloud = streamer.createTex(param.getClouds().getFilename());
 		if (param.hasNight())
@@ -1241,12 +1244,12 @@ void RendererGL::loadTextures(const vector<uint32_t> &texLoadEntities)
 	}
 }
 
-void RendererGL::unloadTextures(const vector<uint32_t> &texUnloadEntities)
+void RendererGL::unloadTextures(const vector<EntityHandle> &texUnloadEntities)
 {
 	// Texture unloading
-	for (uint32_t i : texUnloadEntities)
+	for (const auto &h : texUnloadEntities)
 	{
-		auto &data = bodyData[i];
+		auto &data = bodyData[h];
 
 		// Reset variables
 		data.texLoaded = false;
@@ -1270,14 +1273,14 @@ void RendererGL::uploadLoadedTextures()
 RendererGL::BodyUBO RendererGL::getBodyUBO(
 	const float fovy, const float exp,
 	const dvec3 &viewPos, const mat4 &projMat, const mat4 &viewMat,
-	const EntityState &state, const Entity &params,
+	const EntityState &state, const EntityParam &params,
 	const BodyData &data)
 {
 	const vec3 bodyPos = state.getPosition() - viewPos;
 
 	// Entity rotation
 	const vec3 north = vec3(0,0,1);
-	const vec3 rotAxis = params.getSphere().getRotationAxis();
+	const vec3 rotAxis = params.getModel().getRotationAxis();
 	const quat q = rotate(quat(), 
 		(float)acos(dot(north, rotAxis)), 
 		cross(north, rotAxis))*
@@ -1287,13 +1290,13 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 	const mat4 modelMat = 
 		translate(mat4(), bodyPos)*
 		mat4_cast(q)*
-		scale(mat4(), vec3(params.getSphere().getRadius()));
+		scale(mat4(), vec3(params.getModel().getRadius()));
 
 	// Atmosphere matrix
 	const mat4 atmoMat = (params.hasAtmo())?
 		translate(mat4(), bodyPos)*
 		mat4_cast(q)*
-		scale(mat4(), -vec3(params.getSphere().getRadius()+params.getAtmo().getMaxHeight())):
+		scale(mat4(), -vec3(params.getModel().getRadius()+params.getAtmo().getMaxHeight())):
 		mat4(0.0);
 
 	// Ring matrices
@@ -1331,7 +1334,7 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 	if (visible)
 	{
 		const float dist = length(bodyPos);
-		const float radius = params.getSphere().getRadius();
+		const float radius = params.getModel().getRadius();
 		float flareSize = 0.0;
 		if (params.isStar())
 		{
@@ -1367,7 +1370,7 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 			
 			flareColor = vec4(
 				clamp(20.f*radius*radius*phase/(cutDist*cutDist),0.f,10.f)*
-				params.getSphere().getMeanColor()
+				params.getModel().getMeanColor()
 				,1.0);
 		}
 		flareMat = translate(mat4(), screen)*
@@ -1413,7 +1416,7 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 		?params.getNight().getIntensity():0.0;
 	ubo.starBrightness = params.isStar()
 		?params.getStar().getBrightness():0.0;
-	ubo.radius = params.getSphere().getRadius();
+	ubo.radius = params.getModel().getRadius();
 	ubo.atmoHeight = params.hasAtmo()?params.getAtmo().getMaxHeight():0.0;
 
 	return ubo;
