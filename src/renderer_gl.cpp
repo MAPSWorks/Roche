@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <array>
+#include <functional>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/constants.hpp>
@@ -33,39 +34,23 @@ GLenum indexType()
 	}
 }
 
-vector<DrawCommand> getCommands(
+DrawCommand getCommand(
 	GLuint vao, 
 	GLenum indexType,
 	Buffer &vertexBuffer,
 	Buffer &indexBuffer,
-	const vector<Mesh> &infos)
+	const Mesh &mesh)
 {
-	vector<DrawCommand> commands(infos.size());
-	vector<pair<BufferRange, BufferRange>> ranges(infos.size());
+	BufferRange vertexRange = vertexBuffer.assignVertices(
+		mesh.getVertices().size(), sizeof(Vertex), mesh.getVertices().data());
+	BufferRange indexRange = indexBuffer.assignIndices(
+		mesh.getIndices().size(), sizeof(Index), mesh.getIndices().data());
 
-	for (size_t i=0;i<infos.size();++i)
-	{
-		BufferRange vertexRange = vertexBuffer.assignVertices(infos[i].getVertices().size(), sizeof(Vertex));
-		BufferRange indexRange = indexBuffer.assignIndices(infos[i].getIndices().size(), sizeof(Index));
-		ranges[i] = make_pair(vertexRange, indexRange);
-		commands[i] = DrawCommand(
-			vao, GL_TRIANGLES, indexType,
-			{
-				{0, vertexBuffer.getId(), vertexRange, sizeof(Vertex)}
-			},
-			{indexBuffer.getId(), indexRange, infos[i].getIndices().size()});
-	}
-
-	vertexBuffer.validate();
-	indexBuffer.validate();
-
-	for (size_t i=0;i<infos.size();++i)
-	{
-		vertexBuffer.write(ranges[i].first, infos[i].getVertices().data());
-		indexBuffer.write(ranges[i].second, infos[i].getIndices().data());
-	}
-
-	return commands;
+	return DrawCommand(vao, GL_TRIANGLES,
+		{
+			{0, vertexBuffer.getId(), vertexRange, sizeof(Vertex)}
+		},
+		{indexType, indexBuffer.getId(), indexRange, mesh.getIndices().size()});
 }
 
 void RendererGL::createMeshes()
@@ -78,59 +63,59 @@ void RendererGL::createMeshes()
 		Buffer::Usage::STATIC, 
 		Buffer::Access::WRITE_ONLY);
 
-	const int modelCount = 2;
-	const int flareMeshId  = 0;
-	const int sphereMeshId = 1;
-
-	// Static vertex & index data
-	vector<Mesh> modelInfos(modelCount);
-
 	// Fullscreen tri (no vertex data)
 	_fullscreenTri = DrawCommand(_vertexArray, GL_TRIANGLES, 3, {});
 
 	// Flare
 	const int detail = 8;
-	modelInfos[flareMeshId] = generateFlareMesh(detail);
+	auto flareMesh = generateFlareMesh(detail);
 
 	// Sphere
 	const int entityMeridians = 32;
 	const int entityRings = 32;
-	modelInfos[sphereMeshId] = generateSphere(entityMeridians, entityRings);
+	auto sphereMesh = generateSphere(entityMeridians, entityRings);
 
-	// Load custom models
-	map<EntityHandle, int> bodyMeshId;
-	map<EntityHandle, int> ringMeshId;
+	// Load ring models
+	map<EntityHandle, Mesh> ringMeshes;
 	for (const auto &h: _entityCollection->getBodies())
 	{
 		const EntityParam param = h.getParam();
-		bodyMeshId[h] = sphereMeshId;
 		// Rings
 		if (param.hasRing())
 		{
-			ringMeshId[h] = modelInfos.size();
 			const float near = param.getRing().getInnerDistance();
 			const float far = param.getRing().getOuterDistance();
 			const int ringMeridians = 32;
-			modelInfos.push_back(generateRingMesh(ringMeridians, near, far));
+			ringMeshes[h] = generateRingMesh(ringMeridians, near, far);
 		}
 	}
 
-	vector<DrawCommand> commands = getCommands(
-		_vertexArray, indexType(),
-		_vertexBuffer,
-		_indexBuffer,
-		modelInfos);
+	// Shorter mesh->command function
+	auto command = bind(getCommand, _vertexArray,
+		indexType(), ref(_vertexBuffer), ref(_indexBuffer), std::placeholders::_1);
 
-	_flareDraw  = commands[flareMeshId];
-	_sphereDraw = commands[sphereMeshId];
+	// Get commands
+	_flareDraw  = command(flareMesh);
+	_sphereDraw = command(sphereMesh);
 
+	// Get ring commands
+	map<EntityHandle, DrawCommand> ringCommands;
+	for (const auto &p : ringMeshes)
+	{
+		ringCommands[p.first] = command(p.second);
+	}
+
+	// Validate & write buffers
+	_vertexBuffer.validate();
+	_indexBuffer.validate();
+
+	// Assign commands to bodies
 	for (const auto &h: _entityCollection->getBodies())
 	{
 		auto &data = _bodyData[h];
-		data.bodyDraw = commands[bodyMeshId[h]];
-		const int ringId = ringMeshId[h];
-		if (ringId != -1)
-			data.ringDraw   = commands[ringId];
+		data.bodyDraw = _sphereDraw;
+		auto it = ringCommands.find(h);
+		if (it != ringCommands.end()) data.ringDraw = it->second;
 	}
 }
 
@@ -776,7 +761,7 @@ void RendererGL::render(const RenderInfo &info)
 	sort(translucentEntities.begin(), translucentEntities.end(), fartherFun);
 
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	_profiler.begin("Entities");
+	_profiler.begin("Bodies");
 	renderHdr(closeEntities, currentData);
 	_profiler.end();
 	_profiler.begin("Flares");

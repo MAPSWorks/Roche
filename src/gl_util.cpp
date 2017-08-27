@@ -109,7 +109,8 @@ uint32_t align(const uint32_t offset, const uint32_t align)
 
 BufferRange Buffer::assign(
 	const uint32_t size, 
-	const uint32_t stride)
+	const uint32_t stride,
+	const void* data)
 {
 	if (_validated) 
 		throw runtime_error("Can't assign memory after structure is set");
@@ -118,29 +119,40 @@ BufferRange Buffer::assign(
 	const BufferRange range = {_lastOffset, size};
 	_lastOffset += size;
 
+	if (data)
+	{
+		uint8_t *dataCpy = new uint8_t[range.getSize()];
+		memcpy(dataCpy, data, range.getSize());
+		_toWrite.push_back(make_pair(range, unique_ptr<uint8_t>(dataCpy))); 
+	}
+
 	return range;
 }
 
-BufferRange Buffer::assignVertices(uint32_t count, uint32_t stride)
+BufferRange Buffer::assignVertices(uint32_t count, uint32_t stride,
+	const void* data)
 {
-	return assign(count*stride, stride);
+	return assign(count*stride, stride, data);
 }
 
-BufferRange Buffer::assignIndices(uint32_t count, uint32_t stride)
+BufferRange Buffer::assignIndices(uint32_t count, uint32_t stride,
+	const void* data)
 {
-	return assign(count*stride, stride);
+	return assign(count*stride, stride, data);
 }
 
-BufferRange Buffer::assignUBO(const uint32_t size)
+BufferRange Buffer::assignUBO(const uint32_t size,
+	const void* data)
 {
 	getLimits();
-	return assign(size, _alignUBO);
+	return assign(size, _alignUBO, data);
 }
 
-BufferRange Buffer::assignSSBO(const uint32_t size)
+BufferRange Buffer::assignSSBO(const uint32_t size,
+	const void* data)
 {
 	getLimits();
-	return assign(size, _alignSSBO);
+	return assign(size, _alignSSBO, data);
 }
 
 void Buffer::storageStatic()
@@ -198,6 +210,12 @@ void Buffer::validate()
 		else storageStatic();
 	}
 	_validated = true;
+	// Writes
+	for (const auto &p : _toWrite)
+	{
+		write(p.first, p.second.get());
+	}
+	_toWrite.clear();
 }
 
 void Buffer::write(const BufferRange range, const void *data)
@@ -264,14 +282,13 @@ void *Buffer::getPtr() const
 DrawCommand::DrawCommand(
 	GLuint vao,
 	GLenum mode,
-	GLenum type,
 	const vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo)
 {
 	_indexed = true;
 	_vao = vao;
 	_mode = mode;
 	_count = indexInfo.count;
-	_type = type;
+	_type = indexInfo.type;
 	_indices = (void*)(intptr_t)indexInfo.range.getOffset();
 	_elementBuffer = indexInfo.buffer;
 	_vertexInfo = vertexInfo;

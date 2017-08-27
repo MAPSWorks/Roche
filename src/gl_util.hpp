@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <map>
 #include <memory>
+#include <utility>
 
 #include "graphics_api.hpp"
 #include "ddsloader.hpp"
@@ -66,12 +66,13 @@ public:
 
 	struct IndexInfo
 	{
+		GLenum type;
 		GLuint buffer;
 		BufferRange range;
 		size_t count;
 	};
 	/** Indexed */
-	DrawCommand(GLuint vao, GLenum mode, GLenum type,
+	DrawCommand(GLuint vao, GLenum mode,
 		const std::vector<VertexInfo> &vertexInfo, const IndexInfo &indexInfo);
 	/** Not Indexed */
 	DrawCommand(GLuint vao, GLenum mode, size_t count, 
@@ -141,28 +142,28 @@ public:
 	 * @param stride size in bytes between elements (or alignment requirements)
 	 * @return reserved range
 	 */
-	BufferRange assign(uint32_t size, uint32_t stride);
+	BufferRange assign(uint32_t size, uint32_t stride, const void* data=nullptr);
 	/**
 	 * Reserves a range of vertex data
 	 * @param count number of vertices
 	 * @param stride size in bytes of a vertex
 	 * @return reserved range
 	 */
-	BufferRange assignVertices(uint32_t count, uint32_t stride);
+	BufferRange assignVertices(uint32_t count, uint32_t stride, const void* data=nullptr);
 	/**
 	 * Reserves a range of index data
 	 * @param count number of indices
 	 * @param stride size in bytes of an index
 	 * @return reserved range
 	 */
-	BufferRange assignIndices(uint32_t count, uint32_t stride);
+	BufferRange assignIndices(uint32_t count, uint32_t stride, const void* data=nullptr);
 	/**
 	 * Reserves a range for a Uniform Buffer Object
 	 * (GL Context sensitve method!)
 	 * @param size size in bytes
 	 * @return reserved range
 	 */
-	BufferRange assignUBO(uint32_t size);
+	BufferRange assignUBO(uint32_t size, const void* data=nullptr);
 	/**
 	 * Reserves a range for a Shader Storage Buffer Object
 	 * (GL Context sensitve method!)
@@ -170,7 +171,7 @@ public:
 	 * @param data optional data
 	 * @return reserved range
 	 */
-	BufferRange assignSSBO(uint32_t size);
+	BufferRange assignSSBO(uint32_t size, const void* data=nullptr);
 
 	/**
 	 * Locks assigned ranges so writing and reading can take place
@@ -219,6 +220,8 @@ private:
 	Usage _usage = Usage::STATIC;
 	/// Buffer access flags
 	Access _access = Access::WRITE_ONLY;
+
+	std::vector<std::pair<BufferRange, std::unique_ptr<uint8_t>>> _toWrite;
 
 	/// Minimum alignment between UBOs
 	static uint32_t _alignUBO;

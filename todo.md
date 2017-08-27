@@ -11,12 +11,14 @@
 - [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 ### Stuff for later
+- [ ] Earth water moving normal map
 - [ ] Support custom models (asteroids, phobos, deimos)
 - [ ] Heightmap applied in tese shader
 - [ ] Vulkan implementation, one day
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Make a assign+write method in Buffer
 - [x] Remove fullscreen tri model
 - [x] Enforce the _member notation
 - [x] Separate barycenters from bodies
