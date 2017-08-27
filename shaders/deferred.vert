@@ -5,9 +5,9 @@ out gl_PerVertex
   float gl_ClipDistance[];
 };
 
-layout(location = 0) in vec4 inPosition;
+const vec2 pos[3] = {vec2(-1,-1),vec2(3,-1),vec2(-1,3)};
 
 void main()
 {
-	gl_Position = inPosition;
+	gl_Position = vec4(pos[gl_VertexID],0,1);
 }

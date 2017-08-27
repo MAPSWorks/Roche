@@ -78,16 +78,15 @@ void RendererGL::createMeshes()
 		Buffer::Usage::STATIC, 
 		Buffer::Access::WRITE_ONLY);
 
-	const int modelCount = 3;
-	const int fsTriMeshId  = 0;
-	const int flareMeshId  = 1;
-	const int sphereMeshId = 2;
+	const int modelCount = 2;
+	const int flareMeshId  = 0;
+	const int sphereMeshId = 1;
 
 	// Static vertex & index data
 	vector<Mesh> modelInfos(modelCount);
 
-	// Fullscreen tri
-	modelInfos[fsTriMeshId] = generateFullscreenTri();
+	// Fullscreen tri (no vertex data)
+	_fullscreenTri = DrawCommand(_vertexArray, GL_TRIANGLES, 3, {});
 
 	// Flare
 	const int detail = 8;
@@ -122,9 +121,8 @@ void RendererGL::createMeshes()
 		_indexBuffer,
 		modelInfos);
 
-	_fullscreenTri = commands[fsTriMeshId];
-	_flareDraw     = commands[flareMeshId];
-	_sphereDraw        = commands[sphereMeshId];
+	_flareDraw  = commands[flareMeshId];
+	_sphereDraw = commands[sphereMeshId];
 
 	for (const auto &h: _entityCollection->getBodies())
 	{

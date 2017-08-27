@@ -78,16 +78,6 @@ Mesh generateSphere(
 	return Mesh(vertices, indices);
 }
 
-Mesh generateFullscreenTri()
-{
-	vector<Vertex> vertices(3);
-	vertices[0].position = vec3(-2,-1,0);
-	vertices[1].position = vec3( 2,-1,0);
-	vertices[2].position = vec3( 0, 4,0);
-
-	return Mesh(vertices, {0,1,2});
-}
-
 Mesh generateFlareMesh(const int detail)
 {
 	vector<Vertex> vertices((detail+1)*2);

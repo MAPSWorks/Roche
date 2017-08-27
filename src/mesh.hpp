@@ -26,8 +26,6 @@ private:
 
 Mesh generateSphere(int meridians, int rings);
 
-Mesh generateFullscreenTri();
-
 Mesh generateFlareMesh(int detail);
 
 Mesh generateRingMesh(int meridians, float near, float far);

@@ -7,8 +7,7 @@
 - [ ] Fix planet orientations at epoch
 - [ ] Display some kind of planet description
 - [ ] Split up other textures
-- [ ] Opening screen with controls (can be closed with any input after 1 sec), waits for textures to load
-- [ ] Names of distant planets next to them (fade in when planet into view for 1~2sec)
+- [ ] Opening screen with controls (can be closed with any input after loading is done)
 - [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 ### Stuff for later
@@ -18,6 +17,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Remove fullscreen tri model
 - [x] Enforce the _member notation
 - [x] Separate barycenters from bodies
 - [x] Huge refactor for entities
