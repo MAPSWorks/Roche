@@ -32,12 +32,12 @@ std::string generateScreenshotName();
 
 Game::Game()
 {
-	renderer.reset(new RendererGL());
+	_renderer.reset(new RendererGL());
 }
 
 Game::~Game()
 {
-	renderer->destroy();
+	_renderer->destroy();
 
 	glfwTerminate();
 }
@@ -66,21 +66,21 @@ void Game::loadSettingsFile()
 
 		sweeper video(swp("video"));
 		auto fs = video("fullscreen");
-		fullscreen = (fs.is_null())?true:(bool)fs.value<boolean>();
+		_fullscreen = (fs.is_null())?true:(bool)fs.value<boolean>();
 
-		if (!fullscreen)
+		if (!_fullscreen)
 		{
-			width = video("width").value<number>();
-			height = video("height").value<number>();
+			_width = video("width").value<number>();
+			_height = video("height").value<number>();
 		}
 
 		sweeper graphics(swp("graphics"));
-		maxTexSize = graphics("maxTexSize").value<number>();
-		msaaSamples = graphics("msaaSamples").value<number>();
-		syncTexLoading = graphics("syncTexLoading").value<boolean>();
+		_maxTexSize = graphics("maxTexSize").value<number>();
+		_msaaSamples = graphics("msaaSamples").value<number>();
+		_syncTexLoading = graphics("syncTexLoading").value<boolean>();
 
 		sweeper controls(swp("controls"));
-		sensitivity = controls("sensitivity").value<number>();
+		_sensitivity = controls("sensitivity").value<number>();
 	} 
 	catch (parse_error &e)
 	{
@@ -90,24 +90,24 @@ void Game::loadSettingsFile()
 
 void Game::scrollFun(int offset)
 {
-	if (switchPhase == SwitchPhase::IDLE)
+	if (_switchPhase == SwitchPhase::IDLE)
 	{
 		// FOV zoom/unzoom when alt key held
-		if (glfwGetKey(win, GLFW_KEY_LEFT_ALT))
+		if (glfwGetKey(_win, GLFW_KEY_LEFT_ALT))
 		{
-			viewFovy = clamp(viewFovy*pow(0.5f, 
-				(float)offset*sensitivity*100),
+			_viewFovy = clamp(_viewFovy*pow(0.5f, 
+				(float)offset*_sensitivity*100),
 				radians(0.1f), radians(40.f));
 		}
 		// Exposure +/-
-		else if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL))
+		else if (glfwGetKey(_win, GLFW_KEY_LEFT_CONTROL))
 		{
-			exposure = clamp(exposure+0.1f*offset, -4.f, 4.f);
+			_exposure = clamp(_exposure+0.1f*offset, -4.f, 4.f);
 		}
 		// Distance zoom/unzoom
 		else
 		{
-			viewSpeed.z -= 40*offset*sensitivity;
+			_viewSpeed.z -= 40*offset*_sensitivity;
 		}
 	}
 }
@@ -117,7 +117,7 @@ void Game::init()
 	loadSettingsFile();
 	loadEntityFiles();
 
-	viewPolar.z = getFocusedBody().getParam().getModel().getRadius()*4;
+	_viewPolar.z = getFocusedBody().getParam().getModel().getRadius()*4;
 
 	// Window & context creation
 	if (!glfwInit())
@@ -130,29 +130,29 @@ void Game::init()
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
-	renderer->windowHints();
+	_renderer->windowHints();
 
-	if (fullscreen)
+	if (_fullscreen)
 	{
-		width = mode->width;
-		height = mode->height;
+		_width = mode->width;
+		_height = mode->height;
 	}
-	win = glfwCreateWindow(width, height, "Roche", 
-		fullscreen?monitor:nullptr, 
+	_win = glfwCreateWindow(_width, _height, "Roche", 
+		_fullscreen?monitor:nullptr, 
 		nullptr);
 
-	glfwSetWindowUserPointer(win, this);
+	glfwSetWindowUserPointer(_win, this);
 
-	glfwSetScrollCallback(win, [](GLFWwindow* win, double, double yoffset){
+	glfwSetScrollCallback(_win, [](GLFWwindow* win, double, double yoffset){
 		((Game*)glfwGetWindowUserPointer(win))->scrollFun(yoffset);
 	});
 
-	if (!win)
+	if (!_win)
 	{
 		glfwTerminate();
 		throw std::runtime_error("Can't open window");
 	}
-	glfwMakeContextCurrent(win);
+	glfwMakeContextCurrent(_win);
 
 	glewExperimental = true;
 	const GLenum err = glewInit();
@@ -161,18 +161,18 @@ void Game::init()
 		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
 	}
 
-	// Set epoch as current time (get time since 1970 + adjust for 2017)
-	epoch = (long)time(NULL) - 1483228800;
+	// Set _epoch as current time (get time since 1970 + adjust for 2017)
+	_epoch = (long)time(NULL) - 1483228800;
 
 	// Renderer init
-	renderer->init({
-		&entityCollection, 
-		starMapFilename, 
-		starMapIntensity, 
-		msaaSamples, 
-		maxTexSize, 
-		syncTexLoading, 
-		width, height});
+	_renderer->init({
+		&_entityCollection, 
+		_starMapFilename, 
+		_starMapIntensity, 
+		_msaaSamples, 
+		_maxTexSize, 
+		_syncTexLoading, 
+		_width, _height});
 }
 
 template<class T>
@@ -323,12 +323,12 @@ void Game::loadEntityFiles()
 		object obj = p.parse(fileContent.c_str());
 		sweeper swp(&obj);
 
-		ambientColor = (float)get<double>(swp("ambientColor"));
+		_ambientColor = (float)get<double>(swp("ambientColor"));
 		std::string startingBody = std::string(swp("startingBody").value<string>());
 
 		sweeper starMap(swp("starMap"));
-		starMapFilename = get<std::string>(starMap("diffuse"));
-		starMapIntensity = (float)get<double>(starMap("intensity"));
+		_starMapFilename = get<std::string>(starMap("diffuse"));
+		_starMapIntensity = (float)get<double>(starMap("intensity"));
 
 		const float axialTilt = radians(get<double>(swp("axialTilt")));
 		const mat3 axialMat = mat3(rotate(mat4(), axialTilt, vec3(0,-1,0)));
@@ -411,14 +411,14 @@ void Game::loadEntityFiles()
 			}
 			entities.push_back(entity);
 		}
-		entityCollection.init(entities);
+		_entityCollection.init(entities);
 
 		// Set focused body
-		for (int i=0;i<(int)entityCollection.getBodies().size();++i)
+		for (int i=0;i<(int)_entityCollection.getBodies().size();++i)
 		{
-			if (entityCollection.getBodies()[i].getParam().getName() == startingBody)
+			if (_entityCollection.getBodies()[i].getParam().getName() == startingBody)
 			{
-				focusedBodyId = i;
+				_focusedBodyId = i;
 				break;
 			}
 		}
@@ -431,14 +431,14 @@ void Game::loadEntityFiles()
 
 bool Game::isPressedOnce(const int key)
 {
-	if (glfwGetKey(win, key))
+	if (glfwGetKey(_win, key))
 	{
-		if (keysHeld[key]) return false;
-		else return (keysHeld[key] = true);
+		if (_keysHeld[key]) return false;
+		else return (_keysHeld[key] = true);
 	}
 	else
 	{
-		return (keysHeld[key] = false);
+		return (_keysHeld[key] = false);
 	}
 }
 
@@ -461,12 +461,12 @@ bool isLeapYear(int year)
 	return ((year%4==0) && (year%100!=0)) || (year%400==0);
 }
 
-std::string getFormattedTime(long epochInSeconds)
+std::string getFormattedTime(long _epochInSeconds)
 {
-	const int seconds = epochInSeconds%60;
-	const int minutes = (epochInSeconds/60)%60;
-	const int hours = (epochInSeconds/3600)%24;
-	const int days = epochInSeconds/86400;
+	const int seconds = _epochInSeconds%60;
+	const int minutes = (_epochInSeconds/60)%60;
+	const int hours = (_epochInSeconds/3600)%24;
+	const int days = _epochInSeconds/86400;
 
 	int year = 2017;
 	int i = 0;
@@ -518,21 +518,21 @@ std::string getFormattedTime(long epochInSeconds)
 
 void Game::update(const double dt)
 {
-	epoch += timeWarpValues[timeWarpIndex]*dt;
+	_epoch += _timeWarpValues[_timeWarpIndex]*dt;
 
 	std::map<EntityHandle, dvec3> relativePositions;
 	// Entity state update
-	for (const auto &h : entityCollection.getAll())
+	for (const auto &h : _entityCollection.getAll())
 	{
 		relativePositions[h] = (!h.getParent().exists() || !h.getParam().hasOrbit())?
 			dvec3(0.0):
-			h.getParam().getOrbit().computePosition(epoch);
+			h.getParam().getOrbit().computePosition(_epoch);
 	}
 
 	std::map<EntityHandle, EntityState> state;
 
 	// Entity absolute position update
-	for (auto h : entityCollection.getAll())
+	for (auto h : _entityCollection.getAll())
 	{
 		dvec3 absPosition = relativePositions[h];
 		auto parent = h.getParent();
@@ -545,57 +545,57 @@ void Game::update(const double dt)
 		// Entity Angle
 		const float rotationAngle = 
 			(2.0*pi<float>())*
-			fmod(epoch/h.getParam().getModel().getRotationPeriod(),1.f);
+			fmod(_epoch/h.getParam().getModel().getRotationPeriod(),1.f);
 
 		// Cloud Displacement
 		const float cloudDisp = [&]{
 			if (h.getParam().hasClouds()) return 0.0;
 			const float period = h.getParam().getClouds().getPeriod();
-			return (period)?fmod(-epoch/period, 1.f):0.f;
+			return (period)?fmod(-_epoch/period, 1.f):0.f;
 		}();
 
 		state[h] = EntityState(absPosition, rotationAngle, cloudDisp);
 	}
 
-	entityCollection.setState(state);
+	_entityCollection.setState(state);
 	
 	// Wireframe on/off
 	if (isPressedOnce(GLFW_KEY_W))
 	{
-		wireframe = !wireframe;
+		_wireframe = !_wireframe;
 	}
 
 	// Bloom on/off
 	if (isPressedOnce(GLFW_KEY_B))
 	{
-		bloom = !bloom;
+		_bloom = !_bloom;
 	}
 
 	// Mouse move
 	double posX, posY;
-	glfwGetCursorPos(win, &posX, &posY);
+	glfwGetCursorPos(_win, &posX, &posY);
 
-	if (switchPhase == SwitchPhase::IDLE)
+	if (_switchPhase == SwitchPhase::IDLE)
 	{
 		updateIdle(dt, posX, posY);
 	}
-	else if (switchPhase == SwitchPhase::TRACK)
+	else if (_switchPhase == SwitchPhase::TRACK)
 	{
 		updateTrack(dt);
 	}
-	else if (switchPhase == SwitchPhase::MOVE)
+	else if (_switchPhase == SwitchPhase::MOVE)
 	{
 		updateMove(dt);
 	}
 
 	// Mouse reset
-	preMousePosX = posX;
-	preMousePosY = posY;
+	_preMousePosX = posX;
+	_preMousePosY = posY;
 
 	// Screenshot
 	if (isPressedOnce(GLFW_KEY_F12))
 	{
-		renderer->takeScreenshot(generateScreenshotName());
+		_renderer->takeScreenshot(generateScreenshotName());
 	}
 
 	// Focused entities
@@ -603,17 +603,17 @@ void Game::update(const double dt)
 		getTexLoadBodies(getFocusedBody());
 
 	// Time formatting
-	const long epochInSeconds = floor(epoch);
-	const std::string formattedTime = getFormattedTime(epochInSeconds);
+	const long _epochInSeconds = floor(_epoch);
+	const std::string formattedTime = getFormattedTime(_epochInSeconds);
 		
 	// Scene rendering
-	renderer->render({
-		viewPos, viewFovy, viewDir,
-		exposure, ambientColor, wireframe, bloom, texLoadBodies, 
+	_renderer->render({
+		_viewPos, _viewFovy, _viewDir,
+		_exposure, _ambientColor, _wireframe, _bloom, texLoadBodies, 
 		getDisplayedBody().getParam().getDisplayName(),
-		bodyNameFade, formattedTime});
+		_bodyNameFade, formattedTime});
 
-	auto a = renderer->getProfilerTimes();
+	auto a = _renderer->getProfilerTimes();
 
 	updateProfiling(a);
 
@@ -622,41 +622,41 @@ void Game::update(const double dt)
 	{
 		std::cout << "Current Frame: " << std::endl;
 		displayProfiling(a);
-		auto b = computeAverage(fullTimes, numFrames);
+		auto b = computeAverage(_fullTimes, _numFrames);
 		std::cout << "Average: " << std::endl;
 		displayProfiling(b);
 		std::cout << "Max: " << std::endl;
-		displayProfiling(maxTimes);
+		displayProfiling(_maxTimes);
 	}
 
-	glfwSwapBuffers(win);
+	glfwSwapBuffers(_win);
 	glfwPollEvents();
 }
 
 bool Game::isRunning()
 {
-	return !glfwGetKey(win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(win);
+	return !glfwGetKey(_win, GLFW_KEY_ESCAPE) && !glfwWindowShouldClose(_win);
 }
 
 EntityHandle Game::getFocusedBody()
 {
-	return entityCollection.getBodies()[focusedBodyId];
+	return _entityCollection.getBodies()[_focusedBodyId];
 }
 
 EntityHandle Game::getDisplayedBody()
 {
-	return entityCollection.getBodies()[bodyNameId];
+	return _entityCollection.getBodies()[_bodyNameId];
 }
 
 EntityHandle Game::getPreviousBody()
 {
-	return entityCollection.getBodies()[switchPreviousBodyId];
+	return _entityCollection.getBodies()[_switchPreviousBodyId];
 }
 
 int Game::chooseNextBody(bool direction)
 {
-	int id = focusedBodyId+(direction?1:-1);
-	int size = entityCollection.getBodies().size();
+	int id = _focusedBodyId+(direction?1:-1);
+	int size = _entityCollection.getBodies().size();
 	if (id < 0) id += size;
 	else if (id >= size) id -= size;
 	return id;
@@ -664,109 +664,109 @@ int Game::chooseNextBody(bool direction)
 
 void Game::updateIdle(float dt, double posX, double posY)
 {
-	const vec2 move = {-posX+preMousePosX, posY-preMousePosY};
+	const vec2 move = {-posX+_preMousePosX, posY-_preMousePosY};
 
-	const bool mouseButton1 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_1);
-	const bool mouseButton2 = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_2);
+	const bool mouseButton1 = glfwGetMouseButton(_win, GLFW_MOUSE_BUTTON_1);
+	const bool mouseButton2 = glfwGetMouseButton(_win, GLFW_MOUSE_BUTTON_2);
 
-	if ((mouseButton1 || mouseButton2) && !dragging)
+	if ((mouseButton1 || mouseButton2) && !_dragging)
 	{
-		dragging = true;
+		_dragging = true;
 	}
-	else if (dragging && !(mouseButton1 || mouseButton2))
+	else if (_dragging && !(mouseButton1 || mouseButton2))
 	{
-		dragging = false;
+		_dragging = false;
 	}
 
 	// Drag view around
-	if (dragging)
+	if (_dragging)
 	{
 		if (mouseButton1)
 		{	
-			viewSpeed.x += move.x*sensitivity;
-			viewSpeed.y += move.y*sensitivity;
+			_viewSpeed.x += move.x*_sensitivity;
+			_viewSpeed.y += move.y*_sensitivity;
 			for (int i=0;i<2;++i)
 			{
-				if (viewSpeed[i] > maxViewSpeed) viewSpeed[i] = maxViewSpeed;
-				if (viewSpeed[i] < -maxViewSpeed) viewSpeed[i] = -maxViewSpeed;
+				if (_viewSpeed[i] > _maxViewSpeed) _viewSpeed[i] = _maxViewSpeed;
+				if (_viewSpeed[i] < -_maxViewSpeed) _viewSpeed[i] = -_maxViewSpeed;
 			}
 		}
 		else if (mouseButton2)
 		{
-			panPolar += move*sensitivity*viewFovy;
+			_panPolar += move*_sensitivity*_viewFovy;
 		}
 	}
 
 	const float radius = getFocusedBody().getParam().getModel().getRadius();
 
-	viewPolar.x += viewSpeed.x;
-	viewPolar.y += viewSpeed.y;
-	viewPolar.z += viewSpeed.z*std::max(0.01f, viewPolar.z-radius);
+	_viewPolar.x += _viewSpeed.x;
+	_viewPolar.y += _viewSpeed.y;
+	_viewPolar.z += _viewSpeed.z*std::max(0.01f, _viewPolar.z-radius);
 
-	viewSpeed *= viewSmoothness;
+	_viewSpeed *= _viewSmoothness;
 
 	const float maxVerticalAngle = pi<float>()/2 - 0.001;
 
-	if (viewPolar.y > maxVerticalAngle)
+	if (_viewPolar.y > maxVerticalAngle)
 	{
-		viewPolar.y = maxVerticalAngle;
-		viewSpeed.y = 0;
+		_viewPolar.y = maxVerticalAngle;
+		_viewSpeed.y = 0;
 	}
-	if (viewPolar.y < -maxVerticalAngle)
+	if (_viewPolar.y < -maxVerticalAngle)
 	{
-		viewPolar.y = -maxVerticalAngle;
-		viewSpeed.y = 0;
+		_viewPolar.y = -maxVerticalAngle;
+		_viewSpeed.y = 0;
 	}
-	if (viewPolar.z < radius) viewPolar.z = radius;
+	if (_viewPolar.z < radius) _viewPolar.z = radius;
 
-	if (viewPolar.y + panPolar.y > maxVerticalAngle)
+	if (_viewPolar.y + _panPolar.y > maxVerticalAngle)
 	{
-		panPolar.y = maxVerticalAngle - viewPolar.y;
+		_panPolar.y = maxVerticalAngle - _viewPolar.y;
 	}
-	if (viewPolar.y + panPolar.y < -maxVerticalAngle)
+	if (_viewPolar.y + _panPolar.y < -maxVerticalAngle)
 	{
-		panPolar.y = -maxVerticalAngle - viewPolar.y;
+		_panPolar.y = -maxVerticalAngle - _viewPolar.y;
 	}
 
 	// Position around center
-	const vec3 relViewPos = polarToCartesian(vec2(viewPolar))*
-		viewPolar.z;
+	const vec3 relViewPos = polarToCartesian(vec2(_viewPolar))*
+		_viewPolar.z;
 
-	viewPos = dvec3(relViewPos) + getFocusedBody().getState().getPosition();
+	_viewPos = dvec3(relViewPos) + getFocusedBody().getState().getPosition();
 
-	const vec3 direction = -polarToCartesian(vec2(viewPolar)+panPolar);
+	const vec3 direction = -polarToCartesian(vec2(_viewPolar)+_panPolar);
 
-	viewDir = mat3(lookAt(vec3(0), direction, vec3(0,0,1)));
+	_viewDir = mat3(lookAt(vec3(0), direction, vec3(0,0,1)));
 
 	// Time warping
 	if (isPressedOnce(GLFW_KEY_K))
 	{
-		if (timeWarpIndex > 0) timeWarpIndex--;
+		if (_timeWarpIndex > 0) _timeWarpIndex--;
 	}
 	if (isPressedOnce(GLFW_KEY_L))
 	{
-		if (timeWarpIndex < (int)timeWarpValues.size()-1) timeWarpIndex++;
+		if (_timeWarpIndex < (int)_timeWarpValues.size()-1) _timeWarpIndex++;
 	}
 
 	// Entity name display
-	bodyNameId = focusedBodyId;
-	bodyNameFade = 1.f;
+	_bodyNameId = _focusedBodyId;
+	_bodyNameFade = 1.f;
 
 	// Switching
 	if (isPressedOnce(GLFW_KEY_TAB))
 	{
-		switchPhase = SwitchPhase::TRACK;
+		_switchPhase = SwitchPhase::TRACK;
 		// Save previous entity
-		switchPreviousBodyId = focusedBodyId;
+		_switchPreviousBodyId = _focusedBodyId;
 		// Choose next entity
-		const int direction = !glfwGetKey(win, GLFW_KEY_LEFT_SHIFT);
-		focusedBodyId = chooseNextBody(direction);
+		const int direction = !glfwGetKey(_win, GLFW_KEY_LEFT_SHIFT);
+		_focusedBodyId = chooseNextBody(direction);
 		// Kill timewarp
-		timeWarpIndex = 0;
+		_timeWarpIndex = 0;
 		// Save previous orientation
-		switchPreviousViewDir = viewDir;
+		_switchPreviousViewDir = _viewDir;
 		// Ray test
-		switchNewViewPolar = viewPolar;
+		_switchNewViewPolar = _viewPolar;
 		// Get direction from view to target entity
 		const dvec3 target = getFocusedBody().getState().getPosition() - 
 				getPreviousBody().getState().getPosition();
@@ -790,12 +790,12 @@ void Game::updateIdle(float dt, double posX, double posY)
 				const double targetClosestDist = length(target-dvec3(tangent*closestMinDist));
 				const double tangentCoef = totalDist*(closestMinDist-closestDist)/targetClosestDist;
 				// New cartesian position
-				const vec3 newRelPos = polarToCartesian(vec2(viewPolar))*viewPolar.z + 
+				const vec3 newRelPos = polarToCartesian(vec2(_viewPolar))*_viewPolar.z + 
 					vec3((float)tangentCoef*tangent);
 				// Convert to polar coordinates & set as interpolation target
 				const float newDist = length(newRelPos);
 				const vec3 newRelDir = - normalize(newRelPos);
-				switchNewViewPolar = vec3(
+				_switchNewViewPolar = vec3(
 					atan2(-newRelDir.y, -newRelDir.x), asin(-newRelDir.z), newDist);
 			}
 		}
@@ -816,33 +816,33 @@ float ease2(float t, float alpha)
 void Game::updateTrack(float dt)
 {
 	const float totalTime = 1.0;
-	const float t = min(1.f, switchTime/totalTime);
+	const float t = min(1.f, _switchTime/totalTime);
 	const float f = ease(t);
 
 	// Entity name display
-	bodyNameId = switchPreviousBodyId;
-	bodyNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
+	_bodyNameId = _switchPreviousBodyId;
+	_bodyNameFade = clamp(1.f-t*2.f, 0.f, 1.f);
 
 	// Interpolate positions
-	float posDeltaTheta = switchNewViewPolar.x-viewPolar.x;
+	float posDeltaTheta = _switchNewViewPolar.x-_viewPolar.x;
 	if (posDeltaTheta < -pi<float>()) posDeltaTheta += 2*pi<float>();
 	else if (posDeltaTheta > pi<float>()) posDeltaTheta -= 2*pi<float>();
 
-	const vec3 interpPolar = (1-f)*viewPolar+f*
-		vec3(viewPolar.x+posDeltaTheta, switchNewViewPolar.y, switchNewViewPolar.z);
+	const vec3 interpPolar = (1-f)*_viewPolar+f*
+		vec3(_viewPolar.x+posDeltaTheta, _switchNewViewPolar.y, _switchNewViewPolar.z);
 
-	viewPos = getPreviousBody().getState().getPosition()+
+	_viewPos = getPreviousBody().getState().getPosition()+
 		dvec3(polarToCartesian(vec2(interpPolar))*interpPolar.z);
 
 	// Aim at next entity
 	const vec3 targetDir = 
-		normalize(getFocusedBody().getState().getPosition() - viewPos);
+		normalize(getFocusedBody().getState().getPosition() - _viewPos);
 	// Find the angles
 	const float targetPhi = asin(targetDir.z);
 	const float targetTheta = atan2(targetDir.y, targetDir.x);
 
 	// Find the angles of original direction
-	const vec3 sourceDir = -(transpose(switchPreviousViewDir)[2]);
+	const vec3 sourceDir = -(transpose(_switchPreviousViewDir)[2]);
 	const float sourcePhi = asin(sourceDir.z);
 	const float sourceTheta = atan2(sourceDir.y, sourceDir.x);
 
@@ -857,30 +857,30 @@ void Game::updateTrack(float dt)
 
 	// Reconstruct direction from angles
 	const vec3 dir = polarToCartesian(vec2(theta, phi));
-	viewDir = lookAt(vec3(0), dir, vec3(0,0,1));
+	_viewDir = lookAt(vec3(0), dir, vec3(0,0,1));
 
-	switchTime += dt;
-	if (switchTime > totalTime)
+	_switchTime += dt;
+	if (_switchTime > totalTime)
 	{
-		switchPhase = SwitchPhase::MOVE;
-		switchTime = 0.f;
-		viewPolar = interpPolar;
+		_switchPhase = SwitchPhase::MOVE;
+		_switchTime = 0.f;
+		_viewPolar = interpPolar;
 	}
 }
 
 void Game::updateMove(float dt)
 {
 	const float totalTime = 1.0;
-	const float t = min(1.f, switchTime/totalTime);
+	const float t = min(1.f, _switchTime/totalTime);
 	const double f = ease2(t, 4);
 
 	// Entity name fade
-	bodyNameId = focusedBodyId;
-	bodyNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
+	_bodyNameId = _focusedBodyId;
+	_bodyNameFade = clamp((t-0.5f)*2.f, 0.f, 1.f);
 
 	// Old position to move from
 	const dvec3 sourcePos = getPreviousBody().getState().getPosition()+
-		dvec3(polarToCartesian(vec2(viewPolar))*viewPolar.z);
+		dvec3(polarToCartesian(vec2(_viewPolar))*_viewPolar.z);
 
 	// Distance from entity at arrival
 	const float targetDist = std::max(
@@ -893,19 +893,19 @@ void Game::updateMove(float dt)
 		dvec3(direction*targetDist);
 
 	// Interpolate positions
-	viewPos = f*targetPos+(1-f)*sourcePos;
-	viewDir = lookAt(vec3(0), direction, vec3(0,0,1));
+	_viewPos = f*targetPos+(1-f)*sourcePos;
+	_viewDir = lookAt(vec3(0), direction, vec3(0,0,1));
 
-	switchTime += dt;
-	if (switchTime > totalTime)
+	_switchTime += dt;
+	if (_switchTime > totalTime)
 	{
-		switchPhase = SwitchPhase::IDLE;
-		switchTime = 0.f;
+		_switchPhase = SwitchPhase::IDLE;
+		_switchTime = 0.f;
 		// Reconstruct new polar angles from direction
-		viewPolar = vec3(
+		_viewPolar = vec3(
 			atan2(-direction.y, -direction.x), asin(-direction.z), targetDist);
-		panPolar = vec2(0);
-		viewSpeed = vec3(0);
+		_panPolar = vec2(0);
+		_viewSpeed = vec3(0);
 	}
 }
 
@@ -1036,23 +1036,23 @@ void Game::updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &
 	{
 		// Full time update
 		{
-			auto it = std::find_if(fullTimes.begin(), fullTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+			auto it = std::find_if(_fullTimes.begin(), _fullTimes.end(), [&](std::pair<std::string, uint64_t> pa){
 				return pa.first == p.first;
 			});
-			if (it == fullTimes.end()) fullTimes.push_back(p);
+			if (it == _fullTimes.end()) _fullTimes.push_back(p);
 			else it->second += p.second;
 		}
 
 		// Max time update
 		{
-			auto it = std::find_if(maxTimes.begin(), maxTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+			auto it = std::find_if(_maxTimes.begin(), _maxTimes.end(), [&](std::pair<std::string, uint64_t> pa){
 				return pa.first == p.first;
 			});
-			if (it == maxTimes.end()) maxTimes.push_back(p);
+			if (it == _maxTimes.end()) _maxTimes.push_back(p);
 			else it->second = std::max(it->second, p.second);
 		}
 	}
-	numFrames += 1;
+	_numFrames += 1;
 }
 
 std::vector<std::pair<std::string, uint64_t>> Game::computeAverage(

@@ -4,7 +4,6 @@
 - [ ] Fix atmospheric shaders (fireflies, flickering at high distances) [find a way to get planet-origin coordinates without bouncing back from view space]
 
 ### Minor stuff
-- [ ] Enforce the _member notation
 - [ ] Fix planet orientations at epoch
 - [ ] Display some kind of planet description
 - [ ] Split up other textures
@@ -19,6 +18,7 @@
 - [ ] Auto-pilot tour
 
 ## Done
+- [x] Enforce the _member notation
 - [x] Separate barycenters from bodies
 - [x] Huge refactor for entities
 - [x] Rename 'planet' with 'entity' or 'body'

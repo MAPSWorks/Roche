@@ -70,11 +70,11 @@ vector<DrawCommand> getCommands(
 
 void RendererGL::createMeshes()
 {
-	vertexBuffer = Buffer(
+	_vertexBuffer = Buffer(
 		Buffer::Usage::STATIC,
 		Buffer::Access::WRITE_ONLY);
 
-	indexBuffer = Buffer(
+	_indexBuffer = Buffer(
 		Buffer::Usage::STATIC, 
 		Buffer::Access::WRITE_ONLY);
 
@@ -101,7 +101,7 @@ void RendererGL::createMeshes()
 	// Load custom models
 	map<EntityHandle, int> bodyMeshId;
 	map<EntityHandle, int> ringMeshId;
-	for (const auto &h: entityCollection->getBodies())
+	for (const auto &h: _entityCollection->getBodies())
 	{
 		const EntityParam param = h.getParam();
 		bodyMeshId[h] = sphereMeshId;
@@ -117,18 +117,18 @@ void RendererGL::createMeshes()
 	}
 
 	vector<DrawCommand> commands = getCommands(
-		vertexArray, indexType(),
-		vertexBuffer,
-		indexBuffer,
+		_vertexArray, indexType(),
+		_vertexBuffer,
+		_indexBuffer,
 		modelInfos);
 
-	fullscreenTri = commands[fsTriMeshId];
-	flareDraw     = commands[flareMeshId];
-	sphere        = commands[sphereMeshId];
+	_fullscreenTri = commands[fsTriMeshId];
+	_flareDraw     = commands[flareMeshId];
+	_sphereDraw        = commands[sphereMeshId];
 
-	for (const auto &h: entityCollection->getBodies())
+	for (const auto &h: _entityCollection->getBodies())
 	{
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 		data.bodyDraw = commands[bodyMeshId[h]];
 		const int ringId = ringMeshId[h];
 		if (ringId != -1)
@@ -139,45 +139,45 @@ void RendererGL::createMeshes()
 void RendererGL::createUBO()
 {
 	// Dynamic UBO buffer assigning
-	uboBuffer = Buffer(
+	_uboBuffer = Buffer(
 		Buffer::Usage::DYNAMIC, 
 		Buffer::Access::WRITE_ONLY);
 
-	dynamicData.resize(bufferFrames); // multiple buffering
-	for (auto &data : dynamicData)
+	_dynamicData.resize(_bufferFrames); // multiple buffering
+	for (auto &data : _dynamicData)
 	{
 		// Scene UBO
-		data.sceneUBO = uboBuffer.assignUBO(sizeof(SceneUBO));
+		data.sceneUBO = _uboBuffer.assignUBO(sizeof(SceneUBO));
 		// Entity UBOs
-		for (const auto &h: entityCollection->getBodies())
+		for (const auto &h: _entityCollection->getBodies())
 		{
-			data.bodyUBOs[h] = uboBuffer.assignUBO(sizeof(BodyUBO));
+			data.bodyUBOs[h] = _uboBuffer.assignUBO(sizeof(BodyUBO));
 		}
 	}
 
-	uboBuffer.validate();
+	_uboBuffer.validate();
 }
 
 void RendererGL::init(const InitInfo &info)
 {
-	this->entityCollection = info.collection;
-	this->msaaSamples = info.msaa;
-	this->maxTexSize = info.maxTexSize;
-	this->windowWidth = info.windowWidth;
-	this->windowHeight = info.windowHeight;
+	this->_entityCollection = info.collection;
+	this->_msaaSamples = info.msaa;
+	this->_maxTexSize = info.maxTexSize;
+	this->_windowWidth = info.windowWidth;
+	this->_windowHeight = info.windowHeight;
 
 	// Find the sun
-	for (const auto &h : entityCollection->getBodies())
+	for (const auto &h : _entityCollection->getBodies())
 	{
-		if (h.getParam().isStar()) sun = h;
+		if (h.getParam().isStar()) _sun = h;
 	}
 
-	this->bufferFrames = 3; // triple-buffering
+	this->_bufferFrames = 3; // triple-buffering
 
-	for (const auto &h : entityCollection->getBodies())
-		this->bodyData[h] = BodyData();
+	for (const auto &h : _entityCollection->getBodies())
+		this->_bodyData[h] = BodyData();
 
-	this->fences.resize(bufferFrames);
+	this->_fences.resize(_bufferFrames);
 
 	createVertexArray();
 	createMeshes();
@@ -191,17 +191,17 @@ void RendererGL::init(const InitInfo &info)
 	createRingTextures();
 
 	// Gui init
-	Gui::Font f = gui.loadFont("fonts/Lato-Regular.ttf");
-	mainFontBig = gui.loadFontSize(f, 40.f);
-	mainFontMedium = gui.loadFontSize(f, 20.f);
-	gui.init();
+	Gui::Font f = _gui.loadFont("fonts/Lato-Regular.ttf");
+	_mainFontBig = _gui.loadFontSize(f, 40.f);
+	_mainFontMedium = _gui.loadFontSize(f, 20.f);
+	_gui.init();
 
 	// Streamer init
-	streamer.init(!info.syncTexLoading, 512*512, 200, maxTexSize);
+	_streamer.init(!info.syncTexLoading, 512*512, 200, _maxTexSize);
 
 	// Create starMap texture
-	starMapTexHandle = streamer.createTex(info.starMapFilename);
-	starMapIntensity = info.starMapIntensity;
+	_starMapTexHandle = _streamer.createTex(info.starMapFilename);
+	_starMapIntensity = info.starMapIntensity;
 
 	// Backface culling
 	glFrontFace(GL_CCW);
@@ -226,7 +226,7 @@ void RendererGL::init(const InitInfo &info)
 	glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, innerLevel);
 
 	// Sun Occlusion query for flare
-	glCreateQueries(GL_SAMPLES_PASSED, 2, sunOcclusionQueries);
+	glCreateQueries(GL_SAMPLES_PASSED, 2, _sunOcclusionQueries);
 }
 
 float getAnisotropy(const int requestedAnisotropy)
@@ -250,50 +250,50 @@ void RendererGL::createTextures()
 {
 	// Anisotropy
 	const float requestedAnisotropy = 16.f;
-	textureAnisotropy = getAnisotropy(requestedAnisotropy);
+	_textureAnisotropy = getAnisotropy(requestedAnisotropy);
 
 	// Default textures 
-	diffuseTexDefault = create1PixTex({0,0,0,255});
-	cloudTexDefault = create1PixTex({0,0,0,0});
-	nightTexDefault = create1PixTex({0,0,0,0});
-	specularTexDefault = create1PixTex({0,0,0,0});
+	_diffuseTexDefault = create1PixTex({0,0,0,255});
+	_cloudTexDefault = create1PixTex({0,0,0,0});
+	_nightTexDefault = create1PixTex({0,0,0,0});
+	_specularTexDefault = create1PixTex({0,0,0,0});
 
 	// Samplers
-	glCreateSamplers(1, &bodyTexSampler);
-	glSamplerParameterf(bodyTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, textureAnisotropy);
-	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glSamplerParameteri(bodyTexSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glCreateSamplers(1, &_bodyTexSampler);
+	glSamplerParameterf(_bodyTexSampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, _textureAnisotropy);
+	glSamplerParameteri(_bodyTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(_bodyTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(_bodyTexSampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(_bodyTexSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-	glCreateSamplers(1, &atmoSampler);
-	glSamplerParameteri(atmoSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glSamplerParameteri(atmoSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(atmoSampler, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-	glSamplerParameteri(atmoSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glCreateSamplers(1, &_atmoSampler);
+	glSamplerParameteri(_atmoSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(_atmoSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(_atmoSampler, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glSamplerParameteri(_atmoSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-	glCreateSamplers(1, &ringSampler);
-	glSamplerParameteri(ringSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glSamplerParameteri(ringSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(ringSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glCreateSamplers(1, &_ringSampler);
+	glSamplerParameteri(_ringSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(_ringSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(_ringSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
 }
 
 void RendererGL::createFlare()
 {
 	DDSLoader flareFile("tex/star_glow.DDS");
 	const int mips = flareFile.getMipmapCount();
-	glCreateTextures(GL_TEXTURE_2D, 1, &flareTex);
+	glCreateTextures(GL_TEXTURE_2D, 1, &_flareTex);
 	glTextureStorage2D(
-		flareTex, 
+		_flareTex, 
 		mips, 
 		DDSFormatToGL(flareFile.getFormat()),
 		flareFile.getWidth(0),
 		flareFile.getHeight(0));
-	glTextureParameteri(flareTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(_flareTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
 	for (int i=0;i<mips;++i)
 	{
-		glCompressedTextureSubImage2D(flareTex,
+		glCompressedTextureSubImage2D(_flareTex,
 			i, 0, 0, flareFile.getWidth(i), flareFile.getHeight(i), 
 			DDSFormatToGL(flareFile.getFormat()),
 			flareFile.getImageSize(i), flareFile.getImageData(i).data());
@@ -304,91 +304,91 @@ void RendererGL::createVertexArray()
 {
 	// Vertex Array Object creation
 	const int VERTEX_BINDING = 0;
-	glCreateVertexArrays(1, &vertexArray);
+	glCreateVertexArrays(1, &_vertexArray);
 
 	const int VERTEX_ATTRIB_POS     = 0;
 	const int VERTEX_ATTRIB_UV      = 1;
 	const int VERTEX_ATTRIB_NORMAL  = 2;
 
 	// Position
-	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_POS);
-	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_POS, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_POS, 3, GL_FLOAT, false, offsetof(Vertex, position));
+	glEnableVertexArrayAttrib(_vertexArray, VERTEX_ATTRIB_POS);
+	glVertexArrayAttribBinding(_vertexArray, VERTEX_ATTRIB_POS, VERTEX_BINDING);
+	glVertexArrayAttribFormat(_vertexArray, VERTEX_ATTRIB_POS, 3, GL_FLOAT, false, offsetof(Vertex, position));
 
 	// UVs
-	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_UV);
-	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_UV, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_UV, 2, GL_FLOAT, false, offsetof(Vertex, uv));
+	glEnableVertexArrayAttrib(_vertexArray, VERTEX_ATTRIB_UV);
+	glVertexArrayAttribBinding(_vertexArray, VERTEX_ATTRIB_UV, VERTEX_BINDING);
+	glVertexArrayAttribFormat(_vertexArray, VERTEX_ATTRIB_UV, 2, GL_FLOAT, false, offsetof(Vertex, uv));
 
 	// Normals
-	glEnableVertexArrayAttrib(vertexArray, VERTEX_ATTRIB_NORMAL);
-	glVertexArrayAttribBinding(vertexArray, VERTEX_ATTRIB_NORMAL, VERTEX_BINDING);
-	glVertexArrayAttribFormat(vertexArray, VERTEX_ATTRIB_NORMAL, 3, GL_FLOAT, false, offsetof(Vertex, normal));
+	glEnableVertexArrayAttrib(_vertexArray, VERTEX_ATTRIB_NORMAL);
+	glVertexArrayAttribBinding(_vertexArray, VERTEX_ATTRIB_NORMAL, VERTEX_BINDING);
+	glVertexArrayAttribFormat(_vertexArray, VERTEX_ATTRIB_NORMAL, 3, GL_FLOAT, false, offsetof(Vertex, normal));
 }
 
 void RendererGL::createRendertargets()
 {
 	// Depth stencil texture
-	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &depthStencilTex);
+	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &_depthStencilTex);
 	glTextureStorage2DMultisample(
-		depthStencilTex, msaaSamples, GL_DEPTH24_STENCIL8, windowWidth, windowHeight, GL_FALSE);
+		_depthStencilTex, _msaaSamples, GL_DEPTH24_STENCIL8, _windowWidth, _windowHeight, GL_FALSE);
 
 	const GLenum hdrFormat = GL_RGB16F;
 
 	// HDR MSAA Rendertarget
-	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &hdrMSRendertarget);
-	glTextureStorage2DMultisample(hdrMSRendertarget, msaaSamples, hdrFormat,
-		windowWidth, windowHeight, GL_FALSE);
+	glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &_hdrMSRendertarget);
+	glTextureStorage2DMultisample(_hdrMSRendertarget, _msaaSamples, hdrFormat,
+		_windowWidth, _windowHeight, GL_FALSE);
 
 	// Highpass rendertargets
-	glCreateTextures(GL_TEXTURE_2D, 1, &highpassRendertargets);
-	glTextureStorage2D(highpassRendertargets, bloomDepth+1, 
-		hdrFormat, windowWidth, windowHeight);
+	glCreateTextures(GL_TEXTURE_2D, 1, &_highpassRendertargets);
+	glTextureStorage2D(_highpassRendertargets, _bloomDepth+1, 
+		hdrFormat, _windowWidth, _windowHeight);
 
 	// Highpass views
-	highpassViews.resize(bloomDepth+1);
-	glGenTextures(highpassViews.size(), highpassViews.data());
-	for (size_t i=0;i<highpassViews.size();++i)
+	_highpassViews.resize(_bloomDepth+1);
+	glGenTextures(_highpassViews.size(), _highpassViews.data());
+	for (size_t i=0;i<_highpassViews.size();++i)
 	{
-		glTextureView(highpassViews[i], GL_TEXTURE_2D, highpassRendertargets, 
+		glTextureView(_highpassViews[i], GL_TEXTURE_2D, _highpassRendertargets, 
 			hdrFormat, i, 1, 0, 1);
 	}
 
 	// Bloom rendertargets
-	glCreateTextures(GL_TEXTURE_2D, 1, &bloomRendertargets);
-	glTextureStorage2D(bloomRendertargets, bloomDepth,
-		hdrFormat, windowWidth/2, windowHeight/2);
+	glCreateTextures(GL_TEXTURE_2D, 1, &_bloomRendertargets);
+	glTextureStorage2D(_bloomRendertargets, _bloomDepth,
+		hdrFormat, _windowWidth/2, _windowHeight/2);
 
 	// Bloom views
-	bloomViews.resize(bloomDepth);
-	glGenTextures(bloomViews.size(), bloomViews.data());
-	for (size_t i=0;i<bloomViews.size();++i)
+	_bloomViews.resize(_bloomDepth);
+	glGenTextures(_bloomViews.size(), _bloomViews.data());
+	for (size_t i=0;i<_bloomViews.size();++i)
 	{
-		glTextureView(bloomViews[i], GL_TEXTURE_2D, bloomRendertargets,
+		glTextureView(_bloomViews[i], GL_TEXTURE_2D, _bloomRendertargets,
 			hdrFormat, i, 1, 0, 1);
 	}
 
 	// Sampler
-	glCreateSamplers(1, &rendertargetSampler);
-	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(rendertargetSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glCreateSamplers(1, &_rendertargetSampler);
+	glSamplerParameteri(_rendertargetSampler, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glSamplerParameteri(_rendertargetSampler, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glSamplerParameteri(_rendertargetSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(_rendertargetSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	// Framebuffers
-	glCreateFramebuffers(1, &hdrFBO);
-	glNamedFramebufferTexture(hdrFBO, GL_COLOR_ATTACHMENT0, hdrMSRendertarget, 0);
-	glNamedFramebufferTexture(hdrFBO, GL_DEPTH_STENCIL_ATTACHMENT, depthStencilTex, 0);
+	glCreateFramebuffers(1, &_hdrFBO);
+	glNamedFramebufferTexture(_hdrFBO, GL_COLOR_ATTACHMENT0, _hdrMSRendertarget, 0);
+	glNamedFramebufferTexture(_hdrFBO, GL_DEPTH_STENCIL_ATTACHMENT, _depthStencilTex, 0);
 
-	highpassFBOs.resize(bloomDepth+1);
-	glCreateFramebuffers(highpassFBOs.size(), highpassFBOs.data());
-	for (size_t i=0;i<highpassFBOs.size();++i)
-		glNamedFramebufferTexture(highpassFBOs[i], GL_COLOR_ATTACHMENT0, highpassViews[i], 0);
+	_highpassFBOs.resize(_bloomDepth+1);
+	glCreateFramebuffers(_highpassFBOs.size(), _highpassFBOs.data());
+	for (size_t i=0;i<_highpassFBOs.size();++i)
+		glNamedFramebufferTexture(_highpassFBOs[i], GL_COLOR_ATTACHMENT0, _highpassViews[i], 0);
 
-	bloomFBOs.resize(bloomDepth);
-	glCreateFramebuffers(bloomFBOs.size(), bloomFBOs.data());
-	for (size_t i=0;i<bloomFBOs.size();++i)
-		glNamedFramebufferTexture(bloomFBOs[i], GL_COLOR_ATTACHMENT0, bloomViews[i], 0);
+	_bloomFBOs.resize(_bloomDepth);
+	glCreateFramebuffers(_bloomFBOs.size(), _bloomFBOs.data());
+	for (size_t i=0;i<_bloomFBOs.size();++i)
+		glNamedFramebufferTexture(_bloomFBOs[i], GL_COLOR_ATTACHMENT0, _bloomViews[i], 0);
 
 	// Enable SRGB output
 	glEnable(GL_FRAMEBUFFER_SRGB);
@@ -445,25 +445,25 @@ void RendererGL::createShaders()
 		bodyVert, bodyTesc, bodyTese, bodyFrag
 	};
 
-	pipelineBodyBare = factory.createPipeline(
+	_pipelineBodyBare = factory.createPipeline(
 		entityFilenames);
 
-	pipelineBodyAtmo = factory.createPipeline(
+	_pipelineBodyAtmo = factory.createPipeline(
 		entityFilenames,
 		{hasAtmo});
 
-	pipelineBodyAtmoRing = factory.createPipeline(
+	_pipelineBodyAtmoRing = factory.createPipeline(
 		entityFilenames,
 		{hasAtmo, hasRing});
 
-	pipelineStarMap = factory.createPipeline(
+	_pipelineStarMap = factory.createPipeline(
 		{starMapVert, starMapTese, starMapFrag});
 
-	pipelineAtmo = factory.createPipeline(
+	_pipelineAtmo = factory.createPipeline(
 		{bodyVert, bodyTesc, bodyTese, atmo},
 		{isAtmo});
 
-	pipelineSun = factory.createPipeline(
+	_pipelineSun = factory.createPipeline(
 		entityFilenames,
 		{isStar});
 
@@ -471,39 +471,39 @@ void RendererGL::createShaders()
 		bodyVert, bodyTesc, bodyTese, ringFrag
 	};
 
-	pipelineRingFar = factory.createPipeline(
+	_pipelineRingFar = factory.createPipeline(
 		ringFilenames,
 		{isFarRing});
 
-	pipelineRingNear = factory.createPipeline(
+	_pipelineRingNear = factory.createPipeline(
 		ringFilenames,
 		{isNearRing});
 
-	pipelineHighpass = factory.createPipeline(
+	_pipelineHighpass = factory.createPipeline(
 		{deferred, highpass});
 
-	pipelineDownsample = factory.createPipeline(
+	_pipelineDownsample = factory.createPipeline(
 		{deferred, downsample});
 
-	pipelineBlurW = factory.createPipeline(
+	_pipelineBlurW = factory.createPipeline(
 		{deferred, blur},
 		{blurW});
 
-	pipelineBlurH = factory.createPipeline(
+	_pipelineBlurH = factory.createPipeline(
 		{deferred, blur},
 		{blurH});
 
-	pipelineBloomAdd = factory.createPipeline(
+	_pipelineBloomAdd = factory.createPipeline(
 		{deferred, bloomAdd});
 
-	pipelineFlare = factory.createPipeline(
+	_pipelineFlare = factory.createPipeline(
 		{flareVert, flareFrag});
 
-	pipelineTonemapBloom = factory.createPipeline(
+	_pipelineTonemapBloom = factory.createPipeline(
 		{deferred, tonemap},
 		{bloom});
 
-	pipelineTonemapNoBloom = factory.createPipeline(
+	_pipelineTonemapNoBloom = factory.createPipeline(
 		{deferred, tonemap});
 }
 
@@ -511,21 +511,21 @@ void RendererGL::createScreenshot()
 {
 	// Find best transfer format
 	glGetInternalformativ(GL_RENDERBUFFER, GL_RGBA8, GL_READ_PIXELS_FORMAT,
-		1, (GLint*)&screenBestFormatGL);
-	if (screenBestFormatGL != GL_BGRA) screenBestFormatGL = GL_RGBA;
+		1, (GLint*)&_screenBestFormatGL);
+	if (_screenBestFormatGL != GL_BGRA) _screenBestFormatGL = GL_RGBA;
 
-	if (screenBestFormatGL == GL_RGBA) 
-		screenBestFormat = Screenshot::Format::RGBA8;
-	else if (screenBestFormatGL == GL_BGRA) 
-		screenBestFormat = Screenshot::Format::BGRA8;
+	if (_screenBestFormatGL == GL_RGBA) 
+		_screenBestFormat = Screenshot::Format::RGBA8;
+	else if (_screenBestFormatGL == GL_BGRA) 
+		_screenBestFormat = Screenshot::Format::BGRA8;
 }
 
 void RendererGL::createAtmoLookups()
 {
-	for (const auto &h : entityCollection->getBodies())
+	for (const auto &h : _entityCollection->getBodies())
 	{
 		const EntityParam &param = h.getParam();
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 
 		// Generate atmospheric scattering lookup texture
 		if (param.hasAtmo())
@@ -546,10 +546,10 @@ void RendererGL::createAtmoLookups()
 
 void RendererGL::createRingTextures()
 {
-	for (const auto &h : entityCollection->getBodies())
+	for (const auto &h : _entityCollection->getBodies())
 	{
 		const EntityParam &param = h.getParam();
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 
 		// Load ring textures
 		if (param.hasRing())
@@ -610,8 +610,8 @@ void RendererGL::destroy()
 
 void RendererGL::takeScreenshot(const string &filename)
 {
-	takeScreen = true;
-	screenFilename = filename;
+	_takeScreen = true;
+	_screenFilename = filename;
 }
 
 bool testSpherePlane(const vec3 &sphereCenter, float radius, const vec4 &plane)
@@ -623,29 +623,29 @@ void RendererGL::render(const RenderInfo &info)
 {
 	// GUI
 	const uint8_t textFade = clamp(info.entityNameFade,0.f,1.f)*255;
-	gui.setText(mainFontBig, 5, 25, info.focusedEntityName, 
+	_gui.setText(_mainFontBig, 5, 25, info.focusedEntityName, 
 		textFade, textFade, textFade, textFade);
-	gui.setText(mainFontMedium, 2, windowHeight-8, info.currentTime, 
+	_gui.setText(_mainFontMedium, 2, _windowHeight-8, info.currentTime, 
 		255, 255, 255, 255);
 
 	const float closeBodyMinSizePixels = 1;
-	this->closeBodyMaxDistance =windowHeight/(closeBodyMinSizePixels*tan(info.fovy/2));
-	this->flareMinDistance = closeBodyMaxDistance*0.35;
-	this->flareOptimalDistance = closeBodyMaxDistance*1.0;
-	this->texLoadDistance = closeBodyMaxDistance*1.4;
-	this->texUnloadDistance = closeBodyMaxDistance*1.6;
+	this->_closeBodyMaxDistance =_windowHeight/(closeBodyMinSizePixels*tan(info.fovy/2));
+	this->_flareMinDistance = _closeBodyMaxDistance*0.35;
+	this->_flareOptimalDistance = _closeBodyMaxDistance*1.0;
+	this->_texLoadDistance = _closeBodyMaxDistance*1.4;
+	this->_texUnloadDistance = _closeBodyMaxDistance*1.6;
 
-	profiler.begin("Full frame");
+	_profiler.begin("Full frame");
 
-	auto &currentData = dynamicData[frameId];
+	auto &currentData = _dynamicData[_frameId];
 
 	// Projection and view matrices
-	const mat4 projMat = perspective(info.fovy, windowWidth/(float)windowHeight, 0.f,1.f);
+	const mat4 projMat = perspective(info.fovy, _windowWidth/(float)_windowHeight, 0.f,1.f);
 	const mat4 viewMat = mat4(info.viewDir);
 
 	// Frustum construction
 	const float f = tan(info.fovy/2.0);
-	const float aspect = windowWidth/(float)windowHeight;
+	const float aspect = _windowWidth/(float)_windowHeight;
 
 	// (Don't need far plane)
 	array<vec4, 5> frustum = {
@@ -664,9 +664,9 @@ void RendererGL::render(const RenderInfo &info)
 	vector<EntityHandle> texLoadEntities;
 	vector<EntityHandle> texUnloadEntities;
 
-	for (const auto &h : entityCollection->getBodies())
+	for (const auto &h : _entityCollection->getBodies())
 	{
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 		const auto &param = h.getParam();
 		const auto &state = h.getState();
 		const float radius = param.getModel().getRadius();
@@ -678,11 +678,11 @@ void RendererGL::render(const RenderInfo &info)
 			info.focusedEntitiesId.begin(), 
 			info.focusedEntitiesId.end(), h)>0;
 
-		if ((focused || dist < texLoadDistance) && !data.texLoaded)
+		if ((focused || dist < _texLoadDistance) && !data.texLoaded)
 		{
 			texLoadEntities.push_back(h);
 		}
-		else if (!focused && data.texLoaded && dist > texUnloadDistance)
+		else if (!focused && data.texLoaded && dist > _texUnloadDistance)
 		{
 			// Textures need to be unloaded
 			texUnloadEntities.push_back(h);
@@ -700,7 +700,7 @@ void RendererGL::render(const RenderInfo &info)
 		if (visible)
 		{
 			// Render if is range, always render sun
-			if (dist < closeBodyMaxDistance || param.isStar())
+			if (dist < _closeBodyMaxDistance || param.isStar())
 			{
 				closeEntities.push_back(h);
 				// Entity atmospheres
@@ -711,20 +711,20 @@ void RendererGL::render(const RenderInfo &info)
 			}
 		}
 
-		if (dist > flareMinDistance && !param.isStar())
+		if (dist > _flareMinDistance && !param.isStar())
 		{
 			flares.push_back(h); 
 		}
 	}
 
 	// Manage stream textures
-	profiler.begin("Texture creation/deletion");
+	_profiler.begin("Texture creation/deletion");
 	loadTextures(texLoadEntities);
 	unloadTextures(texUnloadEntities);
-	profiler.end();
-	profiler.begin("Texture updating");
+	_profiler.end();
+	_profiler.begin("Texture updating");
 	uploadLoadedTextures();
-	profiler.end();
+	_profiler.end();
 
 	const float exp = pow(2, info.exposure);
 
@@ -733,30 +733,30 @@ void RendererGL::render(const RenderInfo &info)
 	sceneUBO.projMat = projMat;
 	sceneUBO.viewMat = viewMat;
 	sceneUBO.starMapMat = viewMat*scale(mat4(), vec3(-1));
-	sceneUBO.starMapIntensity = starMapIntensity;
+	sceneUBO.starMapIntensity = _starMapIntensity;
 
 	sceneUBO.ambientColor = info.ambientColor;
 	sceneUBO.exposure = exp;
-	sceneUBO.logDepthFarPlane = (1.0/log2(logDepthC*logDepthFarPlane + 1.0));
-	sceneUBO.logDepthC = logDepthC;
+	sceneUBO.logDepthFarPlane = (1.0/log2(_logDepthC*_logDepthFarPlane + 1.0));
+	sceneUBO.logDepthC = _logDepthC;
 
 	// Entity uniform update
 	map<EntityHandle, BodyUBO> bodyUBOs;
-	for (const auto &h : entityCollection->getBodies())
+	for (const auto &h : _entityCollection->getBodies())
 	{
 		bodyUBOs[h] = getBodyUBO(info.fovy, exp, info.viewPos, projMat, viewMat, 
-			h.getState(), h.getParam(), bodyData[h]);
+			h.getState(), h.getParam(), _bodyData[h]);
 	}
 
 	// Dynamic data upload
-	profiler.begin("Sync wait");
-	fences[frameId].waitClient();
-	profiler.end();
+	_profiler.begin("Sync wait");
+	_fences[_frameId].waitClient();
+	_profiler.end();
 
-	uboBuffer.write(currentData.sceneUBO, &sceneUBO);
-	for (const auto &h : entityCollection->getBodies())
+	_uboBuffer.write(currentData.sceneUBO, &sceneUBO);
+	for (const auto &h : _entityCollection->getBodies())
 	{
-		uboBuffer.write(currentData.bodyUBOs[h], &bodyUBOs[h]);
+		_uboBuffer.write(currentData.bodyUBOs[h], &bodyUBOs[h]);
 	}
 
 	auto closerFun = [&](const EntityHandle &i, const EntityHandle &j)
@@ -778,75 +778,75 @@ void RendererGL::render(const RenderInfo &info)
 	sort(translucentEntities.begin(), translucentEntities.end(), fartherFun);
 
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	profiler.begin("Entities");
+	_profiler.begin("Entities");
 	renderHdr(closeEntities, currentData);
-	profiler.end();
-	profiler.begin("Flares");
+	_profiler.end();
+	_profiler.begin("Flares");
 	renderEntityFlares(flares, currentData);
-	profiler.end();
-	profiler.begin("Translucent objects");
+	_profiler.end();
+	_profiler.begin("Translucent objects");
 	renderTranslucent(translucentEntities, currentData);
-	profiler.end();
+	_profiler.end();
 	if (info.wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	if (info.bloom)
 	{
-		profiler.begin("Highpass");
+		_profiler.begin("Highpass");
 		renderHighpass(currentData);
-		profiler.end();
-		profiler.begin("Downsample");
+		_profiler.end();
+		_profiler.begin("Downsample");
 		renderDownsample(currentData);
-		profiler.end();
-		profiler.begin("Bloom");
+		_profiler.end();
+		_profiler.begin("Bloom");
 		renderBloom(currentData);
-		profiler.end();
+		_profiler.end();
 	}
-	profiler.begin("Tonemapping");
+	_profiler.begin("Tonemapping");
 	renderTonemap(currentData, info.bloom);
-	profiler.end();
-	profiler.begin("Sun Flare");
+	_profiler.end();
+	_profiler.begin("Sun Flare");
 	renderSunFlare(currentData);
-	profiler.end();
-	profiler.begin("GUI");
+	_profiler.end();
+	_profiler.begin("GUI");
 	renderGui();
-	profiler.end();
+	_profiler.end();
 
-	if (takeScreen)
+	if (_takeScreen)
 	{
 		saveScreenshot();
-		takeScreen = false;
+		_takeScreen = false;
 	}
 
-	profiler.end();
+	_profiler.end();
 
-	fences[frameId].lock();
+	_fences[_frameId].lock();
 
-	frameId = (frameId+1)%bufferFrames;
+	_frameId = (_frameId+1)%_bufferFrames;
 }
 
 float RendererGL::getSunVisibility()
 {
 	for (int i=0;i<2;++i)
 	{
-		glGetQueryObjectiv(sunOcclusionQueries[i], GL_QUERY_RESULT_NO_WAIT, 
-			&occlusionQueryResults[i]);
+		glGetQueryObjectiv(_sunOcclusionQueries[i], GL_QUERY_RESULT_NO_WAIT, 
+			&_occlusionQueryResults[i]);
 	}
 
-	return occlusionQueryResults[0]/(float)std::max(1,occlusionQueryResults[1]);
+	return _occlusionQueryResults[0]/(float)std::max(1,_occlusionQueryResults[1]);
 }
 
 void RendererGL::saveScreenshot()
 {
 	// Cancel if already saving screenshot
-	if (screenshot.isSaving()) return;
+	if (_screenshot.isSaving()) return;
 	// Read screen
-	vector<uint8_t> buffer(4*windowWidth*windowHeight);
+	vector<uint8_t> buffer(4*_windowWidth*_windowHeight);
 	glReadBuffer(GL_FRONT);
-	glReadPixels(0, 0, windowWidth, windowHeight, 
-		screenBestFormatGL, GL_UNSIGNED_BYTE, buffer.data());
-	screenshot.save(
-		screenFilename,
-		windowWidth, windowHeight, 
-		screenBestFormat, buffer);
+	glReadPixels(0, 0, _windowWidth, _windowHeight, 
+		_screenBestFormatGL, GL_UNSIGNED_BYTE, buffer.data());
+	_screenshot.save(
+		_screenFilename,
+		_windowWidth, _windowHeight, 
+		_screenBestFormat, buffer);
 }
 
 void RendererGL::renderHdr(
@@ -854,7 +854,7 @@ void RendererGL::renderHdr(
 	const DynamicData &ddata)
 {
 	// Viewport
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 
 	// Depth test/write
 	glDepthMask(GL_TRUE);
@@ -867,57 +867,57 @@ void RendererGL::renderHdr(
 	const vector<GLenum> attachments = {
 		GL_COLOR_ATTACHMENT0, 
 		GL_DEPTH_STENCIL_ATTACHMENT};
-	glInvalidateNamedFramebufferData(hdrFBO, 
+	glInvalidateNamedFramebufferData(_hdrFBO, 
 		attachments.size(), attachments.data());
 	// Clearing
 	vector<float> clearColor = {0.f,0.f,0.f,0.f};
 	vector<float> clearDepth = {1.f};
-	glClearNamedFramebufferfv(hdrFBO, GL_COLOR, 0, clearColor.data());
-	glClearNamedFramebufferfv(hdrFBO, GL_DEPTH, 0, clearDepth.data());
+	glClearNamedFramebufferfv(_hdrFBO, GL_COLOR, 0, clearColor.data());
+	glClearNamedFramebufferfv(_hdrFBO, GL_DEPTH, 0, clearDepth.data());
 	// Bind FBO for rendering
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, _hdrFBO);
 
 	// Entity rendering
 	for (const auto &h : closeEntities)
 	{
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 		const EntityParam &param = h.getParam();
 		const bool star = param.isStar();
 		const bool hasAtmo = param.hasAtmo();
 		const bool hasRing = param.hasRing();
-		if (star) pipelineSun.bind();
+		if (star) _pipelineSun.bind();
 		else if (hasAtmo)
 		{
-			if (hasRing) pipelineBodyAtmoRing.bind();
-			else pipelineBodyAtmo.bind();
+			if (hasRing) _pipelineBodyAtmoRing.bind();
+			else _pipelineBodyAtmo.bind();
 		}
-		else pipelineBodyBare.bind();
+		else _pipelineBodyBare.bind();
 
 		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			ddata.sceneUBO.getOffset(),
 			sizeof(SceneUBO));
 
 		// Bind entity UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, _uboBuffer.getId(),
 			ddata.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
 		// Bind samplers
 		const vector<GLuint> samplers = {
-			bodyTexSampler,
-			bodyTexSampler,
-			bodyTexSampler,
-			bodyTexSampler,
-			atmoSampler,
-			ringSampler
+			_bodyTexSampler,
+			_bodyTexSampler,
+			_bodyTexSampler,
+			_bodyTexSampler,
+			_atmoSampler,
+			_ringSampler
 		};
 		// Bind textures
 		const vector<GLuint> texs = {
-			streamer.getTex(data.diffuse).getCompleteTextureId(diffuseTexDefault),
-			streamer.getTex(data.cloud).getCompleteTextureId(cloudTexDefault),
-			streamer.getTex(data.night).getCompleteTextureId(nightTexDefault),
-			streamer.getTex(data.specular).getCompleteTextureId(specularTexDefault),
+			_streamer.getTex(data.diffuse).getCompleteTextureId(_diffuseTexDefault),
+			_streamer.getTex(data.cloud).getCompleteTextureId(_cloudTexDefault),
+			_streamer.getTex(data.night).getCompleteTextureId(_nightTexDefault),
+			_streamer.getTex(data.specular).getCompleteTextureId(_specularTexDefault),
 			data.atmoLookupTable,
 			data.ringTex2,
 		};
@@ -925,7 +925,7 @@ void RendererGL::renderHdr(
 		glBindSamplers(2, samplers.size(), samplers.data());
 		glBindTextures(2, texs.size(), texs.data());
 
-		if (star) glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[0]);
+		if (star) glBeginQuery(GL_SAMPLES_PASSED, _sunOcclusionQueries[0]);
 		data.bodyDraw.draw(true);
 		if (star)
 		{
@@ -933,7 +933,7 @@ void RendererGL::renderHdr(
 			glDepthFunc(GL_ALWAYS);
 			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 			glDepthMask(GL_FALSE);
-			glBeginQuery(GL_SAMPLES_PASSED, sunOcclusionQueries[1]);
+			glBeginQuery(GL_SAMPLES_PASSED, _sunOcclusionQueries[1]);
 			data.bodyDraw.draw(true);
 			glEndQuery(GL_SAMPLES_PASSED);
 			glDepthFunc(GL_LESS);
@@ -944,18 +944,18 @@ void RendererGL::renderHdr(
 
 	// Star map rendering
 	// Don't render if star map texture not loaded
-	auto &starMapTex = streamer.getTex(starMapTexHandle);
+	auto &starMapTex = _streamer.getTex(_starMapTexHandle);
 	if (starMapTex.isComplete())
 	{
 		glDepthMask(GL_FALSE);
-		pipelineStarMap.bind();
+		_pipelineStarMap.bind();
 		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			ddata.sceneUBO.getOffset(),
 			sizeof(SceneUBO));
-		glBindSampler(1, bodyTexSampler);
+		glBindSampler(1, _bodyTexSampler);
 		glBindTextureUnit(1, starMapTex.getCompleteTextureId());
-		sphere.draw(true);
+		_sphereDraw.draw(true);
 	}
 }
 
@@ -963,7 +963,7 @@ void RendererGL::renderEntityFlares(
 	const vector<EntityHandle> &flares,
 	const DynamicData &data)
 {
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
@@ -971,20 +971,20 @@ void RendererGL::renderEntityFlares(
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, _hdrFBO);
 
-	pipelineFlare.bind();
+	_pipelineFlare.bind();
 
 	glBindSampler(1, 0);
-	glBindTextureUnit(1, flareTex);
+	glBindTextureUnit(1, _flareTex);
 
 	for (const auto &h : flares)
 	{
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			data.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
-		flareDraw.draw();
+		_flareDraw.draw();
 	}
 }
 
@@ -993,7 +993,7 @@ void RendererGL::renderTranslucent(
 	const DynamicData &data)
 {
 	// Viewport
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 	// Only depth test
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LESS);
@@ -1001,28 +1001,28 @@ void RendererGL::renderTranslucent(
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_SRC_ALPHA);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, _hdrFBO);
 
 	for (const auto &h : translucentEntities)
 	{
 		// Bind Scene UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
 			sizeof(SceneUBO));
 		// Bind Entity UBO
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboBuffer.getId(),
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, _uboBuffer.getId(),
 			data.bodyUBOs.at(h).getOffset(),
 			sizeof(BodyUBO));
 
 		const bool hasRing = h.getParam().hasRing();
 		const bool hasAtmo = h.getParam().hasAtmo();
 
-		const auto &data = bodyData[h];
+		const auto &data = _bodyData[h];
 
 		const vector<GLuint> samplers = {
-			atmoSampler,
-			ringSampler,
-			ringSampler
+			_atmoSampler,
+			_ringSampler,
+			_ringSampler
 		};
 
 		const vector<GLuint> texs = {
@@ -1037,21 +1037,21 @@ void RendererGL::renderTranslucent(
 		// Far rings
 		if (hasRing)
 		{
-			pipelineRingFar.bind();
+			_pipelineRingFar.bind();
 			data.ringDraw.draw(true);
 		}
 
 		// Atmosphere
 		if (hasAtmo)
 		{
-			pipelineAtmo.bind();
+			_pipelineAtmo.bind();
 			data.bodyDraw.draw(true);
 		}
 
 		// Near rings
 		if (hasRing)
 		{
-			pipelineRingNear.bind();
+			_pipelineRingNear.bind();
 			data.ringDraw.draw(true);
 		}
 	}
@@ -1060,7 +1060,7 @@ void RendererGL::renderTranslucent(
 void RendererGL::renderHighpass(const DynamicData &data)
 {
 	// Viewport
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
@@ -1071,38 +1071,38 @@ void RendererGL::renderHighpass(const DynamicData &data)
 	glBlendFunc(GL_ONE, GL_ZERO);
 
 	const vector<GLuint> attachments = {GL_COLOR_ATTACHMENT0};
-	glInvalidateNamedFramebufferData(highpassFBOs[0], attachments.size(), attachments.data());
+	glInvalidateNamedFramebufferData(_highpassFBOs[0], attachments.size(), attachments.data());
 
-	glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[0]);
+	glBindFramebuffer(GL_FRAMEBUFFER, _highpassFBOs[0]);
 
-	pipelineHighpass.bind();
+	_pipelineHighpass.bind();
 
-	const vector<GLuint> samplers = {rendertargetSampler};
-	const vector<GLuint> texs = {hdrMSRendertarget};
+	const vector<GLuint> samplers = {_rendertargetSampler};
+	const vector<GLuint> texs = {_hdrMSRendertarget};
 	glBindSamplers(1, samplers.size(), samplers.data());
 	glBindTextures(1, texs.size(), texs.data());
 
 	// Bind scene UBO
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
 			sizeof(SceneUBO));
 
-	fullscreenTri.draw();
+	_fullscreenTri.draw();
 }
 	
 void RendererGL::renderDownsample(const DynamicData &data)
 {
 	const vector<GLenum> invalidateAttach = {GL_COLOR_ATTACHMENT0};
-	glBindSampler(0, rendertargetSampler);
-	pipelineDownsample.bind();
-	for (int i=0;i<bloomDepth;++i)
+	glBindSampler(0, _rendertargetSampler);
+	_pipelineDownsample.bind();
+	for (int i=0;i<_bloomDepth;++i)
 	{
 		// Viewport
-		glViewport(0,0, windowWidth>>(i+1), windowHeight>>(i+1));
-		glInvalidateNamedFramebufferData(highpassFBOs[i+1], invalidateAttach.size(), invalidateAttach.data());
-		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i+1]);
-		glBindTextureUnit(0, highpassViews[i]);
-		fullscreenTri.draw();
+		glViewport(0,0, _windowWidth>>(i+1), _windowHeight>>(i+1));
+		glInvalidateNamedFramebufferData(_highpassFBOs[i+1], invalidateAttach.size(), invalidateAttach.data());
+		glBindFramebuffer(GL_FRAMEBUFFER, _highpassFBOs[i+1]);
+		glBindTextureUnit(0, _highpassViews[i]);
+		_fullscreenTri.draw();
 	}
 }
 
@@ -1110,45 +1110,45 @@ void RendererGL::renderBloom(const DynamicData &data)
 {
 	const vector<GLenum> invalidateAttach = {GL_COLOR_ATTACHMENT0};
 	glCopyImageSubData(
-		highpassViews[bloomDepth], GL_TEXTURE_2D, 0,
+		_highpassViews[_bloomDepth], GL_TEXTURE_2D, 0,
 		0, 0, 0, 
-		bloomViews[bloomDepth-1], GL_TEXTURE_2D, 0,
+		_bloomViews[_bloomDepth-1], GL_TEXTURE_2D, 0,
 		0, 0, 0,
-		mipmapSize(windowWidth,  bloomDepth),
-		mipmapSize(windowHeight, bloomDepth),
+		mipmapSize(_windowWidth,  _bloomDepth),
+		mipmapSize(_windowHeight, _bloomDepth),
 		1);
 
-	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
+	const vector<GLuint> samplers = {_rendertargetSampler, _rendertargetSampler};
 	glBindSamplers(0, samplers.size(), samplers.data());
-	for (int i=bloomDepth;i>=1;--i)
+	for (int i=_bloomDepth;i>=1;--i)
 	{
 		// Viewport
-		glViewport(0,0, windowWidth>>i, windowHeight>>i);
+		glViewport(0,0, _windowWidth>>i, _windowHeight>>i);
 		// Blur horizontally
-		pipelineBlurW.bind();
-		glInvalidateNamedFramebufferData(highpassFBOs[i], invalidateAttach.size(), invalidateAttach.data());
-		glBindFramebuffer(GL_FRAMEBUFFER, highpassFBOs[i]);
-		glBindTextureUnit(0, bloomViews[i-1]);
-		fullscreenTri.draw();
+		_pipelineBlurW.bind();
+		glInvalidateNamedFramebufferData(_highpassFBOs[i], invalidateAttach.size(), invalidateAttach.data());
+		glBindFramebuffer(GL_FRAMEBUFFER, _highpassFBOs[i]);
+		glBindTextureUnit(0, _bloomViews[i-1]);
+		_fullscreenTri.draw();
 
 		// Blur vertically
-		pipelineBlurH.bind();
-		glInvalidateNamedFramebufferData(bloomFBOs[i-1], invalidateAttach.size(), invalidateAttach.data());
-		glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-1]);
-		glBindTextureUnit(0, highpassViews[i]);
-		fullscreenTri.draw();
+		_pipelineBlurH.bind();
+		glInvalidateNamedFramebufferData(_bloomFBOs[i-1], invalidateAttach.size(), invalidateAttach.data());
+		glBindFramebuffer(GL_FRAMEBUFFER, _bloomFBOs[i-1]);
+		glBindTextureUnit(0, _highpassViews[i]);
+		_fullscreenTri.draw();
 
 		// Add blur with higher res
 		if (i>1)
 		{
 			// Viewport
-			glViewport(0,0, windowWidth>>(i-1), windowHeight>>(i-1));
-			pipelineBloomAdd.bind();
-			glInvalidateNamedFramebufferData(bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
-			glBindFramebuffer(GL_FRAMEBUFFER, bloomFBOs[i-2]);
-			const vector<GLuint> texs = {bloomViews[i-1], highpassViews[i-1]};
+			glViewport(0,0, _windowWidth>>(i-1), _windowHeight>>(i-1));
+			_pipelineBloomAdd.bind();
+			glInvalidateNamedFramebufferData(_bloomFBOs[i-2], invalidateAttach.size(), invalidateAttach.data());
+			glBindFramebuffer(GL_FRAMEBUFFER, _bloomFBOs[i-2]);
+			const vector<GLuint> texs = {_bloomViews[i-1], _highpassViews[i-1]};
 			glBindTextures(0, texs.size(), texs.data());
-			fullscreenTri.draw();
+			_fullscreenTri.draw();
 		}
 	}
 }
@@ -1156,7 +1156,7 @@ void RendererGL::renderBloom(const DynamicData &data)
 void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 {
 	// Viewport
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 	// No depth test/write
 	glDepthFunc(GL_ALWAYS);
 	glDepthMask(GL_FALSE);
@@ -1172,28 +1172,28 @@ void RendererGL::renderTonemap(const DynamicData &data, const bool bloom)
 	// Bind default FBO
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if (bloom) pipelineTonemapBloom.bind();
-	else pipelineTonemapNoBloom.bind();
+	if (bloom) _pipelineTonemapBloom.bind();
+	else _pipelineTonemapNoBloom.bind();
 
 	// Bind Scene UBO
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
 			data.sceneUBO.getOffset(),
 			sizeof(SceneUBO));
 
 	// Bind image after bloom is done
-	const vector<GLuint> samplers = {rendertargetSampler, rendertargetSampler};
-	const vector<GLuint> texs = {hdrMSRendertarget, bloomViews[0]};
+	const vector<GLuint> samplers = {_rendertargetSampler, _rendertargetSampler};
+	const vector<GLuint> texs = {_hdrMSRendertarget, _bloomViews[0]};
 	glBindSamplers(1, samplers.size(), samplers.data());
 	glBindTextures(1, texs.size(), texs.data());
 
-	fullscreenTri.draw();
+	_fullscreenTri.draw();
 }
 
 void RendererGL::renderSunFlare(
 	const DynamicData &data)
 {
 	// Viewport
-	glViewport(0,0, windowWidth, windowHeight);
+	glViewport(0,0, _windowWidth, _windowHeight);
 	// No depth test/write
 	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_ALWAYS);
@@ -1204,24 +1204,24 @@ void RendererGL::renderSunFlare(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	pipelineFlare.bind();
+	_pipelineFlare.bind();
 
 	// Bind Scene UBO
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboBuffer.getId(),
-		data.bodyUBOs.at(sun).getOffset(),
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, _uboBuffer.getId(),
+		data.bodyUBOs.at(_sun).getOffset(),
 		sizeof(BodyUBO));
 
 	// Bind textures
 	glBindSampler(1, 0);
-	glBindTextureUnit(1, flareTex);
+	glBindTextureUnit(1, _flareTex);
 
-	flareDraw.draw();
+	_flareDraw.draw();
 }
 
 void RendererGL::renderGui()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	gui.display(windowWidth, windowHeight);
+	_gui.display(_windowWidth, _windowHeight);
 }
 
 void RendererGL::loadTextures(const vector<EntityHandle> &texLoadEntities)
@@ -1230,15 +1230,15 @@ void RendererGL::loadTextures(const vector<EntityHandle> &texLoadEntities)
 	for (const auto &h : texLoadEntities)
 	{
 		const EntityParam param = h.getParam();
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 		// Textures & samplers
-		data.diffuse = streamer.createTex(param.getModel().getDiffuseFilename());
+		data.diffuse = _streamer.createTex(param.getModel().getDiffuseFilename());
 		if (param.hasClouds())
-			data.cloud = streamer.createTex(param.getClouds().getFilename());
+			data.cloud = _streamer.createTex(param.getClouds().getFilename());
 		if (param.hasNight())
-			data.night = streamer.createTex(param.getNight().getFilename());
+			data.night = _streamer.createTex(param.getNight().getFilename());
 		if (param.hasSpecular())
-			data.specular = streamer.createTex(param.getSpecular().getFilename());
+			data.specular = _streamer.createTex(param.getSpecular().getFilename());
 
 		data.texLoaded = true;
 	}
@@ -1249,14 +1249,14 @@ void RendererGL::unloadTextures(const vector<EntityHandle> &texUnloadEntities)
 	// Texture unloading
 	for (const auto &h : texUnloadEntities)
 	{
-		auto &data = bodyData[h];
+		auto &data = _bodyData[h];
 
 		// Reset variables
 		data.texLoaded = false;
-		streamer.deleteTex(data.diffuse);
-		streamer.deleteTex(data.cloud);
-		streamer.deleteTex(data.night);
-		streamer.deleteTex(data.specular);
+		_streamer.deleteTex(data.diffuse);
+		_streamer.deleteTex(data.cloud);
+		_streamer.deleteTex(data.night);
+		_streamer.deleteTex(data.specular);
 		data.diffuse = 0;
 		data.cloud = 0;
 		data.night = 0;
@@ -1267,7 +1267,7 @@ void RendererGL::unloadTextures(const vector<EntityHandle> &texUnloadEntities)
 void RendererGL::uploadLoadedTextures()
 {
 	// Texture uploading
-	streamer.update();
+	_streamer.update();
 }
 
 RendererGL::BodyUBO RendererGL::getBodyUBO(
@@ -1353,9 +1353,9 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 		else
 		{
 			// Smooth transition to detailed entity to flare
-			const float fadeIn = clamp((dist/radius-flareMinDistance)/
-				(flareOptimalDistance-flareMinDistance),0.f,1.f);
-			flareSize = fadeIn*(4.f/(float)windowHeight);
+			const float fadeIn = clamp((dist/radius-_flareMinDistance)/
+				(_flareOptimalDistance-_flareMinDistance),0.f,1.f);
+			flareSize = fadeIn*(4.f/(float)_windowHeight);
 
 			// Angle between view and light 
 			const float phaseAngle = acos(dot(
@@ -1374,7 +1374,7 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 				,1.0);
 		}
 		flareMat = translate(mat4(), screen)*
-			scale(mat4(), vec3(windowHeight/(float)windowWidth,1.0,0.0)*flareSize);
+			scale(mat4(), vec3(_windowHeight/(float)_windowWidth,1.0,0.0)*flareSize);
 	}
 
 	const mat3 viewNormalMat = transpose(inverse(mat3(viewMat)));
@@ -1424,5 +1424,5 @@ RendererGL::BodyUBO RendererGL::getBodyUBO(
 
 vector<pair<string,uint64_t>> RendererGL::getProfilerTimes()
 {
-	return profiler.get();
+	return _profiler.get();
 }

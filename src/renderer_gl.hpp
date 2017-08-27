@@ -183,129 +183,129 @@ private:
 	void saveScreenshot();
 
 	/// Measures time between GL calls
-	GPUProfilerGL profiler;
+	GPUProfilerGL _profiler;
 
 	// Screenshot info
 	/// Signals Screenshot object to save
-	bool takeScreen = false;
+	bool _takeScreen = false;
 	/// Screenshot filename
-	std::string screenFilename = "";
+	std::string _screenFilename = "";
 	/// Preferred GL screenshot format
-	Screenshot::Format screenBestFormat = Screenshot::Format::RGBA8;
+	Screenshot::Format _screenBestFormat = Screenshot::Format::RGBA8;
 	/// Preferred GL screenshot format (GL enum)
-	GLenum screenBestFormatGL = GL_RGBA;
+	GLenum _screenBestFormatGL = GL_RGBA;
 	/// Screenshot object
-	Screenshot screenshot;
+	Screenshot _screenshot;
 
 	/// Samples per pixel of HDR rendertarget
-	int msaaSamples = 1;
+	int _msaaSamples = 1;
 	/// Max texture width/height to be loaded and displayed (-1 means no limit)
-	int maxTexSize = -1;
+	int _maxTexSize = -1;
 	/// Window width in pixels
-	int windowWidth = 1;
+	int _windowWidth = 1;
 	/// Window height in pixels
-	int windowHeight = 1;
+	int _windowHeight = 1;
 	/// Far plane distance
-	float logDepthFarPlane = 5e9;
+	float _logDepthFarPlane = 5e9;
 	/// Logarithmic depth balance coefficient
-	float logDepthC = 1.0;
+	float _logDepthC = 1.0;
 
 	// Constants for distance based loading
 	/// Max distance at which a body is considered 'close' (detailed render)
-	float closeBodyMaxDistance;
+	float _closeBodyMaxDistance;
 	/// Min distance at which a body is considered 'far' (flare render)
-	float flareMinDistance;
+	float _flareMinDistance;
 	/// Optimal distance at which a body is considered 'far' (no flare fade in)
-	float flareOptimalDistance;
+	float _flareOptimalDistance;
 	/// Distance at which a body's textures will be loaded
-	float texLoadDistance;
+	float _texLoadDistance;
 	/// Distance at which a body's textures will be unloaded
-	float texUnloadDistance;
+	float _texUnloadDistance;
 
 	/// Buffer containing vertex data
-	Buffer vertexBuffer;
+	Buffer _vertexBuffer;
 	/// Buffer containing index data
-	Buffer indexBuffer;
+	Buffer _indexBuffer;
 	/// Buffer containing UBO data
-	Buffer uboBuffer;
+	Buffer _uboBuffer;
 	
 	/// Buffer ranges of each frame (multiple buffering)
-	std::vector<DynamicData> dynamicData;
+	std::vector<DynamicData> _dynamicData;
 	/// Data writing fences of each frame (multiple buffering)
-	std::vector<Fence> fences;
+	std::vector<Fence> _fences;
 
 	/// Vertex Array Object of entities, flares and deferred tris
-	GLuint vertexArray;
+	GLuint _vertexArray;
 
 	// Rendertargets : 
 	/// Depth stencil attachment of HDR rendertarget
-	GLuint depthStencilTex;
+	GLuint _depthStencilTex;
 	/// HDR MS rendertarget
-	GLuint hdrMSRendertarget;
+	GLuint _hdrMSRendertarget;
 	/// Highpass rendertargets (multiple mips)
-	GLuint highpassRendertargets;
+	GLuint _highpassRendertargets;
 	/// Bloom rendertargets (multiple mips)
-	GLuint bloomRendertargets;
+	GLuint _bloomRendertargets;
 
 	/// Number of bloom downsample steps (bigger blurs)
-	int bloomDepth = 8;
+	int _bloomDepth = 8;
 	/// Texture views to individual highpass rendertarget mipmaps
-	std::vector<GLuint> highpassViews;
+	std::vector<GLuint> _highpassViews;
 	/// Texture views to individual bloom rendertarget mipmaps
-	std::vector<GLuint> bloomViews;
+	std::vector<GLuint> _bloomViews;
 
 	/// Rendertarget sampler
-	GLuint rendertargetSampler;
+	GLuint _rendertargetSampler;
 
 	// FBOs
 	/// HDR FBO
-	GLuint hdrFBO;
+	GLuint _hdrFBO;
 	/// Highpass FBOs
-	std::vector<GLuint> highpassFBOs;
+	std::vector<GLuint> _highpassFBOs;
 	/// Bloom FBOs
-	std::vector<GLuint> bloomFBOs;
+	std::vector<GLuint> _bloomFBOs;
 
 	// Pipelines
 	/// Body without atmo
-	ShaderPipeline pipelineBodyBare;
+	ShaderPipeline _pipelineBodyBare;
 	/// Body with atmo
-	ShaderPipeline pipelineBodyAtmo;
+	ShaderPipeline _pipelineBodyAtmo;
 	/// Body with atmo and rings
-	ShaderPipeline pipelineBodyAtmoRing;
+	ShaderPipeline _pipelineBodyAtmoRing;
 	/// Star map
-	ShaderPipeline pipelineStarMap;
+	ShaderPipeline _pipelineStarMap;
 	/// Atmosphere
-	ShaderPipeline pipelineAtmo;
+	ShaderPipeline _pipelineAtmo;
 	/// Star
-	ShaderPipeline pipelineSun;
+	ShaderPipeline _pipelineSun;
 	/// Far half ring
-	ShaderPipeline pipelineRingFar;
+	ShaderPipeline _pipelineRingFar;
 	/// Near half ring
-	ShaderPipeline pipelineRingNear;
+	ShaderPipeline _pipelineRingNear;
 	/// Highpass for bloom
-	ShaderPipeline pipelineHighpass;
+	ShaderPipeline _pipelineHighpass;
 	/// Downsample for bloom
-	ShaderPipeline pipelineDownsample;
+	ShaderPipeline _pipelineDownsample;
 	/// Horizontal blur for bloom
-	ShaderPipeline pipelineBlurW;
+	ShaderPipeline _pipelineBlurW;
 	/// Vertical blur for bloom
-	ShaderPipeline pipelineBlurH;
+	ShaderPipeline _pipelineBlurH;
 	/// Bloom reconstitution
-	ShaderPipeline pipelineBloomAdd;
+	ShaderPipeline _pipelineBloomAdd;
 	/// Flares
-	ShaderPipeline pipelineFlare;
+	ShaderPipeline _pipelineFlare;
 	/// Tonemap and resolve with bloom
-	ShaderPipeline pipelineTonemapBloom;
+	ShaderPipeline _pipelineTonemapBloom;
 	/// Tonemap and resolve without bloom
-	ShaderPipeline pipelineTonemapNoBloom;
+	ShaderPipeline _pipelineTonemapNoBloom;
 
 	// Multiple buffering
 	/// Number of frame modulo bufferFrames
-	uint32_t frameId;
+	uint32_t _frameId;
 	/// Number of frames to multi-buffer
-	uint32_t bufferFrames;
+	uint32_t _bufferFrames;
 
-	const EntityCollection* entityCollection;
+	const EntityCollection* _entityCollection;
 
 	/// Entity data only for rendering
 	struct BodyData
@@ -356,52 +356,52 @@ private:
 	float getSunVisibility();
 
 	/// Rendering data for all bodies
-	std::map<EntityHandle, BodyData> bodyData;
+	std::map<EntityHandle, BodyData> _bodyData;
 	/// Index of sun in main entity collection
-	EntityHandle sun;
+	EntityHandle _sun;
 
-	GLuint sunOcclusionQueries[2] = {0, 0};
-	int occlusionQueryResults[2] = {0, 1};
+	GLuint _sunOcclusionQueries[2] = {0, 0};
+	int _occlusionQueryResults[2] = {0, 1};
 
-	DDSStreamer::Handle starMapTexHandle{};
-	float starMapIntensity = 1.0;
+	DDSStreamer::Handle _starMapTexHandle{};
+	float _starMapIntensity = 1.0;
 
 	// Textures
 	/// Default diffuse texture
-	GLuint diffuseTexDefault;
+	GLuint _diffuseTexDefault;
 	/// Default cloud texture
-	GLuint cloudTexDefault;
+	GLuint _cloudTexDefault;
 	/// Default emissive night texture
-	GLuint nightTexDefault;
+	GLuint _nightTexDefault;
 	/// Default specular mask texture
-	GLuint specularTexDefault;
+	GLuint _specularTexDefault;
 
 	/// Flare texture (white dot)
-	GLuint flareTex;
+	GLuint _flareTex;
 
 	// Samplers
 	/// Sampler for body textures
-	GLuint bodyTexSampler;
+	GLuint _bodyTexSampler;
 	/// Sampler for atmospheric lookup table
-	GLuint atmoSampler;
+	GLuint _atmoSampler;
 	/// Sampler for ring textures
-	GLuint ringSampler;
+	GLuint _ringSampler;
 
 	/// Max anisotropy for texture sampling
-	float textureAnisotropy;
+	float _textureAnisotropy;
 
 	// Meshes
 	/// Sphere draw command (for celestial bodies and atmospheres)
-	DrawCommand sphere;
+	DrawCommand _sphereDraw;
 	/// Flare mesh (Circle)
-	DrawCommand flareDraw;
+	DrawCommand _flareDraw;
 	/// Fullscreen triangle for covering the whole screen
-	DrawCommand fullscreenTri;
+	DrawCommand _fullscreenTri;
 
 	/// Stream texture loader
-	DDSStreamer streamer;
+	DDSStreamer _streamer;
 
-	GuiGL gui;
-	Gui::FontSize mainFontBig;
-	Gui::FontSize mainFontMedium;
+	GuiGL _gui;
+	Gui::FontSize _mainFontBig;
+	Gui::FontSize _mainFontMedium;
 };

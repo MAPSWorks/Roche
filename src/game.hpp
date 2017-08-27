@@ -69,100 +69,100 @@ private:
 	int chooseNextBody(bool direction);
 
 	// Main entity collection
-	EntityCollection entityCollection;
+	EntityCollection _entityCollection;
 
 	/// Index in the  the view follows
-	int focusedBodyId = 0; 
+	int _focusedBodyId = 0; 
 	/// Seconds since January 1st 2017 00:00:00 UTC
-	double epoch = 0.0;
+	double _epoch = 0.0;
 	/// Index in the timeWarpValues collection which indicates the current timewarp factor
-	int timeWarpIndex = 0;
+	int _timeWarpIndex = 0;
 	/// Timewarp factors
-	std::vector<double> timeWarpValues 
+	std::vector<double> _timeWarpValues 
 		= {1, 60, 60*10, 3600, 3600*3, 3600*12, 3600*24, 
 			3600*24*7, 3600*24*28, 3600*24*365.25, 3600*24*365.25*8};
 
 	/// Entity name display
-	int bodyNameId = focusedBodyId;
+	int _bodyNameId = _focusedBodyId;
 	/// Entity name display in/out
-	float bodyNameFade = 1.f;
+	float _bodyNameFade = 1.f;
 
 	/// Renderer
-	std::unique_ptr<Renderer> renderer;
+	std::unique_ptr<Renderer> _renderer;
 	/// Exposure coefficient
-	float exposure = 0.0;
+	float _exposure = 0.0;
 	/// Ambient light coefficient
-	float ambientColor = 0.0;
+	float _ambientColor = 0.0;
 	/// MSAA samples per pixel
-	int msaaSamples = 1;
+	int _msaaSamples = 1;
 	/// Maximum texture width/height
-	int maxTexSize = -1;
+	int _maxTexSize = -1;
 	/// Render lines instead of faces
-	bool wireframe = false;
+	bool _wireframe = false;
 	/// Render with bloom or not
-	bool bloom = true;
+	bool _bloom = true;
 	/// Wait for whole texture to load before displaying (no pop-ins)
-	bool syncTexLoading = false;
+	bool _syncTexLoading = false;
 
-	std::string starMapFilename = "";
-	float starMapIntensity = 1.0;
+	std::string _starMapFilename = "";
+	float _starMapIntensity = 1.0;
 
 	// PROFILING
 	/// Total times
-	std::vector<std::pair<std::string, uint64_t>> fullTimes;
+	std::vector<std::pair<std::string, uint64_t>> _fullTimes;
 	/// Max times
-	std::vector<std::pair<std::string, uint64_t>> maxTimes;
-	int numFrames = 0;
+	std::vector<std::pair<std::string, uint64_t>> _maxTimes;
+	int _numFrames = 0;
 
 	// VIEW CONTROL
 	/// Mouse position of previous update cycle
-	double preMousePosX = 0.0;
+	double _preMousePosX = 0.0;
 	/// Mouse position of previous update cycle
-	double preMousePosY = 0.0;
+	double _preMousePosY = 0.0;
 	/// Indicates if we are currently dragging the view
-	bool dragging = false;
+	bool _dragging = false;
 	/// View speed (yaw, pitch, zoom)
-	glm::vec3 viewSpeed = glm::vec3(0,0,0);
+	glm::vec3 _viewSpeed = glm::vec3(0,0,0);
 	/// Max view speed allowed
-	float maxViewSpeed = 0.2;
+	float _maxViewSpeed = 0.2;
 	/// View speed damping for smooth effect
-	float viewSmoothness = 0.85;
+	float _viewSmoothness = 0.85;
 	/// View position
-	glm::dvec3 viewPos;
+	glm::dvec3 _viewPos;
 	/// View matrix
-	glm::mat3 viewDir;
+	glm::mat3 _viewDir;
 
 	// SWITCHING PLANETS
 	/// Indicates if the view is switching from a entity to another
-	SwitchPhase switchPhase = SwitchPhase::IDLE;
+	SwitchPhase _switchPhase = SwitchPhase::IDLE;
 	/// Time of switching
-	float switchTime = 0.0;
+	float _switchTime = 0.0;
 	/// Index in main collection of entity switching from
-	int switchPreviousBodyId;
+	int _switchPreviousBodyId;
 	/// View dir when switching started 
-	glm::mat3 switchPreviousViewDir;
+	glm::mat3 _switchPreviousViewDir;
 	/// When view is obstructed when switching, interpolate to this new position
-	glm::vec3 switchNewViewPolar;
+	glm::vec3 _switchNewViewPolar;
 
 	/// Mouse sensitivity
-	float sensitivity = 0.0004;
+	float _sensitivity = 0.0004;
 
 	// VIEW COORDINATES
 	/// Polar coordinates (theta, phi, distance)
-	glm::vec3 viewPolar;
+	glm::vec3 _viewPolar;
 	/// View panning polar coordinates (theta, phi)
-	glm::vec2 panPolar;
+	glm::vec2 _panPolar;
 	/// Vertical Field of view in radians
-	float viewFovy = glm::radians(40.f);
+	float _viewFovy = glm::radians(40.f);
 
 	/// GLFW Window pointer
-	GLFWwindow *win = nullptr;
+	GLFWwindow *_win = nullptr;
 	/// Key currently held array
-	std::bitset<512> keysHeld;
+	std::bitset<512> _keysHeld;
 	/// Window width in pixels
-	uint32_t width = 0;
+	uint32_t _width = 0;
 	/// Window height in pixels
-	uint32_t height = 0;
+	uint32_t _height = 0;
 	/// Whether window is fullscreen or not
-	bool fullscreen = false;
+	bool _fullscreen = false;
 };
