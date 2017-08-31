@@ -1,27 +1,24 @@
 #include "sweeper.hpp"
+#include "exception.hpp"
 #include <sstream>
 #include <string>
 
 namespace shaun
 {
 
-sweeper::sweeper(shaun * root)
+sweeper::sweeper(shaun &root) : name_("root"), root_(&root)
 {
-    root_ = root;
-    name_ = "root";
 }
 
-sweeper::sweeper(const sweeper& swp)
+sweeper::sweeper(const sweeper& swp) : name_(swp.name_), root_(swp.root_)
 {
-    name_ = swp.name_;
-    root_ = swp.root_;
 }
 
 sweeper::~sweeper()
 {
 }
 
-shaun * sweeper::compute_path(const std::string& path)
+shaun * sweeper::compute_path(const std::string& path) const
 {
     std::string::const_iterator first, second;
     std::string name = name_;
@@ -33,7 +30,7 @@ shaun * sweeper::compute_path(const std::string& path)
         if (second == path.end())
         {
             if (ret->type() != Type::object)
-                throw ("expected object but " + name + " has type " + type_to_string(ret->type()));
+                throw type_error(Type::object, ret->type(), name);
 
             name.assign(first, second);
             ret = static_cast<object*>(ret)->get_variable(name);
@@ -44,7 +41,7 @@ shaun * sweeper::compute_path(const std::string& path)
         if (*(second) == ':' || *(second) == '[')
         {
             if (ret->type() != Type::object)
-                throw ("expected object but " + name + " has type " + type_to_string(ret->type()));
+                throw type_error(Type::object, ret->type(), name);
 
             name.assign(first, second);
 
@@ -53,7 +50,7 @@ shaun * sweeper::compute_path(const std::string& path)
             if (*(second) == '[')
             {
                 if (ret->type() != Type::list)
-                    throw ("expected list but " + name + " has type " + type_to_string(ret->type()));
+                    throw type_error(Type::object, ret->type(), name);
 
                 first = ++second;
                 while (*second != ']') ++second;
@@ -67,7 +64,7 @@ shaun * sweeper::compute_path(const std::string& path)
                 }
                 catch (...)
                 {
-                    throw ("index out of range");
+                    throw list_index_error();
                 }
 
                 ++second;
@@ -85,15 +82,15 @@ shaun * sweeper::compute_path(const std::string& path)
 sweeper& sweeper::operator[](size_t i)
 {
     if (root_->type() != Type::list)
-        throw (name_ + " is not a list");
+        throw type_error(Type::list, root_->type(), name_);
 
     try
     {
-        next_.reset(new sweeper(static_cast<list*>(root_)->elements().at(i).get()));
+        next_.reset(new sweeper(*(static_cast<list*>(root_)->elements().at(i).get())));
     }
     catch (...)
     {
-        throw ("index out of range");
+        throw list_index_error();
     }
     
     return *next_;
@@ -101,7 +98,7 @@ sweeper& sweeper::operator[](size_t i)
 
 sweeper& sweeper::get(const std::string& path)
 {
-    next_.reset(new sweeper(compute_path(path)));
+    next_.reset(new sweeper(*compute_path(path)));
     return *next_;
 }
 
@@ -114,7 +111,7 @@ sweeper& sweeper::operator()(const std::string& path)
     TYPE& sweeper::value() const    \
     {                      \
         if (root_->type() != Type::TYPE)\
-            throw ("expected " + type_to_string(Type::TYPE) + " but " + name_ + " has type " + type_to_string(root_->type()));\
+            throw type_error(Type::TYPE, root_->type(), name_);\
                            \
         return *static_cast<TYPE*>(root_);\
     }
@@ -125,6 +122,17 @@ VALUE(number)
 VALUE(string)
 VALUE(object)
 VALUE(list)
+
+/*
+template<>
+std::string &sweeper::value() const
+{
+    if (root_->type() != Type::string)
+        throw type_error(Type::string, root_->type(), name_);
+
+    return *reinterpret_cast<std::string*>(static_cast<string*>(root_));
+}
+*/
 
 Type sweeper::type() const
 {
@@ -142,7 +150,7 @@ size_t sweeper::size() const
   {
     case Type::null: return 0;
     case Type::number: return (size_t)((double)(*static_cast<number*>(root_)));
-    case Type::string: return ((std::string)(*static_cast<string*>(root_))).size();
+    case Type::string: return (*static_cast<string*>(root_)).size();
     case Type::object: return static_cast<object*>(root_)->size();
     case Type::list: return static_cast<list*>(root_)->size();
     case Type::boolean: return (size_t)((bool)(*static_cast<boolean*>(root_)));

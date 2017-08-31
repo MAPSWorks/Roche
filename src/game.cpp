@@ -27,8 +27,9 @@
 #include <glm/ext.hpp>
 
 using namespace glm;
+using namespace std;
 
-std::string generateScreenshotName();
+string generateScreenshotName();
 
 Game::Game()
 {
@@ -42,49 +43,34 @@ Game::~Game()
 	glfwTerminate();
 }
 
-std::string readFile(const std::string &filename)
-{
-	std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-	if (!in) throw std::runtime_error("Can't open" + filename);
-	std::string contents;
-	in.seekg(0, std::ios::end);
-	contents.resize(in.tellg());
-	in.seekg(0, std::ios::beg);
-	in.read(&contents[0], contents.size());
-	return contents;
-}
-
 void Game::loadSettingsFile()
 {
-	using namespace shaun;
 	try 
 	{
-		parser p{};
-		const std::string fileContent = readFile("config/settings.sn");
-		object obj = p.parse(fileContent.c_str());
-		sweeper swp(&obj);
+		shaun::object obj = shaun::parse_file("config/settings.sn");
+		shaun::sweeper swp(obj);
 
-		sweeper video(swp("video"));
+		shaun::sweeper video(swp("video"));
 		auto fs = video("fullscreen");
-		_fullscreen = (fs.is_null())?true:(bool)fs.value<boolean>();
+		_fullscreen = (fs.is_null())?true:(bool)fs.value<shaun::boolean>();
 
 		if (!_fullscreen)
 		{
-			_width = video("width").value<number>();
-			_height = video("height").value<number>();
+			_width = video("width").value<shaun::number>();
+			_height = video("height").value<shaun::number>();
 		}
 
-		sweeper graphics(swp("graphics"));
-		_maxTexSize = graphics("maxTexSize").value<number>();
-		_msaaSamples = graphics("msaaSamples").value<number>();
-		_syncTexLoading = graphics("syncTexLoading").value<boolean>();
+		shaun::sweeper graphics(swp("graphics"));
+		_maxTexSize = graphics("maxTexSize").value<shaun::number>();
+		_msaaSamples = graphics("msaaSamples").value<shaun::number>();
+		_syncTexLoading = graphics("syncTexLoading").value<shaun::boolean>();
 
-		sweeper controls(swp("controls"));
-		_sensitivity = controls("sensitivity").value<number>();
+		shaun::sweeper controls(swp("controls"));
+		_sensitivity = controls("sensitivity").value<shaun::number>();
 	} 
-	catch (parse_error &e)
+	catch (const shaun::exception &e)
 	{
-		std::cout << e << std::endl;
+		throw runtime_error("Error when parsing settings file :\n" + e.to_string());
 	}
 }
 
@@ -121,7 +107,7 @@ void Game::init()
 
 	// Window & context creation
 	if (!glfwInit())
-		throw std::runtime_error("Can't init GLFW");
+		throw runtime_error("Can't init GLFW");
 
 	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 	const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -150,7 +136,7 @@ void Game::init()
 	if (!_win)
 	{
 		glfwTerminate();
-		throw std::runtime_error("Can't open window");
+		throw runtime_error("Can't open window");
 	}
 	glfwMakeContextCurrent(_win);
 
@@ -158,7 +144,7 @@ void Game::init()
 	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
-		throw std::runtime_error("Can't initialize GLEW : " + std::string((const char*)glewGetErrorString(err)));
+		throw runtime_error("Can't initialize GLEW : " + string((const char*)glewGetErrorString(err)));
 	}
 
 	// Set _epoch as current time (get time since 1970 + adjust for 2017)
@@ -185,9 +171,9 @@ double get(shaun::sweeper swp)
 }
 
 template <>
-std::string get(shaun::sweeper swp)
+string get(shaun::sweeper swp)
 {
-	if (swp.is_null()) return ""; else return std::string(swp.value<shaun::string>());
+	if (swp.is_null()) return ""; else return swp.value<shaun::string>();
 }
 
 template <>
@@ -248,7 +234,7 @@ Model parseModel(shaun::sweeper &modelsw, const mat3 &axialMat)
 		get<double>(modelsw("rotPeriod")),
 		get<vec3>(modelsw("meanColor"))*
 		(float)get<double>(modelsw("albedo")),
-		get<std::string>(modelsw("diffuse")));
+		get<string>(modelsw("diffuse")));
 }
 
 Atmo parseAtmo(shaun::sweeper &atmosw)
@@ -269,11 +255,11 @@ Ring parseRing(shaun::sweeper &ringsw, const mat3 &axialMat)
 		axis(
 			radians(get<double>(ringsw("rightAscension"))),
 			radians(get<double>(ringsw("declination")))),
-		get<std::string>(ringsw("backscat")),
-		get<std::string>(ringsw("forwardscat")),
-		get<std::string>(ringsw("unlit")),
-		get<std::string>(ringsw("transparency")),
-		get<std::string>(ringsw("color")));
+		get<string>(ringsw("backscat")),
+		get<string>(ringsw("forwardscat")),
+		get<string>(ringsw("unlit")),
+		get<string>(ringsw("transparency")),
+		get<string>(ringsw("color")));
 }
 
 Star parseStar(shaun::sweeper &starsw)
@@ -290,14 +276,14 @@ Star parseStar(shaun::sweeper &starsw)
 Clouds parseClouds(shaun::sweeper &cloudssw)
 {
 	return Clouds(
-		get<std::string>(cloudssw("filename")),
+		get<string>(cloudssw("filename")),
 		get<double>(cloudssw("period")));
 }
 
 Night parseNight(shaun::sweeper &nightsw)
 {
 	return Night(
-		get<std::string>(nightsw("filename")),
+		get<string>(nightsw("filename")),
 		get<double>(nightsw("intensity")));
 }
 
@@ -306,7 +292,7 @@ Specular parseSpecular(shaun::sweeper &specsw)
 	shaun::sweeper mask0(specsw("mask0"));
 	shaun::sweeper mask1(specsw("mask1"));
 	return Specular(
-		get<std::string>(specsw("filename")),
+		get<string>(specsw("filename")),
 		{get<vec3>(mask0("color")), 
 		 (float)get<double>(mask0("hardness"))},
 		{get<vec3>(mask1("color")),
@@ -315,35 +301,32 @@ Specular parseSpecular(shaun::sweeper &specsw)
 
 void Game::loadEntityFiles()
 {
-	using namespace shaun;
 	try
 	{
-		parser p;
-		std::string fileContent = readFile("config/entities.sn");
-		object obj = p.parse(fileContent.c_str());
-		sweeper swp(&obj);
+		shaun::object obj = shaun::parse_file("config/entities.sn");
+		shaun::sweeper swp(obj);
 
 		_ambientColor = (float)get<double>(swp("ambientColor"));
-		std::string startingBody = std::string(swp("startingBody").value<string>());
+		string startingBody = swp("startingBody").value<shaun::string>();
 
-		sweeper starMap(swp("starMap"));
-		_starMapFilename = get<std::string>(starMap("diffuse"));
+		shaun::sweeper starMap(swp("starMap"));
+		_starMapFilename = get<string>(starMap("diffuse"));
 		_starMapIntensity = (float)get<double>(starMap("intensity"));
 
 		const float axialTilt = radians(get<double>(swp("axialTilt")));
 		const mat3 axialMat = mat3(rotate(mat4(), axialTilt, vec3(0,-1,0)));
 
-		std::vector<EntityParam> entities;
+		vector<EntityParam> entities;
 
-		sweeper barycenterSw(swp("barycenters"));
+		shaun::sweeper barycenterSw(swp("barycenters"));
 		for (int i=0;i<(int)barycenterSw.size();++i)
 		{
-			sweeper bc(barycenterSw[i]);
+			shaun::sweeper bc(barycenterSw[i]);
 			EntityParam entity;
-			entity.setName(std::string(bc("name").value<string>()));
-			entity.setParentName(get<std::string>(bc("parent")));
+			entity.setName(bc("name").value<shaun::string>());
+			entity.setParentName(get<string>(bc("parent")));
 
-			sweeper orbitsw(bc("orbit"));
+			shaun::sweeper orbitsw(bc("orbit"));
 			if (!orbitsw.is_null())
 			{
 				entity.setOrbit(parseOrbit(orbitsw));
@@ -351,60 +334,55 @@ void Game::loadEntityFiles()
 			entities.push_back(entity);
 		}
 
-		sweeper bodySweeper(swp("bodies"));
+		shaun::sweeper bodySweeper(swp("bodies"));
 
 		for (int i=0;i<(int)bodySweeper.size();++i)
 		{
-			sweeper bd(bodySweeper[i]);
-			std::string name = std::string(bd("name").value<string>());
+			shaun::sweeper bd(bodySweeper[i]);
+			string name = bd("name").value<shaun::string>();
 			// Create entity
 			EntityParam entity;
 			entity.setName(name);
-			const std::string displayName = get<std::string>(bd("displayName"));
+			const string displayName = get<string>(bd("displayName"));
 			entity.setDisplayName(displayName==""?name:displayName);
-			entity.setParentName(get<std::string>(bd("parent")));
+			entity.setParentName(get<string>(bd("parent")));
 
-			sweeper orbitsw(bd("orbit"));
+			shaun::sweeper orbitsw(bd("orbit"));
 			if (!orbitsw.is_null())
 			{
 				entity.setOrbit(parseOrbit(orbitsw));
 			}
-			sweeper modelsw(bd("model"));
+			shaun::sweeper modelsw(bd("model"));
 			if (!modelsw.is_null())
 			{
 				entity.setModel(parseModel(modelsw, axialMat));
 			}
-			sweeper atmosw(bd("atmo"));
+			shaun::sweeper atmosw(bd("atmo"));
 			if (!atmosw.is_null())
 			{
 				entity.setAtmo(parseAtmo(atmosw));
 			}
-
-			sweeper ringsw(bd("ring"));
+			shaun::sweeper ringsw(bd("ring"));
 			if (!ringsw.is_null())
 			{
 				entity.setRing(parseRing(ringsw, axialMat));
 			}
-
-			sweeper starsw(bd("star"));
+			shaun::sweeper starsw(bd("star"));
 			if (!starsw.is_null())
 			{
 				entity.setStar(parseStar(starsw));
 			}
-
-			sweeper cloudssw(bd("clouds"));
+			shaun::sweeper cloudssw(bd("clouds"));
 			if (!cloudssw.is_null())
 			{
 				entity.setClouds(parseClouds(cloudssw));
 			}
-
-			sweeper nightsw(bd("night"));
+			shaun::sweeper nightsw(bd("night"));
 			if (!nightsw.is_null())
 			{
 				entity.setNight(parseNight(nightsw));
 			}
-
-			sweeper specsw(bd("specular"));
+			shaun::sweeper specsw(bd("specular"));
 			if (!specsw.is_null())
 			{
 				entity.setSpecular(parseSpecular(specsw));
@@ -423,9 +401,9 @@ void Game::loadEntityFiles()
 			}
 		}
 	}
-	catch (parse_error &e)
+	catch (const shaun::exception &e)
 	{
-		throw std::runtime_error(std::string("Parse Error : ") + e.what());
+		throw runtime_error("Error when parsing entity file :\n" + e.to_string());
 	}
 }
 
@@ -450,10 +428,10 @@ vec3 polarToCartesian(const vec2 &p)
 		sin(p.y));
 }
 
-std::string format(int value)
+string format(int value)
 {
-	return std::string(1, (char)('0'+(value/10))) +
-		std::string(1, (char)('0'+(value%10)));
+	return string(1, (char)('0'+(value/10))) +
+		string(1, (char)('0'+(value%10)));
 }
 
 bool isLeapYear(int year)
@@ -461,7 +439,7 @@ bool isLeapYear(int year)
 	return ((year%4==0) && (year%100!=0)) || (year%400==0);
 }
 
-std::string getFormattedTime(long _epochInSeconds)
+string getFormattedTime(long _epochInSeconds)
 {
 	const int seconds = _epochInSeconds%60;
 	const int minutes = (_epochInSeconds/60)%60;
@@ -483,7 +461,7 @@ std::string getFormattedTime(long _epochInSeconds)
 
 	int remainingDays = days-i;
 
-	std::vector<int> monthLength = {
+	vector<int> monthLength = {
 		31,28+(isLeapYear(year)?1:0), 31,
 		30, 31, 30,
 		31, 31, 30,
@@ -502,15 +480,15 @@ std::string getFormattedTime(long _epochInSeconds)
 		else break;
 	}
 
-	std::vector<std::string> monthNames = {
+	vector<string> monthNames = {
 		"Jan", "Feb", "Mar", 
 		"Apr", "May", "Jun", 
 		"Jul", "Aug", "Sep", 
 		"Oct", "Nov", "Dec"};
 
 	return monthNames[month] + ". " + 
-		std::to_string(remainingDays-j+1) + " " + 
-		std::to_string(year) + " " + 
+		to_string(remainingDays-j+1) + " " + 
+		to_string(year) + " " + 
 		format(hours) + ':' + 
 		format(minutes) + ':' +
 		format(seconds) + " UTC";
@@ -520,7 +498,7 @@ void Game::update(const double dt)
 {
 	_epoch += _timeWarpValues[_timeWarpIndex]*dt;
 
-	std::map<EntityHandle, dvec3> relativePositions;
+	map<EntityHandle, dvec3> relativePositions;
 	// Entity state update
 	for (const auto &h : _entityCollection.getAll())
 	{
@@ -529,7 +507,7 @@ void Game::update(const double dt)
 			h.getParam().getOrbit().computePosition(_epoch);
 	}
 
-	std::map<EntityHandle, EntityState> state;
+	map<EntityHandle, EntityState> state;
 
 	// Entity absolute position update
 	for (auto h : _entityCollection.getAll())
@@ -599,12 +577,12 @@ void Game::update(const double dt)
 	}
 
 	// Focused entities
-	const std::vector<EntityHandle> texLoadBodies = 
+	const vector<EntityHandle> texLoadBodies = 
 		getTexLoadBodies(getFocusedBody());
 
 	// Time formatting
 	const long _epochInSeconds = floor(_epoch);
-	const std::string formattedTime = getFormattedTime(_epochInSeconds);
+	const string formattedTime = getFormattedTime(_epochInSeconds);
 		
 	// Scene rendering
 	_renderer->render({
@@ -620,12 +598,12 @@ void Game::update(const double dt)
 	// Display profiler in console
 	if (isPressedOnce(GLFW_KEY_F5) && !a.empty())
 	{
-		std::cout << "Current Frame: " << std::endl;
+		cout << "Current Frame: " << endl;
 		displayProfiling(a);
 		auto b = computeAverage(_fullTimes, _numFrames);
-		std::cout << "Average: " << std::endl;
+		cout << "Average: " << endl;
 		displayProfiling(b);
-		std::cout << "Max: " << std::endl;
+		cout << "Max: " << endl;
 		displayProfiling(_maxTimes);
 	}
 
@@ -701,7 +679,7 @@ void Game::updateIdle(float dt, double posX, double posY)
 
 	_viewPolar.x += _viewSpeed.x;
 	_viewPolar.y += _viewSpeed.y;
-	_viewPolar.z += _viewSpeed.z*std::max(0.01f, _viewPolar.z-radius);
+	_viewPolar.z += _viewSpeed.z*glm::max(0.01f, _viewPolar.z-radius);
 
 	_viewSpeed *= _viewSmoothness;
 
@@ -816,7 +794,7 @@ float ease2(float t, float alpha)
 void Game::updateTrack(float dt)
 {
 	const float totalTime = 1.0;
-	const float t = min(1.f, _switchTime/totalTime);
+	const float t = glm::min(1.f, _switchTime/totalTime);
 	const float f = ease(t);
 
 	// Entity name display
@@ -871,7 +849,7 @@ void Game::updateTrack(float dt)
 void Game::updateMove(float dt)
 {
 	const float totalTime = 1.0;
-	const float t = min(1.f, _switchTime/totalTime);
+	const float t = glm::min(1.f, _switchTime/totalTime);
 	const double f = ease2(t, 4);
 
 	// Entity name fade
@@ -883,7 +861,7 @@ void Game::updateMove(float dt)
 		dvec3(polarToCartesian(vec2(_viewPolar))*_viewPolar.z);
 
 	// Distance from entity at arrival
-	const float targetDist = std::max(
+	const float targetDist = glm::max(
 		4*getFocusedBody().getParam().getModel().getRadius(), 1000.f);
 	// Direction from old position to new entity
 	const vec3 direction = 
@@ -909,66 +887,10 @@ void Game::updateMove(float dt)
 	}
 }
 
-/*
-int Game::getParent(size_t entityId)
-{
-	return entityParents[entityId];
-}
-
-std::vector<size_t> Game::getAllParents(size_t entityId)
-{
-	std::vector<size_t> parents = {};
-	int temp = entityId;
-	int tempParent = -1;
-	while ((tempParent = getParent(temp)) != -1)
-	{
-		parents.push_back(tempParent);
-		temp = tempParent;
-	}
-	return parents;
-}
-
-int Game::getLevel(size_t entityId)
-{
-	int level = 0;
-	int temp = entityId;
-	int tempParent = -1;
-	while ((tempParent = getParent(temp)) != -1)
-	{
-		level += 1;
-		temp = tempParent;
-	}
-	return level;
-}
-
-std::vector<size_t> Game::getChildren(size_t entityId)
-{
-	std::vector<size_t> children;
-	for (size_t i=0;i<entityParents.size();++i)
-	{
-		if (getParent(i) == (int)entityId) children.push_back(i);
-	}
-	return children;
-}
-
-std::vector<size_t> Game::getAllChildren(size_t entityId)
-{
-	auto c = getChildren(entityId);
-	std::vector<size_t> accum = {};
-	for (auto i : c)
-	{
-		auto cc = getAllChildren(i);
-		accum.insert(accum.end(), cc.begin(), cc.end());
-	}
-	c.insert(c.end(), accum.begin(), accum.end());
-	return c;
-}
-*/
-
-std::vector<EntityHandle> Game::getTexLoadBodies(const EntityHandle &focusedEntity)
+vector<EntityHandle> Game::getTexLoadBodies(const EntityHandle &focusedEntity)
 {
 	// Itself visible
-	std::vector<EntityHandle> v = {focusedEntity};
+	vector<EntityHandle> v = {focusedEntity};
 
 	// All parents visible
 	auto parents = focusedEntity.getAllParents();
@@ -979,18 +901,18 @@ std::vector<EntityHandle> Game::getTexLoadBodies(const EntityHandle &focusedEnti
 	v.insert(v.end(), siblings.begin(), siblings.end());
 
 	// Only select bodies
-	v.erase(std::remove_if(v.begin(), v.end(), [](const EntityHandle &h){
+	v.erase(remove_if(v.begin(), v.end(), [](const EntityHandle &h){
 		return !h.getParam().isBody();
 	}), v.end());
 
 	return v;
 }
 
-std::string generateScreenshotName()
+string generateScreenshotName()
 {
 	time_t t = time(0);
 	struct tm *now = localtime(&t);
-	std::stringstream filenameBuilder;
+	stringstream filenameBuilder;
 	filenameBuilder << 
 		"./screenshots/screenshot_" << 
 		(now->tm_year+1900) << "-" << 
@@ -1002,7 +924,7 @@ std::string generateScreenshotName()
 	return filenameBuilder.str();
 }
 
-void Game::displayProfiling(const std::vector<std::pair<std::string, uint64_t>> &a)
+void Game::displayProfiling(const vector<pair<string, uint64_t>> &a)
 {
 	// First entry is full time of frame
 	uint64_t full = a[0].second;
@@ -1015,28 +937,28 @@ void Game::displayProfiling(const std::vector<std::pair<std::string, uint64_t>> 
 	// Display each entry
 	for (auto p : a)
 	{
-		std::cout.width(largestName);
-		std::cout << std::left << p.first;
+		cout.width(largestName);
+		cout << left << p.first;
 		uint64_t nano = p.second;
 		double percent = 100*nano/(double)full;
 		double fps = 1E9/(double)nano;
 		double micro = nano/1E6;
 		// If entry is full time, display fps instead of percentage of frame
 		if (nano == full)
-			std::cout << "  " << micro << "ms (" << fps << "FPS)" << std::endl;
+			cout << "  " << micro << "ms (" << fps << "FPS)" << endl;
 		else
-			std::cout << "  " << micro << "ms (" << percent << "%)" << std::endl;
+			cout << "  " << micro << "ms (" << percent << "%)" << endl;
 	}
-	std::cout << "-------------------------" << std::endl;
+	cout << "-------------------------" << endl;
 }
 
-void Game::updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &a)
+void Game::updateProfiling(const vector<pair<string, uint64_t>> &a)
 {
 	for (auto p : a)
 	{
 		// Full time update
 		{
-			auto it = std::find_if(_fullTimes.begin(), _fullTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+			auto it = find_if(_fullTimes.begin(), _fullTimes.end(), [&](pair<string, uint64_t> pa){
 				return pa.first == p.first;
 			});
 			if (it == _fullTimes.end()) _fullTimes.push_back(p);
@@ -1045,20 +967,20 @@ void Game::updateProfiling(const std::vector<std::pair<std::string, uint64_t>> &
 
 		// Max time update
 		{
-			auto it = std::find_if(_maxTimes.begin(), _maxTimes.end(), [&](std::pair<std::string, uint64_t> pa){
+			auto it = find_if(_maxTimes.begin(), _maxTimes.end(), [&](pair<string, uint64_t> pa){
 				return pa.first == p.first;
 			});
 			if (it == _maxTimes.end()) _maxTimes.push_back(p);
-			else it->second = std::max(it->second, p.second);
+			else it->second = glm::max(it->second, p.second);
 		}
 	}
 	_numFrames += 1;
 }
 
-std::vector<std::pair<std::string, uint64_t>> Game::computeAverage(
-	const std::vector<std::pair<std::string, uint64_t>> &a, int frames)
+vector<pair<string, uint64_t>> Game::computeAverage(
+	const vector<pair<string, uint64_t>> &a, int frames)
 {
-	std::vector<std::pair<std::string, uint64_t>> result = a;
+	vector<pair<string, uint64_t>> result = a;
 	for (auto &p : result)
 	{
 		p.second /= (float)frames;

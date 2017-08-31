@@ -12,6 +12,7 @@ set(SOURCE
 	mesh.cpp
 	gui.cpp
 	thirdparty/shaun/shaun.cpp
+	thirdparty/shaun/parser.cpp
 	thirdparty/shaun/sweeper.cpp)
 
 set(SOURCE_GL

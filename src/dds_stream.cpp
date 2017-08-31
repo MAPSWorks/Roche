@@ -96,27 +96,20 @@ struct TexInfo
 
 TexInfo parseInfoFile(const string &filename, int maxSize)
 {
-	ifstream in(filename.c_str(), ios::in | ios::binary);
-	if (!in) return {};
-
-	string contents;
-	in.seekg(0, ios::end);
-	contents.resize(in.tellg());
-	in.seekg(0, ios::beg);
-	in.read(&contents[0], contents.size());
-
 	try
 	{
-		shaun::parser p{};
-		shaun::object obj = p.parse(contents.c_str());
-		shaun::sweeper swp(&obj);
+		shaun::object obj = shaun::parse_file(filename);
+		shaun::sweeper swp(obj);
 
 		TexInfo info{};
 		info.size = swp("size").value<shaun::number>();
 		info.levels = swp("levels").value<shaun::number>();
-		info.prefix = (string)swp("prefix").value<shaun::string>();
-		info.separator = (string)swp("separator").value<shaun::string>();
-		info.suffix = (string)swp("suffix").value<shaun::string>();
+		string prefix = swp("prefix").value<shaun::string>();
+		string separator = swp("separator").value<shaun::string>();
+		string suffix = swp("suffix").value<shaun::string>();
+		info.prefix = prefix;
+		info.separator = separator;
+		info.suffix = suffix;
 		info.rowColumnOrder = swp("row_column_order").value<shaun::boolean>();
 
 		int maxRows = maxSize/(info.size*2);

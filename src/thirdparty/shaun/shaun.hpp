@@ -4,10 +4,11 @@
 #include <map>
 #include <vector>
 #include <memory>
-#include "shaun.hpp"
 
 namespace shaun
 {
+  
+class visitor;
 
 enum class Type : int { object, list, boolean, number, string, null };
 
@@ -18,10 +19,41 @@ class shaun
 public:    
     virtual ~shaun() {}
 
-    virtual Type type() = 0;
+    Type type() const;
+    bool is_null() const;
 
-    virtual bool is_null();
+    /**
+     * returns the index of a potential child
+     * node of the current node
+     */
+    virtual int index_of(shaun * child) const;
+
+    /**
+     * node part of the visitor pattern
+     */
+    virtual void visited(visitor& v) = 0;
+
+    virtual operator bool() const;
+    virtual operator char() const;
+    virtual operator unsigned char() const;
+    virtual operator short() const;
+    virtual operator unsigned short() const;
+    virtual operator int() const;
+    virtual operator unsigned int() const;
+    virtual operator long() const;
+    virtual operator unsigned long() const;
+    virtual operator wchar_t() const;
+    virtual operator float() const;
+    virtual operator double() const;
+    virtual operator long double() const;
+    virtual operator std::string() const;
+    virtual operator const char *() const;
+
 protected:
+    shaun() = delete;
+    shaun(Type t);
+
+    Type type_;
 };
 
 
@@ -29,22 +61,58 @@ protected:
 class list : public shaun
 {
 public:
+  
+    using vector = std::vector<std::shared_ptr<shaun> >;
+    using iterator = vector::iterator;
+    using const_iterator = vector::const_iterator;
+    
     list();
     list(const list& l);
+
     ~list();
-    Type type();
 
-    void push_back(shaun * elem);
-    const std::vector<std::shared_ptr<shaun> >& elements();
+    // cf. shaun::visited()
+    void visited(visitor& v);
 
-    shaun * operator[](size_t i);
+    /**
+     * same as std::vector
+     */
+    void push_back(const shaun& elem);
 
     template<class C>
+    void push_back(C elem);
+
+    /**
+     * c++11 foreach loop integration
+     */
+    iterator begin();
+    const_iterator begin() const;
+    iterator end();
+    const_iterator end() const;
+
+    /**
+     * returns the underlying vector of the list
+     */
+    const vector& elements();
+
+    shaun& operator[](size_t i);
+    const shaun& operator[](size_t i) const;
+
+    /**
+     * different from operator[]
+     * as it can return a casted value
+     * (i.e. list.at<double>(0) can return a double from a shaun::number)
+     */
+    template<class C>
     C& at(size_t i);
+    template<class C>
+    const C& at(size_t i) const;
     
     size_t size() const;
+    virtual int index_of(shaun *child) const;
+
 private:
-    std::vector<std::shared_ptr<shaun> > elements_;
+    vector elements_;
 };
 
 class boolean : public shaun
@@ -52,10 +120,38 @@ class boolean : public shaun
 public:
     boolean();
     boolean(const boolean& b);
-    boolean(bool yes);
-    Type type();
 
-    operator bool() const { return value; } 
+    boolean(bool);
+    boolean(char);
+    boolean(unsigned char);
+    boolean(short int);
+    boolean(unsigned short int);
+    boolean(int);
+    boolean(unsigned int);
+    boolean(long);
+    boolean(unsigned long);
+    boolean(wchar_t);
+    boolean(float);
+    boolean(double);
+    boolean(long double);
+
+    void visited(visitor& v);
+
+ 
+    virtual operator bool() const;
+    virtual operator char() const;
+    virtual operator unsigned char() const;
+    virtual operator short() const;
+    virtual operator unsigned short() const;
+    virtual operator int() const;
+    virtual operator unsigned int() const;
+    virtual operator long() const;
+    virtual operator unsigned long() const;
+    virtual operator wchar_t() const;
+    virtual operator float() const;
+    virtual operator double() const;
+    virtual operator long double() const;
+
 private:
     bool value;
 };
@@ -63,20 +159,44 @@ private:
 class number : public shaun
 {
 public:
-    enum class Unit : int { deg, rad, none };
-
     number();
     number(const number& num);
-    number(double val, Unit u);
-    Type type();
 
-    Unit unit();
-    operator double() const { return value; }
+    number(bool, const std::string& u = "");
+    number(char, const std::string& u = "");
+    number(unsigned char, const std::string& u = "");
+    number(short int, const std::string& u = "");
+    number(unsigned short int, const std::string& u = "");
+    number(int, const std::string& u = "");
+    number(unsigned int, const std::string& u = "");
+    number(long, const std::string& u = "");
+    number(unsigned long, const std::string& u = "");
+    number(wchar_t, const std::string& u = "");
+    number(float, const std::string& u = "");
+    number(double, const std::string& u = "");
+    number(long double, const std::string& u = "");
 
-    
+    void visited(visitor& v);
+
+    const std::string& unit() const;
+ 
+    virtual operator bool() const;
+    virtual operator char() const;
+    virtual operator unsigned char() const;
+    virtual operator short() const;
+    virtual operator unsigned short() const;
+    virtual operator int() const;
+    virtual operator unsigned int() const;
+    virtual operator long() const;
+    virtual operator unsigned long() const;
+    virtual operator wchar_t() const;
+    virtual operator float() const;
+    virtual operator double() const;
+    virtual operator long double() const;
+
 private:
     double value;
-    Unit un;
+    std::string un;
 };
 
 class string : public shaun
@@ -85,11 +205,33 @@ public:
     string();
     string(const string& str);
     string(const std::string& str);
-    Type type();
+    string(const char * str);
 
-    explicit operator std::string() const
+    void visited(visitor& v);
+
+    operator std::string() const
     {
-        return value;
+      return value;
+    }
+
+    operator const char *() const
+    {
+      return value.c_str();
+    }
+
+    bool operator==(const char * str)
+    {
+      return value == str;
+    }
+
+    bool operator==(const std::string& str)
+    {
+      return value == str;
+    }
+
+    size_t size() const
+    {
+      return value.size();
     }
 private:
     std::string value;
@@ -99,9 +241,8 @@ class null : public shaun
 {
 public:
     null();
-    Type type();
 
-    bool is_null();
+    void visited(visitor& v);
 
     static null Null;
 };
@@ -109,29 +250,49 @@ public:
 class object : public shaun
 {
 public:
+    using map = std::map<std::string, std::shared_ptr<shaun> >;
+    using iterator = map::iterator;
+    using const_iterator = map::const_iterator;
+
     friend class sweeper;
+
     object();
     object(const object& obj);
+
     ~object();
-    Type type();
+    void visited(visitor& v);
 
     object& operator=(const object& obj);
 
     template<class C>
-    void add(std::pair<std::string, C *> pair);
+    void add(std::pair<std::string, C> pair);
 
     template<class C>
-    void add(const std::string& name, C * ptr);
+    void add(const std::string& name, C ptr);
+
+    iterator begin();
+    const_iterator begin() const;
+    iterator end();
+    const_iterator end() const;
 
     template<class C>
     C& get(const std::string& name);
 
-    Type type_of(const std::string& name);
+    template<class C>
+    C get_with_default(C, const std::string&) const;
+
+    template<class C>
+    const C& get(const std::string& name) const;
+
+    Type type_of(const std::string& name) const;
     
     size_t size() const;
+    virtual int index_of(shaun *child) const;
+
+    const std::map<std::string, std::shared_ptr<shaun> >& variables() const;
 private:
 
-    shaun * get_variable(const std::string& name);
+    shaun * get_variable(const std::string& name) const;
     std::map<std::string, std::shared_ptr<shaun> > variables_;
 };
 

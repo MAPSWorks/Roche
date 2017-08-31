@@ -1,41 +1,204 @@
 #include "shaun.hpp"
 #include <utility>
+#include <algorithm>
+#include <set>
 #include <sstream>
 #include <iostream>
+#include "visitor.hpp"
+#include "exception.hpp"
 
-#define TYPE_FUN(TYPE) Type TYPE::type() { return Type::TYPE; }
-// #define VISIT_FUN(x) void x::visited(visitor * visitor) { visitor->visit_ ## x () }
-#define OBJ_GET(x) template<>                              \
-    x& object::get<x> (const std::string& name)            \
-    {                                                      \
-        if (get_variable(name)->type() == Type::x)         \
-            return *(static_cast<x*>(get_variable(name))); \
-                                                           \
-        throw std::string("type missmatch");               \
+const char * NULL_STRING = "";
+
+#define VISIT_FUN(x) void x::visited(visitor& v) { v.visit_ ## x (*this); }
+#define OBJ_GET(x) template<>                                        \
+    x& object::get<x> (const std::string& name)                      \
+    {                                                                \
+        if (get_variable(name)->type() == Type::x)                   \
+            return *(static_cast<x*>(get_variable(name)));           \
+                                                                     \
+        throw type_error(Type::x, get_variable(name)->type(), name); \
+    }                                                                \
+    template<>                                                       \
+    const x& object::get<x> (const std::string& name) const          \
+    {                                                                \
+        if (get_variable(name)->type() == Type::x)                   \
+            return *(static_cast<const x*>(get_variable(name)));     \
+                                                                     \
+        throw type_error(Type::x, get_variable(name)->type(), name); \
+    }\
+    template<>\
+    x object::get_with_default<x>(x def, const std::string& name) const\
+    {\
+      try\
+      {\
+        return get<x>(name);\
+      }\
+      catch (...)\
+      {\
+        return def;\
+      }\
     }
 
+#define OBJ_GET_DEF_BOOL(x) template<>\
+    x object::get_with_default<x>(x def, const std::string& name) const\
+    {\
+      try\
+      {\
+        return get<boolean>(name);\
+      }\
+      catch (...)\
+      {\
+        return def;\
+      }\
+    }
+#define OBJ_GET_DEF_NUM(x) template<>\
+    x object::get_with_default<x>(x def, const std::string& name) const\
+    {\
+      try\
+      {\
+        return get<number>(name);\
+      }\
+      catch (...)\
+      {\
+        return def;\
+      }\
+    }
+
+#define OBJ_GET_DEF_STR(x) template<>\
+    x object::get_with_default<x>(x def, const std::string& name) const\
+    {\
+      try\
+      {\
+        return get<string>(name);\
+      }\
+      catch (...)\
+      {\
+        return def;\
+      }\
+    }
+
+
 #define OBJ_ADD(x) template<>                                               \
-    void object::add<x> (const std::string& name, x * ptr)                  \
+    void object::add<x> (const std::string& name, x v)                      \
     {                                                                       \
+        x * ptr = new x(v);                                                 \
         std::shared_ptr<shaun> to_add(ptr);                                 \
         variables_.insert(std::make_pair(name, to_add));                    \
     }                                                                       \
                                                                             \
     template<>                                                              \
-    void object::add<x> (std::pair<std::string, x *> pair)                  \
+    void object::add<x> (std::pair<std::string, x> pair)                    \
     {                                                                       \
-        std::shared_ptr<shaun> to_add(pair.second);                         \
+        x * ptr = new x(pair.second);                                       \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
         variables_.insert(std::make_pair(pair.first, to_add));              \
     }
 
+#define OBJ_ADD_PRIM_TO_BOOLEAN(x) template<>                               \
+  void object::add<x> (const std::string& name, x v)                        \
+  {                                                                         \
+    shaun * ptr = new boolean(v);                                           \
+    std::shared_ptr<shaun> to_add(ptr);                                     \
+    variables_.insert(std::make_pair(name, to_add));                        \
+  }                                                                         \
+                                                                            \
+    template<>                                                              \
+    void object::add<x> (std::pair<std::string, x> pair)                    \
+    {                                                                       \
+        shaun * ptr = new boolean(pair.second);                             \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(pair.first, to_add));              \
+    }
 
+#define OBJ_ADD_PRIM_TO_NUMBER(x) template<>                                \
+  void object::add<x> (const std::string& name, x v)                        \
+  {                                                                         \
+    shaun * ptr = new number(v);                                            \
+    std::shared_ptr<shaun> to_add(ptr);                                     \
+    variables_.insert(std::make_pair(name, to_add));                        \
+  }                                                                         \
+                                                                            \
+    template<>                                                              \
+    void object::add<x> (std::pair<std::string, x> pair)                    \
+    {                                                                       \
+        shaun * ptr = new number(pair.second);                              \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(pair.first, to_add));              \
+    }
+
+#define OBJ_ADD_PRIM_TO_STRING(x) template<>                                \
+    void object::add<x> (const std::string& name, x v)                      \
+    {                                                                       \
+        shaun * ptr = new string(v);                                        \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(name, to_add));                    \
+    }                                                                       \
+                                                                            \
+    template<>                                                              \
+    void object::add<x> (std::pair<std::string, x> pair)                    \
+    {                                                                       \
+        shaun * ptr = new string(pair.second);                              \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(pair.first, to_add));              \
+    }
 
 namespace shaun
 {
 
-bool shaun::is_null()
+std::ostream& operator<<(std::ostream& out, const exception& err)
 {
-    return false;
+    out << err.to_string();
+
+    return out;
+}
+
+shaun::shaun(Type t) : type_(t)
+{
+
+}
+
+bool shaun::is_null() const
+{
+    return type_ == Type::null;
+}
+
+int shaun::index_of(shaun *child) const
+{
+    return -1;
+}
+
+Type shaun::type() const
+{
+    return type_;
+}
+
+#define PRIM_CAST(type)\
+  shaun::operator type() const { return 0; }\
+  boolean::operator type() const { return value; }\
+  number::operator type() const { return value; }
+
+PRIM_CAST(bool)
+PRIM_CAST(char)
+PRIM_CAST(unsigned char)
+PRIM_CAST(short)
+PRIM_CAST(unsigned short)
+PRIM_CAST(int)
+PRIM_CAST(unsigned int)
+PRIM_CAST(long)
+PRIM_CAST(unsigned long)
+PRIM_CAST(wchar_t)
+PRIM_CAST(float)
+PRIM_CAST(double)
+PRIM_CAST(long double)
+
+shaun::operator std::string() const
+{
+  return std::string();
+}
+
+shaun::operator const char *() const
+{
+  return NULL_STRING;
 }
 
 /*****************************
@@ -44,14 +207,13 @@ bool shaun::is_null()
  *
  *****************************/
 
-TYPE_FUN(object)
-// VISIT_FUN(object);
+VISIT_FUN(object)
 
-object::object()
+object::object() : shaun(Type::object)
 {
 }
 
-object::object(const object& obj) : variables_(obj.variables_)
+object::object(const object& obj) : shaun(Type::object), variables_(obj.variables_)
 {
 }
 
@@ -65,7 +227,7 @@ object& object::operator=(const object& org)
     return *this;
 }
 
-shaun * object::get_variable(const std::string& name)
+shaun * object::get_variable(const std::string& name) const
 {
     try
     {
@@ -81,39 +243,104 @@ OBJ_GET(number)
 OBJ_GET(object)
 OBJ_GET(boolean)
 OBJ_GET(string)
-OBJ_GET(list)
+OBJ_GET_DEF_BOOL(bool)
+
+OBJ_GET_DEF_NUM(char)
+OBJ_GET_DEF_NUM(unsigned char)
+OBJ_GET_DEF_NUM(short int)
+OBJ_GET_DEF_NUM(unsigned short int)
+OBJ_GET_DEF_NUM(int)
+OBJ_GET_DEF_NUM(unsigned int)
+OBJ_GET_DEF_NUM(long)
+OBJ_GET_DEF_NUM(unsigned long)
+OBJ_GET_DEF_NUM(wchar_t)
+OBJ_GET_DEF_NUM(float)
+OBJ_GET_DEF_NUM(double)
+OBJ_GET_DEF_NUM(long double)
+
+OBJ_GET_DEF_STR(std::string)
 
 OBJ_ADD(number)
 OBJ_ADD(object)
 OBJ_ADD(boolean)
 OBJ_ADD(string)
 OBJ_ADD(list)
+OBJ_ADD_PRIM_TO_BOOLEAN(bool)
 
-template<> void object::add<null> (const std::string& name, null * ptr) { }
-template<> void object::add<null> (std::pair<std::string, null *> pair) { }
+OBJ_ADD_PRIM_TO_NUMBER(char)
+OBJ_ADD_PRIM_TO_NUMBER(unsigned char)
+OBJ_ADD_PRIM_TO_NUMBER(short int)
+OBJ_ADD_PRIM_TO_NUMBER(unsigned short int)
+OBJ_ADD_PRIM_TO_NUMBER(int)
+OBJ_ADD_PRIM_TO_NUMBER(unsigned int)
+OBJ_ADD_PRIM_TO_NUMBER(long)
+OBJ_ADD_PRIM_TO_NUMBER(unsigned long)
+OBJ_ADD_PRIM_TO_NUMBER(wchar_t)
+OBJ_ADD_PRIM_TO_NUMBER(float)
+OBJ_ADD_PRIM_TO_NUMBER(double)
+OBJ_ADD_PRIM_TO_NUMBER(long double)
+
+OBJ_ADD_PRIM_TO_STRING(std::string)
+OBJ_ADD_PRIM_TO_STRING(const std::string)
+OBJ_ADD_PRIM_TO_STRING(const char *)
+  
+object::iterator object::begin()
+{
+    return variables_.begin();
+}
+
+object::iterator object::end()
+{
+    return variables_.end();
+}
+
+object::const_iterator object::begin() const
+{
+    return variables_.begin();
+}
+
+object::const_iterator object::end() const
+{
+    return variables_.end();
+}
+
+template<> void object::add<null> (const std::string&, null) { }
+template<> void object::add<null> (std::pair<std::string, null>) { }
 
 template<>
-void object::add<shaun> (const std::string& name, shaun * ptr)
+void object::add<const shaun&> (const std::string& name, const shaun &ptr)
 {
-    switch (ptr->type())
+    switch (ptr.type())
     {
-        case Type::number: add<number> (name, static_cast<number*>(ptr)); break;
-        case Type::object: add<object> (name, static_cast<object*>(ptr)); break;
-        case Type::boolean: add<boolean> (name, static_cast<boolean*>(ptr)); break;
-        case Type::string: add<string> (name, static_cast<string*>(ptr)); break;
-        case Type::list: add<list> (name, static_cast<list*>(ptr)); break;
+        case Type::number:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new number(static_cast<const number&>(ptr)))));
+        break;
+        case Type::object:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new object(static_cast<const object&>(ptr)))));
+        break;
+        case Type::boolean:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new boolean(static_cast<const boolean&>(ptr)))));
+        break;
+        case Type::string:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new string(static_cast<const string&>(ptr)))));
+        break;
+        case Type::list:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new list(static_cast<const list&>(ptr)))));
+        break;
+
+        // no pollution
         case Type::null:
         default: break;
     }
 }
 
 template<>
-void object::add<shaun> (std::pair<std::string, shaun *> pair)
+void object::add<const shaun&> (std::pair<std::string, const shaun&> pair)
 {
-    add<shaun> (pair.first, pair.second);
+    add<const shaun&>(pair.first, pair.second);
 }
 
-Type object::type_of(const std::string& name)
+Type object::type_of(const std::string& name) const
 {
     return get_variable(name)->type();
 }
@@ -123,20 +350,32 @@ size_t object::size() const
   return variables_.size();
 }
 
+const std::map<std::string, std::shared_ptr<shaun> >& object::variables() const
+{
+    return variables_;
+}
+
+int object::index_of(shaun * child) const
+{
+    std::set<shaun*> elems;
+    std::transform(variables_.begin(), variables_.end(), std::inserter(elems, elems.begin())
+                   , [](const std::pair<std::string, std::shared_ptr<shaun> >& p) { return p.second.get(); });
+    return std::distance(elems.begin(), elems.find(child));
+}
+
 /*****************************
  *
  *     list functions
  *
  *****************************/
 
-TYPE_FUN(list)
-// VISIT_FUN(list);
+VISIT_FUN(list)
 
-list::list()
+list::list() : shaun(Type::list)
 {
 }
 
-list::list(const list& l) : elements_(l.elements_)
+list::list(const list& l) : shaun(Type::list), elements_(l.elements_)
 {
 }
 
@@ -144,10 +383,86 @@ list::~list()
 {
 }
 
-void list::push_back(shaun * elem)
+void list::push_back(const shaun& ptr)
 {
-    std::shared_ptr<shaun> ptr(elem);
-    elements_.push_back(ptr);
+    switch (ptr.type())
+    {
+        case Type::number:
+            elements_.push_back(std::shared_ptr<shaun>(new number(static_cast<const number&>(ptr))));
+        break;
+        case Type::object:
+            elements_.push_back(std::shared_ptr<shaun>(new object(static_cast<const object&>(ptr))));
+        break;
+        case Type::boolean:
+            elements_.push_back(std::shared_ptr<shaun>(new boolean(static_cast<const boolean&>(ptr))));
+        break;
+        case Type::string:
+            elements_.push_back(std::shared_ptr<shaun>(new string(static_cast<const string&>(ptr))));
+        break;
+        case Type::list:
+            elements_.push_back(std::shared_ptr<shaun>(new list(static_cast<const list&>(ptr))));
+        break;
+
+        // no pollution
+        case Type::null:
+        default: break;
+    }
+}
+
+#define LIST_PUSH_NUM(x) template<>\
+  void list::push_back<x>(x v)\
+  {\
+    elements_.push_back(std::shared_ptr<shaun>(new number(v)));\
+  }
+#define LIST_PUSH_BOOL(x) template<>\
+  void list::push_back<x>(x v)\
+  {\
+    elements_.push_back(std::shared_ptr<shaun>(new boolean(v)));\
+  }
+#define LIST_PUSH_STRING(x) template<>\
+  void list::push_back<x>(x v)\
+  {\
+    elements_.push_back(std::shared_ptr<shaun>(new string(v)));\
+  }
+
+LIST_PUSH_BOOL(bool)
+
+LIST_PUSH_NUM(char)
+LIST_PUSH_NUM(unsigned char)
+LIST_PUSH_NUM(short)
+LIST_PUSH_NUM(unsigned short)
+LIST_PUSH_NUM(int)
+LIST_PUSH_NUM(unsigned int)
+LIST_PUSH_NUM(long)
+LIST_PUSH_NUM(unsigned long)
+LIST_PUSH_NUM(wchar_t)
+LIST_PUSH_NUM(float)
+LIST_PUSH_NUM(double)
+LIST_PUSH_NUM(long double)
+
+LIST_PUSH_STRING(const std::string&)
+LIST_PUSH_STRING(std::string)
+LIST_PUSH_STRING(const char *)
+
+
+list::iterator list::begin()
+{
+    return elements_.begin();
+}
+
+list::iterator list::end()
+{
+    return elements_.end();
+}
+
+list::const_iterator list::begin() const
+{
+    return elements_.begin();
+}
+
+list::const_iterator list::end() const
+{
+    return elements_.end();
 }
 
 const std::vector<std::shared_ptr<shaun> >& list::elements()
@@ -155,19 +470,33 @@ const std::vector<std::shared_ptr<shaun> >& list::elements()
     return elements_;
 }
 
-shaun * list::operator[](size_t i)
+shaun& list::operator[](size_t i)
 {
-    return elements_[i].get();
+    return *elements_[i];
+}
+
+const shaun& list::operator[](size_t i) const
+{
+    return *elements_[i];
 }
 
 #define LIST_AT(TYPE) template<>\
-    TYPE& list::at(size_t i)\
+    TYPE& list::at<TYPE>(size_t i)\
     {\
         shaun * ptr = elements_[i].get();\
         if (ptr->type() != Type::TYPE)\
-            throw "type missmatch";\
+            throw type_error(Type::TYPE, ptr->type(), "list element");\
 \
         return *static_cast<TYPE*>(ptr);\
+    }\
+    template<>\
+    const TYPE& list::at<TYPE>(size_t i) const\
+    {\
+        shaun * ptr = elements_[i].get();\
+        if (ptr->type() != Type::TYPE)\
+            throw type_error(Type::TYPE, ptr->type(), "list element");\
+\
+        return *static_cast<const TYPE*>(ptr);\
     }
 
 LIST_AT(list)
@@ -181,27 +510,42 @@ size_t list::size() const
   return elements_.size();
 }
 
+int list::index_of(shaun *child) const
+{
+    return std::distance(elements_.begin(), std::find(elements_.begin(), elements_.end(), std::shared_ptr<shaun>(child)));
+}
+
 /*****************************
  *
  *     boolean functions
  *
  *****************************/
 
-TYPE_FUN(boolean)
-// VISIT_FUN(boolean);
+VISIT_FUN(boolean)
 
-boolean::boolean() : value(false)
+boolean::boolean() : shaun(Type::boolean), value(false)
 {
 }
 
-boolean::boolean(const boolean& b)
+boolean::boolean(const boolean& b) : shaun(Type::boolean), value(b.value)
 {
-    value = b.value;
 }
 
-boolean::boolean(bool yes) : value(yes)
-{
-}
+#define BOOLEAN_PRIM_CTOR(x) boolean::boolean(x val) : shaun(Type::boolean), value(val) {}
+BOOLEAN_PRIM_CTOR(bool)
+BOOLEAN_PRIM_CTOR(char)
+BOOLEAN_PRIM_CTOR(unsigned char)
+BOOLEAN_PRIM_CTOR(short int)
+BOOLEAN_PRIM_CTOR(unsigned short int)
+BOOLEAN_PRIM_CTOR(int)
+BOOLEAN_PRIM_CTOR(unsigned int)
+BOOLEAN_PRIM_CTOR(long)
+BOOLEAN_PRIM_CTOR(unsigned long)
+BOOLEAN_PRIM_CTOR(wchar_t)
+BOOLEAN_PRIM_CTOR(float)
+BOOLEAN_PRIM_CTOR(double)
+BOOLEAN_PRIM_CTOR(long double)
+
 
 /*****************************
  *
@@ -209,24 +553,34 @@ boolean::boolean(bool yes) : value(yes)
  *
  *****************************/
 
-TYPE_FUN(number)
-// VISIT_FUN(number);
+VISIT_FUN(number)
 
-number::number() : value(0), un(Unit::none)
+number::number() : shaun(Type::number), value(0), un("")
 {
 }
 
-number::number(const number& num)
+number::number(const number& num) : shaun(Type::number)
 {
     value = num.value;
     un    = num.un;
 }
 
-number::number(double val, Unit u) : value(val), un(u)
-{
-}
+#define NUMBER_PRIM_CTOR(x) number::number(x val, const std::string& u) : shaun(Type::number), value(val), un(u) {}
+NUMBER_PRIM_CTOR(bool)
+NUMBER_PRIM_CTOR(char)
+NUMBER_PRIM_CTOR(unsigned char)
+NUMBER_PRIM_CTOR(short int)
+NUMBER_PRIM_CTOR(unsigned short int)
+NUMBER_PRIM_CTOR(int)
+NUMBER_PRIM_CTOR(unsigned int)
+NUMBER_PRIM_CTOR(long)
+NUMBER_PRIM_CTOR(unsigned long)
+NUMBER_PRIM_CTOR(wchar_t)
+NUMBER_PRIM_CTOR(float)
+NUMBER_PRIM_CTOR(double)
+NUMBER_PRIM_CTOR(long double)
 
-number::Unit number::unit()
+const std::string& number::unit() const
 {
     return un;
 }
@@ -237,39 +591,38 @@ number::Unit number::unit()
  *
  *****************************/
 
-TYPE_FUN(string)
-// VISIT_FUN(string);
+VISIT_FUN(string)
 
-string::string()
+string::string() : shaun(Type::string)
 {
 }
 
-string::string(const string& str)
+string::string(const string& str) : shaun(Type::string), value(str.value)
 {
-    value = str.value;
 }
 
-string::string(const std::string& str)
+string::string(const std::string& str) : shaun(Type::string), value(str)
 {
-    value = str;
 }
+
+string::string(const char * str) : shaun(Type::string), value(str)
+{
+}
+                                
+
 /*****************************
  *
  *     null functions
  *
  *****************************/
- 
-TYPE_FUN(null)
-null::null()
+
+VISIT_FUN(null)
+
+null::null() : shaun(Type::null)
 {
 }
 
 null null::Null;
-
-bool null::is_null()
-{
-    return true;
-}
 
 std::string type_to_string(Type t)
 {
