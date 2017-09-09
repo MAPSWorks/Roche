@@ -1,11 +1,12 @@
-#include "shaun.hpp"
+#include <SHAUN/shaun.hpp>
 #include <utility>
 #include <algorithm>
 #include <set>
 #include <sstream>
 #include <iostream>
-#include "visitor.hpp"
-#include "exception.hpp"
+#include <iterator>
+#include <SHAUN/visitor.hpp>
+#include <SHAUN/exception.hpp>
 
 const char * NULL_STRING = "";
 
@@ -92,7 +93,25 @@ const char * NULL_STRING = "";
         x * ptr = new x(pair.second);                                       \
         std::shared_ptr<shaun> to_add(ptr);                                 \
         variables_.insert(std::make_pair(pair.first, to_add));              \
+    }                                                                       \
+                                                                            \
+    template<>                                                              \
+    void object::add<const x&> (const std::string& name, const x& v)        \
+    {                                                                       \
+        x * ptr = new x(v);                                                 \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(name, to_add));                    \
+    }                                                                       \
+                                                                            \
+    template<>                                                              \
+    void object::add<const x&> (std::pair<std::string, const x&> pair)      \
+    {                                                                       \
+        x * ptr = new x(pair.second);                                       \
+        std::shared_ptr<shaun> to_add(ptr);                                 \
+        variables_.insert(std::make_pair(pair.first, to_add));              \
     }
+
+
 
 #define OBJ_ADD_PRIM_TO_BOOLEAN(x) template<>                               \
   void object::add<x> (const std::string& name, x v)                        \
@@ -217,6 +236,7 @@ object::object(const object& obj) : shaun(Type::object), variables_(obj.variable
 {
 }
 
+
 object::~object()
 {
 }
@@ -229,20 +249,28 @@ object& object::operator=(const object& org)
 
 shaun * object::get_variable(const std::string& name) const
 {
-    try
-    {
-        return variables_.at(name).get();
-    }
-    catch (...)
-    {
-        return &null::Null;
-    }
+    return variables_.at(name).get();
 }
 
 OBJ_GET(number)
 OBJ_GET(object)
 OBJ_GET(boolean)
 OBJ_GET(string)
+
+template<>
+shaun& object::get<shaun>(const std::string& name)
+{
+  shaun * ret = get_variable(name);
+  return *ret;
+}
+
+template<>
+const shaun& object::get<shaun>(const std::string& name) const
+{
+  shaun * ret = get_variable(name);
+  return *ret;
+}
+
 OBJ_GET_DEF_BOOL(bool)
 
 OBJ_GET_DEF_NUM(char)
@@ -265,6 +293,8 @@ OBJ_ADD(object)
 OBJ_ADD(boolean)
 OBJ_ADD(string)
 OBJ_ADD(list)
+OBJ_ADD(null)
+
 OBJ_ADD_PRIM_TO_BOOLEAN(bool)
 
 OBJ_ADD_PRIM_TO_NUMBER(char)
@@ -281,7 +311,7 @@ OBJ_ADD_PRIM_TO_NUMBER(double)
 OBJ_ADD_PRIM_TO_NUMBER(long double)
 
 OBJ_ADD_PRIM_TO_STRING(std::string)
-OBJ_ADD_PRIM_TO_STRING(const std::string)
+OBJ_ADD_PRIM_TO_STRING(const std::string&)
 OBJ_ADD_PRIM_TO_STRING(const char *)
   
 object::iterator object::begin()
@@ -304,9 +334,6 @@ object::const_iterator object::end() const
     return variables_.end();
 }
 
-template<> void object::add<null> (const std::string&, null) { }
-template<> void object::add<null> (std::pair<std::string, null>) { }
-
 template<>
 void object::add<const shaun&> (const std::string& name, const shaun &ptr)
 {
@@ -327,9 +354,9 @@ void object::add<const shaun&> (const std::string& name, const shaun &ptr)
         case Type::list:
             variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new list(static_cast<const list&>(ptr)))));
         break;
-
-        // no pollution
         case Type::null:
+            variables_.insert(std::make_pair(name, std::shared_ptr<shaun>(new null())));
+        break;
         default: break;
     }
 }
@@ -402,9 +429,9 @@ void list::push_back(const shaun& ptr)
         case Type::list:
             elements_.push_back(std::shared_ptr<shaun>(new list(static_cast<const list&>(ptr))));
         break;
-
-        // no pollution
         case Type::null:
+            elements_.push_back(std::shared_ptr<shaun>(new null()));
+        break;
         default: break;
     }
 }
@@ -622,7 +649,7 @@ null::null() : shaun(Type::null)
 {
 }
 
-null null::Null;
+null::~null() {}
 
 std::string type_to_string(Type t)
 {
@@ -637,5 +664,26 @@ std::string type_to_string(Type t)
         default: return "unknown";
     }
 }
+
+template<class C>
+const C& to(const shaun& sh);
+#define TO(x) template<> const x & to(const shaun& sh) { if (sh.type() != Type::x) throw type_error(Type::x, sh.type(), "lol"); return *static_cast<const x*>(&sh); }
+
+TO(null)
+TO(list)
+TO(boolean)
+TO(number)
+TO(string)
+TO(object)
+
+#define CTOR_FROM_SHAUN(x) x::x(const shaun& sh) : x(to<x>(sh)) {}
+
+CTOR_FROM_SHAUN(null)
+CTOR_FROM_SHAUN(list)
+CTOR_FROM_SHAUN(boolean)
+CTOR_FROM_SHAUN(number)
+CTOR_FROM_SHAUN(string)
+CTOR_FROM_SHAUN(object)
+
 
 }  // namespace

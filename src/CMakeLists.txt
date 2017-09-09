@@ -52,7 +52,8 @@ target_include_directories(roche PRIVATE
 	${GLM_INCLUDE_DIRS}
 	${GLFW_INCLUDE_DIR}
 	${GLEW_INCLUDE_DIR}
-	${OPENGL_INCLUDE_DIR})
+	${OPENGL_INCLUDE_DIR}
+	../include/)
 
 target_link_libraries(roche 
 	${GLFW_LIBRARIES} 

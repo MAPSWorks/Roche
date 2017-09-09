@@ -21,8 +21,8 @@
 #include "renderer.hpp"
 #include "renderer_gl.hpp"
 
-#include "thirdparty/shaun/sweeper.hpp"
-#include "thirdparty/shaun/parser.hpp"
+#include <SHAUN/sweeper.hpp>
+#include <SHAUN/parser.hpp>
 
 #include <glm/ext.hpp>
 
@@ -896,9 +896,12 @@ vector<EntityHandle> Game::getTexLoadBodies(const EntityHandle &focusedEntity)
 	auto parents = focusedEntity.getAllParents();
 	v.insert(v.end(), parents.begin(), parents.end());
 
-	// All siblings visible
-	auto siblings = focusedEntity.getParent().getAllChildren();
-	v.insert(v.end(), siblings.begin(), siblings.end());
+	// All siblings visible (exclude level 1)
+	if (focusedEntity.getParent().getParent().exists())
+	{
+		auto siblings = focusedEntity.getParent().getAllChildren();
+		v.insert(v.end(), siblings.begin(), siblings.end());
+	}
 
 	// Only select bodies
 	v.erase(remove_if(v.begin(), v.end(), [](const EntityHandle &h){

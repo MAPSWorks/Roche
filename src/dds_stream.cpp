@@ -2,8 +2,8 @@
 
 #include "gl_util.hpp"
 
-#include "thirdparty/shaun/sweeper.hpp"
-#include "thirdparty/shaun/parser.hpp"
+#include <SHAUN/sweeper.hpp>
+#include <SHAUN/parser.hpp>
 
 #include <iostream>
 #include <fstream>

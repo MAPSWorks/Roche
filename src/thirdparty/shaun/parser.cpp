@@ -1,4 +1,4 @@
-#include "parser.hpp"
+#include <SHAUN/parser.hpp>
 
 namespace shaun
 {
@@ -31,6 +31,7 @@ private:
     number parse_number();
     boolean parse_boolean();
     list parse_list();
+    void parse_null();
 
     template<typename T> int signum(T val);
     
@@ -178,7 +179,7 @@ private:
         {
           auto sh = parse_variable();
             obj.add<const shaun&>(sh.first, *sh.second);
-            delete sh.second;
+              delete sh.second;
             skipws();
         }
 
@@ -244,6 +245,12 @@ private:
         if (c == '[')
         {
             ret = new list(parse_list());
+        }
+
+        if (c == 'n')
+        {
+            parse_null();
+            ret = new null();
         }
         
         if (ret)
@@ -318,7 +325,7 @@ private:
         }
 
         // discard last new line, if existing
-        if (str[str.size() - 1] == '\n') str.resize(str.size() - 1);
+        if (str.size() > 0 && str[str.size() - 1] == '\n') str.resize(str.size() - 1);
 
         PARSE_ASSERT(iss_->good(), unexpected EOF while parsing string);
 
@@ -404,12 +411,25 @@ private:
         {
           shaun * sh = parse_value();
             ret.push_back(*sh);
-            delete sh;
+              delete sh;
             skipws();
         }
 
         forward();
         return ret;
+    }
+
+    void parser::parse_null()
+    {
+      std::string ret;
+      char_type c;
+      while (isalpha(c = iss_->peek()))
+      {
+        ret.push_back(c);
+        forward();
+      }
+
+      PARSE_ASSERT(ret == "null", expected null value);
     }
 
     template<typename T> int parser::signum(T val)
@@ -431,7 +451,7 @@ private:
 
     object parse_file(const std::string& str)
     {
-      std::ifstream file(str);
+      std::ifstream file(str, std::ios::binary);
         return parser(file).parse();
     }
 } // namespace

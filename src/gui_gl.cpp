@@ -1,5 +1,7 @@
 #include "gui_gl.hpp"
 
+#include <algorithm>
+
 using namespace std;
 
 const size_t maxVertices = 10000;
@@ -34,7 +36,7 @@ void GuiGL::initGraphics(
 	glVertexArrayAttribFormat(_vao, VERTEX_ATTRIB_UV, 2, 
 		GL_FLOAT, false, offsetof(Vertex, u));
 
-	// Normals
+	// Colors
 	glEnableVertexArrayAttrib(_vao, VERTEX_ATTRIB_COLOR);
 	glVertexArrayAttribBinding(_vao, VERTEX_ATTRIB_COLOR, VERTEX_BINDING);
 	glVertexArrayAttribFormat(_vao, VERTEX_ATTRIB_COLOR, 4, 

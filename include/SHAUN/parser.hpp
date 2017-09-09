@@ -11,8 +11,8 @@
 #include <stack>
 #include <utility>
 #include <iostream>
-#include "shaun.hpp"
-#include "exception.hpp"
+#include <SHAUN/shaun.hpp>
+#include <SHAUN/exception.hpp>
 
 namespace shaun
 {
