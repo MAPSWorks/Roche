@@ -11,11 +11,11 @@
 - [ ] Do a compute depth buffer test instead of occlusion query for sun occlusion
 
 ### Stuff for later
-- [ ] Earth water moving normal map
 - [ ] Support custom models (asteroids, phobos, deimos)
 - [ ] Heightmap applied in tese shader
+- [ ] Break geometry into patches 
 - [ ] Vulkan implementation, one day
-- [ ] Auto-pilot tour
+- [ ] Make a video 
 
 ## Done
 
