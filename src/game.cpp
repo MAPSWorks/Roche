@@ -106,6 +106,9 @@ void Game::init()
 	_viewPolar.z = getFocusedBody().getParam().getModel().getRadius()*4;
 
 	// Window & context creation
+	glfwSetErrorCallback([](int error, const char* desc) {
+		cout << desc << endl;
+	});
 	if (!glfwInit())
 		throw runtime_error("Can't init GLFW");
 
@@ -127,17 +130,17 @@ void Game::init()
 		_fullscreen?monitor:nullptr, 
 		nullptr);
 
-	glfwSetWindowUserPointer(_win, this);
-
-	glfwSetScrollCallback(_win, [](GLFWwindow* win, double, double yoffset){
-		((Game*)glfwGetWindowUserPointer(win))->scrollFun(yoffset);
-	});
-
 	if (!_win)
 	{
 		glfwTerminate();
 		throw runtime_error("Can't open window");
 	}
+
+	glfwSetWindowUserPointer(_win, this);
+
+	glfwSetScrollCallback(_win, [](GLFWwindow* win, double, double yoffset){
+		((Game*)glfwGetWindowUserPointer(win))->scrollFun(yoffset);
+	});
 	glfwMakeContextCurrent(_win);
 
 	glewExperimental = true;
